@@ -1,0 +1,1620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Solar Panel Farm - Wireframe Particle Simulation</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html, body {
+    margin: 0; padding: 0; background: #ffffff; color: #2a2a2e;
+    font-family: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+    overflow: hidden; height: 100%;
+  }
+  #app { position: fixed; inset: 0; }
+  .hud {
+    position: fixed; left: 20px; bottom: 18px; font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(40, 40, 48, 0.55); pointer-events: none; user-select: none;
+  }
+  .hud b { color: rgba(20, 20, 24, 0.85); font-weight: 500; }
+  .corner {
+    position: fixed; right: 22px; top: 18px; font-size: 10px;
+    letter-spacing: 0.25em; text-transform: uppercase;
+    color: rgba(40, 40, 48, 0.5); text-align: right;
+    pointer-events: none; user-select: none;
+  }
+  .corner small { display: block; color: rgba(40, 40, 48, 0.35); font-size: 9px; margin-top: 4px; }
+  .robot-debug {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 70;
+    width: 286px;
+    max-height: calc(100vh - 36px);
+    overflow: auto;
+    padding: 12px;
+    background: rgba(250, 250, 252, 0.94);
+    border: 1px solid rgba(40, 40, 48, 0.14);
+    color: rgba(28, 28, 32, 0.78);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: 0 12px 34px rgba(40, 40, 48, 0.08);
+  }
+  .robot-debug__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    color: rgba(20, 20, 24, 0.9);
+    letter-spacing: 0.18em;
+  }
+  .robot-debug__title {
+    display: grid;
+    gap: 3px;
+  }
+  .robot-debug__title small {
+    color: rgba(40, 40, 48, 0.42);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+  }
+  .robot-debug__section {
+    margin: 11px 0 7px;
+    color: rgba(20, 20, 24, 0.78);
+    letter-spacing: 0.18em;
+  }
+  .robot-debug__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .robot-debug label {
+    display: grid;
+    gap: 4px;
+  }
+  .robot-debug input,
+  .robot-debug textarea {
+    width: 100%;
+    border: 1px solid rgba(40, 40, 48, 0.16);
+    background: rgba(255, 255, 255, 0.82);
+    color: rgba(20, 20, 24, 0.82);
+    font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0;
+    padding: 6px;
+    outline: none;
+  }
+  .robot-debug input:focus,
+  .robot-debug textarea:focus {
+    border-color: rgba(20, 20, 24, 0.38);
+  }
+  .robot-debug textarea {
+    height: 112px;
+    margin-top: 8px;
+    resize: none;
+    text-transform: none;
+  }
+  .robot-debug__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .robot-debug button {
+    flex: 1;
+    min-width: 74px;
+    border: 1px solid rgba(40, 40, 48, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 7px 8px;
+    color: rgba(20, 20, 24, 0.76);
+    font: inherit;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .robot-debug__toggle {
+    flex: 0 0 auto !important;
+    min-width: 58px !important;
+    padding: 6px 8px !important;
+  }
+  .robot-debug.is-collapsed {
+    width: 150px;
+    overflow: visible;
+  }
+  .robot-debug.is-collapsed .robot-debug__head {
+    margin-bottom: 0;
+  }
+  .robot-debug.is-collapsed .robot-debug__body {
+    display: none;
+  }
+  .robot-debug button:hover {
+    background: rgba(252, 225, 50, 0.24);
+    border-color: rgba(40, 40, 48, 0.28);
+  }
+  .robot-debug button.active {
+    background: rgba(252, 225, 50, 0.42);
+    border-color: rgba(40, 40, 48, 0.34);
+    color: rgba(20, 20, 24, 0.9);
+  }
+  #loader {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 14px; background: #ffffff; z-index: 50;
+    transition: opacity 0.8s ease; pointer-events: none;
+  }
+  #loader.gone { opacity: 0; }
+  .ring {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 1px solid rgba(40,40,48,0.15);
+    border-top-color: rgba(20,20,24,0.75);
+    animation: spin 1.1s linear infinite;
+  }
+  .lbl {
+    font-size: 10.5px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: rgba(40,40,48,0.6);
+  }
+  #lblText { min-width: 280px; text-align: center; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  canvas { display: block; }
+
+  .page-nav {
+    position: fixed;
+    top: 18px;
+    left: 22px;
+    z-index: 60;
+    display: flex;
+    gap: 20px;
+    font-size: 10.5px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+  .page-nav a {
+    color: rgba(40, 40, 48, 0.45);
+    text-decoration: none;
+    padding-bottom: 4px;
+    border-bottom: 1px solid transparent;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .page-nav a:hover { color: rgba(20, 20, 24, 0.85); }
+  .page-nav a.active {
+    color: rgba(20, 20, 24, 0.95);
+    border-bottom-color: rgba(20, 20, 24, 0.35);
+  }
+  @media (max-width: 700px) {
+    .page-nav {
+      top: 16px;
+      left: 18px;
+      gap: 16px;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+    }
+    .corner {
+      top: 48px;
+      left: 18px;
+      right: 18px;
+      max-width: calc(100vw - 36px);
+      text-align: left;
+      font-size: 9px;
+      line-height: 1.35;
+      letter-spacing: 0.2em;
+    }
+    .corner small {
+      font-size: 8px;
+      line-height: 1.4;
+    }
+    .hud {
+      left: 16px;
+      right: 16px;
+      bottom: 128px;
+      font-size: 10px;
+      line-height: 1.6;
+    }
+    .robot-debug {
+      left: 16px;
+      right: 16px;
+      bottom: 14px;
+      width: auto;
+    }
+  }
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="page-nav" aria-label="Scene pages">
+  <a href="city-particles.html">City</a>
+  <a class="active" href="solar-panel-farm.html">Solar farm</a>
+</nav>
+<div id="loader">
+  <div class="ring"></div>
+  <div class="lbl" id="lblText">Assembling photovoltaic field...</div>
+</div>
+<div class="corner">
+  SOLAR ARRAY FARM - 20 DEG PANEL TILT
+  <small>wireframe panels - irradiance particles</small>
+</div>
+<div class="hud">
+  <b>drag</b> to orbit &nbsp;-&nbsp; <b>scroll</b> to zoom &nbsp;-&nbsp; <b>right-drag</b> to pan
+</div>
+<div class="robot-debug" id="robotDebug">
+  <div class="robot-debug__head">
+    <div class="robot-debug__title">
+      <span>Debug</span>
+      <small>Skid + camera</small>
+    </div>
+    <button class="robot-debug__toggle" id="toggleDebugPanel" type="button">Hide</button>
+  </div>
+  <div class="robot-debug__body">
+    <div class="robot-debug__section">Skid Steer</div>
+    <div class="robot-debug__grid">
+      <label>X <input id="robotX" type="number" step="1" /></label>
+      <label>Z <input id="robotZ" type="number" step="1" /></label>
+      <label>Rot Deg <input id="robotRotation" type="number" step="1" /></label>
+      <label>Scale <input id="robotScale" type="number" min="0.2" max="1.4" step="0.01" /></label>
+    </div>
+    <div class="robot-debug__section">Camera</div>
+    <div class="robot-debug__grid">
+      <label>Cam X <input id="cameraX" type="number" step="1" /></label>
+      <label>Cam Y <input id="cameraY" type="number" step="1" /></label>
+      <label>Cam Z <input id="cameraZ" type="number" step="1" /></label>
+      <label>FOV <input id="cameraFov" type="number" min="20" max="100" step="1" /></label>
+      <label>Clip Near <input id="cameraNear" type="number" min="0.01" step="0.1" /></label>
+      <label>Clip Far <input id="cameraFar" type="number" min="1" step="100" /></label>
+      <label>Target X <input id="targetX" type="number" step="1" /></label>
+      <label>Target Y <input id="targetY" type="number" step="1" /></label>
+      <label>Target Z <input id="targetZ" type="number" step="1" /></label>
+      <label>Fade Near <input id="fadeNear" type="number" min="0" step="1" /></label>
+      <label>Fade Far <input id="fadeFar" type="number" min="1" step="1" /></label>
+    </div>
+    <textarea id="robotData" readonly spellcheck="false"></textarea>
+    <div class="robot-debug__actions">
+      <button id="toggleRobotMove" type="button">Move Off</button>
+      <button id="copyRobotData" type="button">Copy</button>
+      <button id="resetRobotData" type="button">Reset Bot</button>
+      <button id="resetCameraData" type="button">Reset Cam</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const container = document.getElementById('app');
+const lblText = document.getElementById('lblText');
+const loader = document.getElementById('loader');
+const robotDebugEls = {
+  panel: document.getElementById('robotDebug'),
+  x: document.getElementById('robotX'),
+  z: document.getElementById('robotZ'),
+  rotation: document.getElementById('robotRotation'),
+  scale: document.getElementById('robotScale'),
+  cameraX: document.getElementById('cameraX'),
+  cameraY: document.getElementById('cameraY'),
+  cameraZ: document.getElementById('cameraZ'),
+  cameraFov: document.getElementById('cameraFov'),
+  cameraNear: document.getElementById('cameraNear'),
+  cameraFar: document.getElementById('cameraFar'),
+  targetX: document.getElementById('targetX'),
+  targetY: document.getElementById('targetY'),
+  targetZ: document.getElementById('targetZ'),
+  fadeNear: document.getElementById('fadeNear'),
+  fadeFar: document.getElementById('fadeFar'),
+  data: document.getElementById('robotData'),
+  togglePanel: document.getElementById('toggleDebugPanel'),
+  move: document.getElementById('toggleRobotMove'),
+  copy: document.getElementById('copyRobotData'),
+  reset: document.getElementById('resetRobotData'),
+  resetCamera: document.getElementById('resetCameraData'),
+};
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0xffffff, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+const DEFAULT_CAMERA_X = 430;
+const DEFAULT_CAMERA_Y = 250;
+const DEFAULT_CAMERA_Z = 520;
+const DEFAULT_TARGET_X = 0;
+const DEFAULT_TARGET_Y = 18;
+const DEFAULT_TARGET_Z = 0;
+const DEFAULT_CAMERA_FOV = 68;
+const DEFAULT_CAMERA_NEAR = 1;
+const DEFAULT_CAMERA_FAR = 8000;
+const DEFAULT_FADE_NEAR = 8;
+const DEFAULT_FADE_FAR = 70;
+
+const camera = new THREE.PerspectiveCamera(
+  DEFAULT_CAMERA_FOV,
+  window.innerWidth / window.innerHeight,
+  DEFAULT_CAMERA_NEAR,
+  DEFAULT_CAMERA_FAR
+);
+camera.position.set(DEFAULT_CAMERA_X, DEFAULT_CAMERA_Y, DEFAULT_CAMERA_Z);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 45;
+controls.maxDistance = 2700;
+controls.maxPolarAngle = Math.PI * 0.58;
+controls.target.set(DEFAULT_TARGET_X, DEFAULT_TARGET_Y, DEFAULT_TARGET_Z);
+
+const GLOBE_R = 5200;
+const greyA  = new THREE.Color('#b0b0b5');
+const greyB  = new THREE.Color('#8a8a90');
+const greyC  = new THREE.Color('#cccdd0');
+const yellow = greyC;
+const yellowB = greyB;
+
+function makeSpriteTexture() {
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  g.addColorStop(0.00, 'rgba(255,255,255,1.00)');
+  g.addColorStop(0.10, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.28, 'rgba(255,255,255,0.42)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.14)');
+  g.addColorStop(0.80, 'rgba(255,255,255,0.04)');
+  g.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const sprite = makeSpriteTexture();
+const sharedUniforms = {
+  uTime: { value: 0 },
+  uMap: { value: sprite },
+  uPixelRatio: { value: renderer.getPixelRatio() },
+  uSphereR: { value: GLOBE_R },
+  uFadeNear: { value: DEFAULT_FADE_NEAR },
+  uFadeFar:  { value: DEFAULT_FADE_FAR },
+  uBgColor:  { value: new THREE.Color(0xffffff) },
+  uWobble:   { value: 0.28 },
+};
+
+const SKID_STATE_KEY = 'solar-skidsteer-transform-v1';
+const CAMERA_STATE_KEY = 'solar-camera-transform-v1';
+const DEBUG_PANEL_STATE_KEY = 'solar-debug-panel-v1';
+const DEFAULT_SKID_X = -170.81;
+const DEFAULT_SKID_Z = -238.74;
+const DEFAULT_SKID_ROTATION = -0.18;
+const DEFAULT_SKID_SCALE = 0.48;
+const skidState = {
+  x: 0,
+  z: 0,
+  rotation: 0,
+  scale: DEFAULT_SKID_SCALE,
+  initialized: false,
+};
+let skidSteerGroup = null;
+let suppressRobotInput = false;
+let suppressCameraInput = false;
+let robotMoveMode = false;
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function degToRad(deg) {
+  return deg * Math.PI / 180;
+}
+
+function radToDeg(rad) {
+  return rad * 180 / Math.PI;
+}
+
+function roundForDebug(value, digits = 2) {
+  return Number(value.toFixed(digits));
+}
+
+const pointVert = /* glsl */`
+  attribute float aSize;
+  attribute float aPhase;
+  varying vec3 vColor;
+  varying float vTwinkle;
+  varying float vFade;
+  varying float vBackface;
+  uniform float uTime;
+  uniform float uPixelRatio;
+  uniform float uSizeScale;
+  uniform float uSphereR;
+  uniform float uFadeNear;
+  uniform float uFadeFar;
+  uniform float uWobble;
+
+  vec3 wrapSphere(vec3 p) {
+    float R = uSphereR;
+    if (R < 1.0) return p;
+    float ax = p.z / R;
+    float az = -p.x / R;
+    float cx = cos(ax), sx = sin(ax);
+    vec3 d = vec3(0.0, cx, sx);
+    float cz = cos(az), sz = sin(az);
+    vec3 dir = vec3(d.x * cz - d.y * sz,
+                    d.x * sz + d.y * cz,
+                    d.z);
+    return vec3(0.0, -R, 0.0) + dir * (R + p.y);
+  }
+
+  void main() {
+    vColor = color;
+    vTwinkle = 0.78 + 0.22 * sin(uTime * 1.6 + aPhase * 3.3);
+    vec3 wob = vec3(
+      sin(uTime * 0.7 + aPhase * 2.3),
+      sin(uTime * 1.1 + aPhase * 1.7),
+      cos(uTime * 0.8 + aPhase * 2.9)
+    ) * uWobble;
+    vec3 wp = wrapSphere(position + wob);
+    vec3 outN = normalize(wp - vec3(0.0, -uSphereR, 0.0));
+    vec3 toCam = normalize(cameraPosition - wp);
+    vBackface = dot(outN, toCam);
+    vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+    gl_Position = projectionMatrix * mv;
+    float dist = -mv.z;
+    vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+    float size = aSize * uSizeScale * 140.0 * uPixelRatio;
+    float hazePuff = 1.0 + vFade * 1.6;
+    gl_PointSize = max(1.5, (size / max(0.001, dist)) * hazePuff);
+  }
+`;
+
+const pointFrag = /* glsl */`
+  varying vec3 vColor;
+  varying float vTwinkle;
+  varying float vFade;
+  varying float vBackface;
+  uniform sampler2D uMap;
+  uniform vec3 uBgColor;
+
+  void main() {
+    float horizonFade = smoothstep(-0.28, 0.08, vBackface);
+    vec4 tex = texture2D(uMap, gl_PointCoord);
+    if (tex.a < 0.02) discard;
+    vec3 col = mix(vColor * vTwinkle, uBgColor, vFade * 0.95);
+    float alpha = tex.a * (1.0 - vFade) * horizonFade;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+function makePointsMaterial(sizeScale = 1.0) {
+  return new THREE.ShaderMaterial({
+    uniforms: { ...sharedUniforms, uSizeScale: { value: sizeScale } },
+    vertexShader: pointVert,
+    fragmentShader: pointFrag,
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+  });
+}
+
+const modelVert = /* glsl */`
+  uniform float uSphereR;
+  uniform float uFadeNear;
+  uniform float uFadeFar;
+  varying vec3 vNormalW;
+  varying vec3 vWorldPos;
+  varying float vFade;
+
+  void main() {
+    vec3 wp;
+    vec3 wn;
+    if (uSphereR < 1.0) {
+      wp = position;
+      wn = normal;
+    } else {
+      float R = uSphereR;
+      float ax = position.z / R;
+      float az = -position.x / R;
+      float cx = cos(ax), sx = sin(ax);
+      float cz = cos(az), sz = sin(az);
+      mat3 Rx = mat3(
+        1.0, 0.0, 0.0,
+        0.0,  cx,  sx,
+        0.0, -sx,  cx
+      );
+      mat3 Rz = mat3(
+         cz, sz, 0.0,
+        -sz, cz, 0.0,
+        0.0, 0.0, 1.0
+      );
+      mat3 Rot = Rz * Rx;
+      wp = Rot * vec3(0.0, R + position.y, 0.0) + vec3(0.0, -R, 0.0);
+      wn = normalize(Rot * normal);
+    }
+    vNormalW = wn;
+    vWorldPos = wp;
+    vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+    gl_Position = projectionMatrix * mv;
+    float dist = -mv.z;
+    vFade = clamp((dist - 800.0) / 1900.0, 0.0, 1.0);
+  }
+`;
+
+const modelFrag = /* glsl */`
+  uniform vec3 uColor;
+  uniform vec3 uBgColor;
+  uniform float uGrainScale;
+  uniform float uDiscardBase;
+  uniform float uDiscardEdge;
+  uniform float uSphereR;
+  varying vec3 vNormalW;
+  varying vec3 vWorldPos;
+  varying float vFade;
+
+  float hash13(vec3 p3) {
+    p3 = fract(p3 * 0.1031);
+    p3 += dot(p3, p3.zyx + 31.32);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  void main() {
+    vec3 sphereOutN = normalize(vWorldPos - vec3(0.0, -uSphereR, 0.0));
+    vec3 sphereToCam = normalize(cameraPosition - vWorldPos);
+    float horizonFade = smoothstep(-0.28, 0.08, dot(sphereOutN, sphereToCam));
+
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float facing = abs(dot(normalize(vNormalW), viewDir));
+    float grain = hash13(vWorldPos * uGrainScale);
+    float threshold = uDiscardBase + uDiscardEdge * (1.0 - facing) + vFade * 0.16;
+    if (grain < threshold) discard;
+
+    vec3 lightDir = normalize(vec3(0.36, 0.94, 0.28));
+    float ndl = max(0.0, dot(normalize(vNormalW), lightDir));
+    float topness = clamp(vNormalW.y, 0.0, 1.0);
+    vec3 col = uColor * mix(0.55, 1.28, topness * 0.44 + ndl * 0.56);
+    col = mix(col, vec3(0.82, 0.82, 0.85), 0.12);
+    col = mix(col, uBgColor, vFade * 0.44);
+    gl_FragColor = vec4(col, horizonFade);
+  }
+`;
+
+const wireVert = /* glsl */`
+  uniform float uSphereR;
+  uniform float uFadeNear;
+  uniform float uFadeFar;
+  varying float vFade;
+  varying float vBackface;
+
+  void main() {
+    vec3 wp;
+    if (uSphereR < 1.0) {
+      wp = position;
+    } else {
+      float R = uSphereR;
+      float ax = position.z / R;
+      float az = -position.x / R;
+      float cx = cos(ax), sx = sin(ax);
+      float cz = cos(az), sz = sin(az);
+      mat3 Rx = mat3(1.0, 0.0, 0.0,  0.0, cx, sx,  0.0, -sx, cx);
+      mat3 Rz = mat3(cz, sz, 0.0,  -sz, cz, 0.0,  0.0, 0.0, 1.0);
+      mat3 Rot = Rz * Rx;
+      wp = Rot * vec3(0.0, R + position.y, 0.0) + vec3(0.0, -R, 0.0);
+    }
+    vec3 outN = normalize(wp - vec3(0.0, -uSphereR, 0.0));
+    vec3 toCam = normalize(cameraPosition - wp);
+    vBackface = dot(outN, toCam);
+    vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+    gl_Position = projectionMatrix * mv;
+    float dist = -mv.z;
+    vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+  }
+`;
+
+const wireFrag = /* glsl */`
+  uniform vec3 uColor;
+  uniform vec3 uBgColor;
+  uniform float uAlpha;
+  varying float vFade;
+  varying float vBackface;
+
+  void main() {
+    float horizonFade = smoothstep(-0.28, 0.08, vBackface);
+    vec3 col = mix(uColor, uBgColor, vFade * 0.85);
+    float alpha = uAlpha * (1.0 - vFade * 0.95) * horizonFade;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+function makeTransform(cx, cz, yaw, pitch, baseY = 1.55) {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  return function transform(x, y, z) {
+    const py = y * cp - z * sp;
+    const pz = y * sp + z * cp;
+    return [
+      cx + x * cy - pz * sy,
+      baseY + py,
+      cz + x * sy + pz * cy,
+    ];
+  };
+}
+
+function addBox(buffers, cx, cz, w, h, d, yaw, pitch, baseY = 1.55) {
+  const transform = makeTransform(cx, cz, yaw, pitch, baseY);
+  const hx = w * 0.5, hy = h * 0.5, hz = d * 0.5;
+  const corners = [
+    transform(-hx, -hy, -hz), transform( hx, -hy, -hz), transform( hx, -hy,  hz), transform(-hx, -hy,  hz),
+    transform(-hx,  hy, -hz), transform( hx,  hy, -hz), transform( hx,  hy,  hz), transform(-hx,  hy,  hz),
+  ];
+  if (!buffers) return { corners };
+
+  const faceDefs = [
+    [0,1,2,3], [4,7,6,5], [1,5,6,2],
+    [0,3,7,4], [3,2,6,7], [0,4,5,1],
+  ];
+  for (const face of faceDefs) {
+    const a = corners[face[0]], b = corners[face[1]], c = corners[face[2]], d0 = corners[face[3]];
+    const ab = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    const ac = new THREE.Vector3(c[0] - a[0], c[1] - a[1], c[2] - a[2]);
+    const n = new THREE.Vector3().crossVectors(ab, ac).normalize();
+    const start = buffers.positions.length / 3;
+    for (const p of [a, b, c, d0]) {
+      buffers.positions.push(p[0], p[1], p[2]);
+      buffers.normals.push(n.x, n.y, n.z);
+      if (buffers.hoverCenters) buffers.hoverCenters.push(cx, cz);
+    }
+    buffers.indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+  }
+  return { corners };
+}
+
+function addLine(linePositions, a, b) {
+  linePositions.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+}
+
+const BOX_EDGES = [
+  [0,1], [1,2], [2,3], [3,0], [4,5], [5,6],
+  [6,7], [7,4], [0,4], [1,5], [2,6], [3,7],
+];
+
+function localToWorld(lx, lz, yaw, ox = 0, oz = 0) {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  return [ox + lx * cy - lz * sy, oz + lx * sy + lz * cy];
+}
+
+function addWireBox(linePositions, cx, cz, w, h, d, yaw, pitch = 0, baseY = 1.55) {
+  const { corners } = addBox(null, cx, cz, w, h, d, yaw, pitch, baseY);
+  for (const edge of BOX_EDGES) addLine(linePositions, corners[edge[0]], corners[edge[1]]);
+  return corners;
+}
+
+function addCircle(linePositions, center, radius, normalAxis = 'y', segments = 20) {
+  const pts = [];
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    if (normalAxis === 'x') pts.push([center[0], center[1] + Math.cos(a) * radius, center[2] + Math.sin(a) * radius]);
+    else if (normalAxis === 'z') pts.push([center[0] + Math.cos(a) * radius, center[1] + Math.sin(a) * radius, center[2]]);
+    else pts.push([center[0] + Math.cos(a) * radius, center[1], center[2] + Math.sin(a) * radius]);
+  }
+  for (let i = 0; i < segments; i++) addLine(linePositions, pts[i], pts[(i + 1) % segments]);
+}
+
+function addJoint(linePositions, center, radius = 3.2) {
+  addCircle(linePositions, center, radius, 'x', 22);
+  addCircle(linePositions, center, radius * 0.75, 'y', 18);
+}
+
+function addLink(linePositions, a, b, thickness = 2.4) {
+  const dx = b[0] - a[0], dz = b[2] - a[2];
+  const yaw = Math.atan2(dx, dz);
+  const len = Math.hypot(dx, dz);
+  const cy = (a[1] + b[1]) * 0.5;
+  const pitch = -Math.atan2(b[1] - a[1], len);
+  addWireBox(linePositions, (a[0] + b[0]) * 0.5, (a[2] + b[2]) * 0.5, thickness, thickness, len, yaw, pitch, cy);
+}
+
+function defaultSkidState() {
+  return {
+    x: DEFAULT_SKID_X,
+    z: DEFAULT_SKID_Z,
+    rotation: DEFAULT_SKID_ROTATION,
+    scale: DEFAULT_SKID_SCALE,
+  };
+}
+
+function defaultCameraState() {
+  return {
+    x: DEFAULT_CAMERA_X,
+    y: DEFAULT_CAMERA_Y,
+    z: DEFAULT_CAMERA_Z,
+    targetX: DEFAULT_TARGET_X,
+    targetY: DEFAULT_TARGET_Y,
+    targetZ: DEFAULT_TARGET_Z,
+    fov: DEFAULT_CAMERA_FOV,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+  };
+}
+
+function normalizeCameraState(state) {
+  const defaults = defaultCameraState();
+  const near = clamp(Number.isFinite(state.near) ? state.near : defaults.near, 0.01, 2000);
+  const far = Math.max(near + 1, Math.min(Number.isFinite(state.far) ? state.far : defaults.far, 50000));
+  const fadeNear = clamp(Number.isFinite(state.fadeNear) ? state.fadeNear : defaults.fadeNear, 0, 10000);
+  const fadeFar = Math.max(fadeNear + 0.1, Math.min(Number.isFinite(state.fadeFar) ? state.fadeFar : defaults.fadeFar, 20000));
+  return {
+    x: Number.isFinite(state.x) ? state.x : defaults.x,
+    y: Number.isFinite(state.y) ? state.y : defaults.y,
+    z: Number.isFinite(state.z) ? state.z : defaults.z,
+    targetX: Number.isFinite(state.targetX) ? state.targetX : defaults.targetX,
+    targetY: Number.isFinite(state.targetY) ? state.targetY : defaults.targetY,
+    targetZ: Number.isFinite(state.targetZ) ? state.targetZ : defaults.targetZ,
+    fov: clamp(Number.isFinite(state.fov) ? state.fov : defaults.fov, 20, 100),
+    near,
+    far,
+    fadeNear,
+    fadeFar,
+  };
+}
+
+function readSavedCameraState() {
+  const defaults = defaultCameraState();
+  try {
+    const raw = localStorage.getItem(CAMERA_STATE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return normalizeCameraState(parsed);
+  } catch (e) {
+    return defaults;
+  }
+}
+
+function cameraDebugPayload() {
+  return {
+    position: {
+      x: roundForDebug(camera.position.x, 2),
+      y: roundForDebug(camera.position.y, 2),
+      z: roundForDebug(camera.position.z, 2),
+    },
+    target: {
+      x: roundForDebug(controls.target.x, 2),
+      y: roundForDebug(controls.target.y, 2),
+      z: roundForDebug(controls.target.z, 2),
+    },
+    fov: roundForDebug(camera.fov, 2),
+    clipping: {
+      near: roundForDebug(camera.near, 3),
+      far: roundForDebug(camera.far, 2),
+    },
+    fade: {
+      near: roundForDebug(sharedUniforms.uFadeNear.value, 2),
+      far: roundForDebug(sharedUniforms.uFadeFar.value, 2),
+    },
+  };
+}
+
+function saveCameraState() {
+  try {
+    localStorage.setItem(CAMERA_STATE_KEY, JSON.stringify({
+      x: camera.position.x,
+      y: camera.position.y,
+      z: camera.position.z,
+      targetX: controls.target.x,
+      targetY: controls.target.y,
+      targetZ: controls.target.z,
+      fov: camera.fov,
+      near: camera.near,
+      far: camera.far,
+      fadeNear: sharedUniforms.uFadeNear.value,
+      fadeFar: sharedUniforms.uFadeFar.value,
+    }));
+  } catch (e) {
+    console.warn('Unable to save camera transform:', e);
+  }
+}
+
+function applyCameraState(state, persist = true) {
+  const next = normalizeCameraState(state);
+  camera.position.set(next.x, next.y, next.z);
+  camera.fov = next.fov;
+  camera.near = next.near;
+  camera.far = next.far;
+  camera.updateProjectionMatrix();
+  sharedUniforms.uFadeNear.value = next.fadeNear;
+  sharedUniforms.uFadeFar.value = next.fadeFar;
+  controls.target.set(next.targetX, next.targetY, next.targetZ);
+  controls.update();
+  if (persist) saveCameraState();
+  updateCameraDebug();
+}
+
+function readSavedSkidState(farmYaw) {
+  try {
+    const raw = localStorage.getItem(SKID_STATE_KEY);
+    const defaults = defaultSkidState();
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return {
+      x: Number.isFinite(parsed.x) ? parsed.x : defaults.x,
+      z: Number.isFinite(parsed.z) ? parsed.z : defaults.z,
+      rotation: Number.isFinite(parsed.rotation) ? parsed.rotation : defaults.rotation,
+      scale: Number.isFinite(parsed.scale) ? clamp(parsed.scale, 0.2, 1.4) : DEFAULT_SKID_SCALE,
+    };
+  } catch (e) {
+    return defaultSkidState();
+  }
+}
+
+function saveSkidState() {
+  try {
+    localStorage.setItem(SKID_STATE_KEY, JSON.stringify({
+      x: skidState.x,
+      z: skidState.z,
+      rotation: skidState.rotation,
+      scale: skidState.scale,
+    }));
+  } catch (e) {
+    console.warn('Unable to save skid steer transform:', e);
+  }
+}
+
+function ensureSkidState(farmYaw) {
+  if (skidState.initialized) return;
+  Object.assign(skidState, readSavedSkidState(farmYaw), { initialized: true });
+}
+
+function robotDebugPayload() {
+  return {
+    x: roundForDebug(skidState.x, 2),
+    z: roundForDebug(skidState.z, 2),
+    rotationRad: roundForDebug(skidState.rotation, 4),
+    rotationDeg: roundForDebug(radToDeg(skidState.rotation), 2),
+    scale: roundForDebug(skidState.scale, 3),
+  };
+}
+
+function debugPayload() {
+  return {
+    skidSteer: robotDebugPayload(),
+    camera: cameraDebugPayload(),
+  };
+}
+
+function updateDebugData() {
+  if (robotDebugEls.data) {
+    robotDebugEls.data.value = JSON.stringify(debugPayload(), null, 2);
+  }
+}
+
+function updateRobotDebug() {
+  if (!robotDebugEls.x) return;
+  suppressRobotInput = true;
+  robotDebugEls.x.value = skidState.x.toFixed(1);
+  robotDebugEls.z.value = skidState.z.toFixed(1);
+  robotDebugEls.rotation.value = radToDeg(skidState.rotation).toFixed(1);
+  robotDebugEls.scale.value = skidState.scale.toFixed(2);
+  suppressRobotInput = false;
+  updateDebugData();
+}
+
+function cameraInputs() {
+  return [
+    robotDebugEls.cameraX,
+    robotDebugEls.cameraY,
+    robotDebugEls.cameraZ,
+    robotDebugEls.cameraFov,
+    robotDebugEls.cameraNear,
+    robotDebugEls.cameraFar,
+    robotDebugEls.targetX,
+    robotDebugEls.targetY,
+    robotDebugEls.targetZ,
+    robotDebugEls.fadeNear,
+    robotDebugEls.fadeFar,
+  ].filter(Boolean);
+}
+
+function updateCameraDebug() {
+  if (!robotDebugEls.cameraX) return;
+  if (cameraInputs().includes(document.activeElement)) {
+    updateDebugData();
+    return;
+  }
+  suppressCameraInput = true;
+  robotDebugEls.cameraX.value = camera.position.x.toFixed(1);
+  robotDebugEls.cameraY.value = camera.position.y.toFixed(1);
+  robotDebugEls.cameraZ.value = camera.position.z.toFixed(1);
+  robotDebugEls.cameraFov.value = camera.fov.toFixed(1);
+  robotDebugEls.cameraNear.value = camera.near.toFixed(2);
+  robotDebugEls.cameraFar.value = camera.far.toFixed(1);
+  robotDebugEls.targetX.value = controls.target.x.toFixed(1);
+  robotDebugEls.targetY.value = controls.target.y.toFixed(1);
+  robotDebugEls.targetZ.value = controls.target.z.toFixed(1);
+  robotDebugEls.fadeNear.value = sharedUniforms.uFadeNear.value.toFixed(1);
+  robotDebugEls.fadeFar.value = sharedUniforms.uFadeFar.value.toFixed(1);
+  suppressCameraInput = false;
+  updateDebugData();
+}
+
+function updateRobotMoveModeUI() {
+  robotDebugEls.move.textContent = robotMoveMode ? 'Move On' : 'Move Off';
+  robotDebugEls.move.classList.toggle('active', robotMoveMode);
+  renderer.domElement.style.cursor = robotMoveMode ? 'move' : '';
+}
+
+function applyRobotDebugInputs() {
+  if (suppressRobotInput) return;
+  const x = parseFloat(robotDebugEls.x.value);
+  const z = parseFloat(robotDebugEls.z.value);
+  const rotationDeg = parseFloat(robotDebugEls.rotation.value);
+  const scale = parseFloat(robotDebugEls.scale.value);
+  if (Number.isFinite(x)) skidState.x = x;
+  if (Number.isFinite(z)) skidState.z = z;
+  if (Number.isFinite(rotationDeg)) skidState.rotation = degToRad(rotationDeg);
+  if (Number.isFinite(scale)) skidState.scale = clamp(scale, 0.2, 1.4);
+  buildSkidSteerRobot();
+  saveSkidState();
+}
+
+function applyCameraDebugInputs() {
+  if (suppressCameraInput) return;
+  const x = parseFloat(robotDebugEls.cameraX.value);
+  const y = parseFloat(robotDebugEls.cameraY.value);
+  const z = parseFloat(robotDebugEls.cameraZ.value);
+  const fov = parseFloat(robotDebugEls.cameraFov.value);
+  const near = parseFloat(robotDebugEls.cameraNear.value);
+  const far = parseFloat(robotDebugEls.cameraFar.value);
+  const targetX = parseFloat(robotDebugEls.targetX.value);
+  const targetY = parseFloat(robotDebugEls.targetY.value);
+  const targetZ = parseFloat(robotDebugEls.targetZ.value);
+  const fadeNear = parseFloat(robotDebugEls.fadeNear.value);
+  const fadeFar = parseFloat(robotDebugEls.fadeFar.value);
+
+  applyCameraState({
+    x: Number.isFinite(x) ? x : camera.position.x,
+    y: Number.isFinite(y) ? y : camera.position.y,
+    z: Number.isFinite(z) ? z : camera.position.z,
+    fov: Number.isFinite(fov) ? fov : camera.fov,
+    near: Number.isFinite(near) ? near : camera.near,
+    far: Number.isFinite(far) ? far : camera.far,
+    targetX: Number.isFinite(targetX) ? targetX : controls.target.x,
+    targetY: Number.isFinite(targetY) ? targetY : controls.target.y,
+    targetZ: Number.isFinite(targetZ) ? targetZ : controls.target.z,
+    fadeNear: Number.isFinite(fadeNear) ? fadeNear : sharedUniforms.uFadeNear.value,
+    fadeFar: Number.isFinite(fadeFar) ? fadeFar : sharedUniforms.uFadeFar.value,
+  });
+}
+
+function setDebugPanelCollapsed(collapsed, persist = true) {
+  robotDebugEls.panel.classList.toggle('is-collapsed', collapsed);
+  robotDebugEls.togglePanel.textContent = collapsed ? 'Show' : 'Hide';
+  robotDebugEls.togglePanel.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  if (persist) {
+    try {
+      localStorage.setItem(DEBUG_PANEL_STATE_KEY, collapsed ? 'collapsed' : 'open');
+    } catch (e) {
+      console.warn('Unable to save debug panel state:', e);
+    }
+  }
+}
+
+function readDebugPanelCollapsed() {
+  try {
+    return localStorage.getItem(DEBUG_PANEL_STATE_KEY) === 'collapsed';
+  } catch (e) {
+    return false;
+  }
+}
+
+function disposeSkidObject(object) {
+  object.traverse((child) => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) child.material.dispose();
+  });
+}
+
+function buildSkidSteerRobot(farmYaw = skidState.rotation) {
+  ensureSkidState(farmYaw);
+  if (skidSteerGroup) {
+    scene.remove(skidSteerGroup);
+    disposeSkidObject(skidSteerGroup);
+  }
+
+  const linePositions = [];
+  const accentPositions = [];
+  const originX = skidState.x;
+  const originZ = skidState.z;
+  const yaw = skidState.rotation;
+  const modelScale = skidState.scale;
+
+  function place(lx, lz) {
+    return localToWorld(lx * modelScale, lz * modelScale, yaw, originX, originZ);
+  }
+  function box(lx, lz, w, h, d, baseY, pitch = 0, target = linePositions) {
+    const [x, z] = place(lx, lz);
+    return addWireBox(target, x, z, w * modelScale, h * modelScale, d * modelScale, yaw, pitch, baseY * modelScale);
+  }
+  function point(lx, y, lz) {
+    const [x, z] = place(lx, lz);
+    return [x, y * modelScale, z];
+  }
+
+  box(-13.5, 0, 6.2, 5.5, 34, 3.2);
+  box(13.5, 0, 6.2, 5.5, 34, 3.2);
+  box(0, -2, 25, 10, 28, 7.2);
+  box(0, -11, 18, 7, 10, 13.2);
+  box(0, 5, 18, 15, 14, 18.8);
+  box(0, 10.5, 13, 11, 10, 27.2);
+
+  for (const lx of [-13.5, 13.5]) {
+    for (const lz of [-12, 0, 12]) {
+      const p = point(lx, 3.1, lz);
+      addCircle(accentPositions, p, 2.6 * modelScale, 'x', 18);
+      addCircle(accentPositions, p, 1.5 * modelScale, 'x', 14);
+    }
+  }
+
+  const loaderLeftA = point(-10.5, 15, 1);
+  const loaderLeftB = point(-12.5, 23, 18);
+  const loaderRightA = point(10.5, 15, 1);
+  const loaderRightB = point(12.5, 23, 18);
+  addLink(linePositions, loaderLeftA, loaderLeftB, 1.7);
+  addLink(linePositions, loaderRightA, loaderRightB, 1.7);
+  addLine(accentPositions, loaderLeftB, loaderRightB);
+
+  const pedestal = box(0, 1, 10, 8, 10, 22.8);
+  const shoulder = point(0, 30, 3);
+  const elbow = point(12, 44, 20);
+  const wrist = point(-5, 35, 39);
+  const tool = point(-9, 28, 49);
+  addJoint(accentPositions, shoulder, 4.2 * modelScale);
+  addJoint(accentPositions, elbow, 3.6 * modelScale);
+  addJoint(accentPositions, wrist, 2.8 * modelScale);
+  addLink(linePositions, shoulder, elbow, 3.2 * modelScale);
+  addLink(linePositions, elbow, wrist, 2.7 * modelScale);
+  addLink(linePositions, wrist, tool, 2.0 * modelScale);
+
+  const gripperA = point(-16, 27, 54);
+  const gripperB = point(-2, 27, 55);
+  addLine(linePositions, tool, gripperA);
+  addLine(linePositions, tool, gripperB);
+  addLine(linePositions, gripperA, point(-18, 25, 58));
+  addLine(linePositions, gripperB, point(0, 25, 59));
+
+  for (const corner of pedestal) addLine(accentPositions, corner, shoulder);
+
+  skidSteerGroup = new THREE.Group();
+  skidSteerGroup.name = 'skidsteer-robot';
+
+  const bodyGeo = new THREE.BufferGeometry();
+  bodyGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+  const bodyMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#55565d') },
+      uAlpha: { value: 0.86 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  skidSteerGroup.add(new THREE.LineSegments(bodyGeo, bodyMat));
+
+  const accentGeo = new THREE.BufferGeometry();
+  accentGeo.setAttribute('position', new THREE.Float32BufferAttribute(accentPositions, 3));
+  const accentMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#8f9096') },
+      uAlpha: { value: 0.56 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  skidSteerGroup.add(new THREE.LineSegments(accentGeo, accentMat));
+  scene.add(skidSteerGroup);
+  updateRobotDebug();
+}
+
+function buildPanelFarm() {
+  lblText.textContent = 'Generating panel modules...';
+  const panels = [];
+  const yaw = -0.18;
+  const pitch = -0.34;
+  const blocks = [
+    { cx: -230, cz: -126, cols: 28, rows: 18 },
+    { cx:  206, cz: -126, cols: 28, rows: 18 },
+    { cx: -210, cz:  150, cols: 24, rows: 16 },
+    { cx:  238, cz:  150, cols: 30, rows: 16 },
+    { cx:   14, cz:  392, cols: 34, rows: 10 },
+  ];
+  const panelW = 10.5;
+  const panelD = 4.25;
+  const panelT = 0.42;
+  const colGap = 2.2;
+  const rowGap = 4.8;
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const tmp = new THREE.Vector3();
+
+  for (const block of blocks) {
+    for (let r = 0; r < block.rows; r++) {
+      for (let c = 0; c < block.cols; c++) {
+        const lx = (c - (block.cols - 1) * 0.5) * (panelW + colGap);
+        const lz = (r - (block.rows - 1) * 0.5) * (panelD + rowGap);
+        const jitter = Math.sin(c * 1.7 + r * 0.8) * 0.08;
+        tmp.set(
+          block.cx + lx * cy - lz * sy,
+          0,
+          block.cz + lx * sy + lz * cy
+        );
+        panels.push({
+          cx: tmp.x,
+          cz: tmp.z,
+          w: panelW,
+          d: panelD,
+          t: panelT,
+          yaw: yaw + jitter,
+          pitch: pitch + Math.sin(r * 0.75) * 0.018,
+        });
+      }
+    }
+  }
+
+  const wirePositions = [];
+  const railPositions = [];
+  const supportPositions = [];
+  const glintPositions = [];
+  const glintColors = [];
+  const glintSizes = [];
+  const glintPhases = [];
+  const lineColor = new THREE.Color();
+
+  for (let i = 0; i < panels.length; i++) {
+    const p = panels[i];
+    const { corners } = addBox(null, p.cx, p.cz, p.w, p.t, p.d, p.yaw, p.pitch);
+    const edges = [
+      [0,1], [1,2], [2,3], [3,0], [4,5], [5,6],
+      [6,7], [7,4], [0,4], [1,5], [2,6], [3,7],
+    ];
+    for (const e of edges) addLine(wirePositions, corners[e[0]], corners[e[1]]);
+
+    const transform = makeTransform(p.cx, p.cz, p.yaw, p.pitch);
+    const topZs = [-p.d * 0.17, p.d * 0.17];
+    for (const z of topZs) {
+      addLine(railPositions, transform(-p.w * 0.46, p.t * 0.76, z), transform(p.w * 0.46, p.t * 0.76, z));
+    }
+    addLine(railPositions, transform(0, p.t * 0.8, -p.d * 0.48), transform(0, p.t * 0.8, p.d * 0.48));
+
+    if (i % 2 === 0) {
+      const feet = [
+        transform(-p.w * 0.36, -p.t * 0.58, p.d * 0.28),
+        transform( p.w * 0.36, -p.t * 0.58, p.d * 0.28),
+      ];
+      for (const foot of feet) addLine(supportPositions, [foot[0], 0.08, foot[2]], foot);
+    }
+
+    for (let s = 0; s < 4; s++) {
+      const gx = -p.w * 0.42 + Math.random() * p.w * 0.84;
+      const gz = -p.d * 0.40 + Math.random() * p.d * 0.80;
+      const g = transform(gx, p.t * 0.86, gz);
+      glintPositions.push(g[0], g[1] + 0.08, g[2]);
+      if (Math.random() < 0.58) lineColor.copy(yellow).lerp(yellowB, Math.random() * 0.4);
+      else lineColor.copy(greyA).lerp(greyC, Math.random() * 0.45);
+      glintColors.push(lineColor.r, lineColor.g, lineColor.b);
+      glintSizes.push(1.15 + Math.random() * 1.25);
+      glintPhases.push(Math.random() * Math.PI * 2);
+    }
+  }
+
+  const wireGeo = new THREE.BufferGeometry();
+  wireGeo.setAttribute('position', new THREE.Float32BufferAttribute(wirePositions, 3));
+  const wireMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#8d8d93') },
+      uAlpha: { value: 0.68 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  scene.add(new THREE.LineSegments(wireGeo, wireMat));
+
+  const detailGeo = new THREE.BufferGeometry();
+  detailGeo.setAttribute('position', new THREE.Float32BufferAttribute(railPositions.concat(supportPositions), 3));
+  const detailMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#b5b5bb') },
+      uAlpha: { value: 0.42 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  scene.add(new THREE.LineSegments(detailGeo, detailMat));
+
+  const glintGeo = new THREE.BufferGeometry();
+  glintGeo.setAttribute('position', new THREE.Float32BufferAttribute(glintPositions, 3));
+  glintGeo.setAttribute('color', new THREE.Float32BufferAttribute(glintColors, 3));
+  glintGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(glintSizes, 1));
+  glintGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(glintPhases, 1));
+  scene.add(new THREE.Points(glintGeo, makePointsMaterial(1.08)));
+
+  buildServiceGrid(blocks, yaw);
+  buildInverterBoxes(yaw);
+  buildSkidSteerRobot(yaw);
+  return panels.length;
+}
+
+function buildServiceGrid(blocks, yaw) {
+  lblText.textContent = 'Wiring service lanes...';
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const linePositions = [];
+  const particlePos = [];
+  const particleCol = [];
+  const particleSize = [];
+  const particlePhase = [];
+  const c = new THREE.Color();
+
+  function local(x, z) {
+    return [x * cy - z * sy, 0.16, x * sy + z * cy];
+  }
+  const serviceRuns = [
+    [-585, -22, 585, -22],
+    [-560, 282, 560, 282],
+    [-24, -360, -24, 500],
+    [28, -360, 28, 500],
+    [-610, -342, 610, -342],
+    [-610, 520, 610, 520],
+  ];
+  for (const run of serviceRuns) {
+    const a = local(run[0], run[1]);
+    const b = local(run[2], run[3]);
+    addLine(linePositions, a, b);
+    const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
+    const steps = Math.floor(len / 3.8);
+    for (let i = 0; i < steps; i++) {
+      const t = i / Math.max(1, steps - 1);
+      const x = a[0] + (b[0] - a[0]) * t + (Math.random() - 0.5) * 1.4;
+      const z = a[2] + (b[2] - a[2]) * t + (Math.random() - 0.5) * 1.4;
+      particlePos.push(x, 0.22 + Math.random() * 0.2, z);
+      if (Math.random() < 0.22) c.copy(yellow).lerp(yellowB, Math.random() * 0.5);
+      else c.copy(greyA).lerp(greyB, Math.random() * 0.6);
+      particleCol.push(c.r, c.g, c.b);
+      particleSize.push(0.95 + Math.random() * 0.7);
+      particlePhase.push(Math.random() * Math.PI * 2);
+    }
+  }
+
+  const lineGeo = new THREE.BufferGeometry();
+  lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+  const lineMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#ababaf') },
+      uAlpha: { value: 0.32 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+  });
+  scene.add(new THREE.LineSegments(lineGeo, lineMat));
+
+  const pointGeo = new THREE.BufferGeometry();
+  pointGeo.setAttribute('position', new THREE.Float32BufferAttribute(particlePos, 3));
+  pointGeo.setAttribute('color', new THREE.Float32BufferAttribute(particleCol, 3));
+  pointGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(particleSize, 1));
+  pointGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(particlePhase, 1));
+  scene.add(new THREE.Points(pointGeo, makePointsMaterial(0.9)));
+}
+
+function buildInverterBoxes(yaw) {
+  const boxes = [
+    [-44, -18, 22, 10, 13],
+    [48, -18, 22, 10, 13],
+    [-48, 282, 20, 9, 12],
+    [48, 282, 20, 9, 12],
+    [-214, 506, 18, 8, 11],
+    [232, 506, 18, 8, 11],
+  ];
+  const wires = [];
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  for (const box of boxes) {
+    const x = box[0] * cy - box[1] * sy;
+    const z = box[0] * sy + box[1] * cy;
+    const { corners } = addBox(null, x, z, box[2], box[3], box[4], yaw, 0);
+    const edges = [
+      [0,1], [1,2], [2,3], [3,0], [4,5], [5,6],
+      [6,7], [7,4], [0,4], [1,5], [2,6], [3,7],
+    ];
+    for (const e of edges) addLine(wires, corners[e[0]], corners[e[1]]);
+  }
+
+  const wireGeo = new THREE.BufferGeometry();
+  wireGeo.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
+  const wireMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#8f8f95') },
+      uAlpha: { value: 0.58 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+  });
+  scene.add(new THREE.LineSegments(wireGeo, wireMat));
+}
+
+let eGeo;
+const EMBER_COUNT = 15500;
+const FLOW_BOUND = 1240;
+
+function buildEmbers() {
+  lblText.textContent = 'Seeding atmospheric particles...';
+  eGeo = new THREE.BufferGeometry();
+  const pos = new Float32Array(EMBER_COUNT * 3);
+  const col = new Float32Array(EMBER_COUNT * 3);
+  const sz  = new Float32Array(EMBER_COUNT);
+  const ph  = new Float32Array(EMBER_COUNT);
+  const c = new THREE.Color();
+
+  for (let i = 0; i < EMBER_COUNT; i++) {
+    pos[i*3+0] = (Math.random() * 2 - 1) * FLOW_BOUND;
+    pos[i*3+1] = Math.random() < 0.74
+      ? 0.4 + Math.random() * 24
+      : 24 + Math.random() * 210;
+    pos[i*3+2] = (Math.random() * 2 - 1) * FLOW_BOUND;
+    if (Math.random() < 0.30) c.copy(yellow).lerp(yellowB, Math.random() * 0.45);
+    else c.copy(greyA).lerp(greyB, Math.random() * 0.55);
+    const r = Math.hypot(pos[i*3+0], pos[i*3+2]);
+    c.multiplyScalar(Math.max(0.48, 1 - r / (FLOW_BOUND * 1.3)));
+    col[i*3+0] = c.r;
+    col[i*3+1] = c.g;
+    col[i*3+2] = c.b;
+    sz[i] = 1.0 + Math.random() * 1.45;
+    ph[i] = Math.random() * Math.PI * 2;
+  }
+  eGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  eGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  eGeo.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
+  eGeo.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
+  scene.add(new THREE.Points(eGeo, makePointsMaterial(0.95)));
+}
+
+function updateEmbers(dt, elapsed) {
+  if (!eGeo) return;
+  const arr = eGeo.attributes.position.array;
+  for (let i = 0; i < EMBER_COUNT; i++) {
+    const ix = i * 3;
+    const px = arr[ix + 0], py = arr[ix + 1], pz = arr[ix + 2];
+    const f1 = 0.0038, f2 = 0.0058, f3 = 0.0044;
+    const vx = (Math.sin(pz * f1 + elapsed * 0.32) + Math.cos(py * f2 + elapsed * 0.41)) * 8.4;
+    const vy = (Math.sin(px * f3 + elapsed * 0.27) - Math.cos(pz * f1 + elapsed * 0.34)) * 1.8;
+    const vz = (Math.cos(px * f1 + elapsed * 0.39) - Math.sin(py * f2 + elapsed * 0.30)) * 8.4;
+    arr[ix + 0] = px + vx * dt;
+    arr[ix + 1] = py + vy * dt;
+    arr[ix + 2] = pz + vz * dt;
+    const B = FLOW_BOUND;
+    if (arr[ix + 0] >  B) arr[ix + 0] = -B;
+    if (arr[ix + 0] < -B) arr[ix + 0] =  B;
+    if (arr[ix + 2] >  B) arr[ix + 2] = -B;
+    if (arr[ix + 2] < -B) arr[ix + 2] =  B;
+    if (arr[ix + 1] > 240) arr[ix + 1] = 0.4;
+    if (arr[ix + 1] < 0)   arr[ix + 1] = 240;
+  }
+  eGeo.attributes.position.needsUpdate = true;
+}
+
+const composer = {
+  render: () => renderer.render(scene, camera),
+  setSize: (w, h) => renderer.setSize(w, h),
+};
+
+const groundRaycaster = new THREE.Raycaster();
+const groundPointer = new THREE.Vector2();
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const robotDragPoint = new THREE.Vector3();
+const robotDrag = {
+  active: false,
+  pointerId: null,
+  offsetX: 0,
+  offsetZ: 0,
+};
+
+function getGroundPointFromEvent(event, target) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return false;
+
+  groundPointer.set(x * 2 - 1, -(y * 2 - 1));
+  groundRaycaster.setFromCamera(groundPointer, camera);
+  return !!groundRaycaster.ray.intersectPlane(groundPlane, target);
+}
+
+function robotHitRadius() {
+  return Math.max(14, 44 * skidState.scale);
+}
+
+function isPointerOnRobot(event) {
+  if (!skidState.initialized) return false;
+  if (!getGroundPointFromEvent(event, robotDragPoint)) return false;
+  return Math.hypot(robotDragPoint.x - skidState.x, robotDragPoint.z - skidState.z) <= robotHitRadius();
+}
+
+function startRobotDrag(event) {
+  if (event.button !== 0) return;
+  const canDrag = robotMoveMode
+    ? getGroundPointFromEvent(event, robotDragPoint)
+    : isPointerOnRobot(event);
+  if (!canDrag) return;
+  robotDrag.active = true;
+  robotDrag.pointerId = event.pointerId;
+  robotDrag.offsetX = skidState.x - robotDragPoint.x;
+  robotDrag.offsetZ = skidState.z - robotDragPoint.z;
+  controls.enabled = false;
+  renderer.domElement.setPointerCapture(event.pointerId);
+  event.preventDefault();
+}
+
+function moveRobotDrag(event) {
+  if (!robotDrag.active) return false;
+  if (getGroundPointFromEvent(event, robotDragPoint)) {
+    skidState.x = robotDragPoint.x + robotDrag.offsetX;
+    skidState.z = robotDragPoint.z + robotDrag.offsetZ;
+    buildSkidSteerRobot();
+    saveSkidState();
+  }
+  event.preventDefault();
+  return true;
+}
+
+function endRobotDrag(event) {
+  if (!robotDrag.active) return;
+  if (event.pointerId === robotDrag.pointerId && renderer.domElement.hasPointerCapture(event.pointerId)) {
+    renderer.domElement.releasePointerCapture(event.pointerId);
+  }
+  robotDrag.active = false;
+  robotDrag.pointerId = null;
+  controls.enabled = true;
+  saveSkidState();
+}
+
+function handlePointerMove(event) {
+  moveRobotDrag(event);
+}
+
+renderer.domElement.addEventListener('pointerdown', startRobotDrag);
+window.addEventListener('pointermove', handlePointerMove, { passive: false });
+window.addEventListener('pointerup', endRobotDrag);
+window.addEventListener('pointercancel', endRobotDrag);
+window.addEventListener('blur', () => {
+  if (robotDrag.active) {
+    robotDrag.active = false;
+    controls.enabled = true;
+  }
+});
+
+for (const input of [robotDebugEls.x, robotDebugEls.z, robotDebugEls.rotation, robotDebugEls.scale]) {
+  input.addEventListener('input', applyRobotDebugInputs);
+}
+
+for (const input of cameraInputs()) {
+  input.addEventListener('input', applyCameraDebugInputs);
+}
+
+controls.addEventListener('change', () => {
+  saveCameraState();
+  updateCameraDebug();
+});
+
+robotDebugEls.togglePanel.addEventListener('click', () => {
+  setDebugPanelCollapsed(!robotDebugEls.panel.classList.contains('is-collapsed'));
+});
+
+robotDebugEls.move.addEventListener('click', () => {
+  robotMoveMode = !robotMoveMode;
+  updateRobotMoveModeUI();
+});
+
+robotDebugEls.copy.addEventListener('click', async () => {
+  const value = robotDebugEls.data.value;
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch (e) {
+    robotDebugEls.data.select();
+    document.execCommand('copy');
+  }
+});
+
+robotDebugEls.reset.addEventListener('click', () => {
+  Object.assign(skidState, defaultSkidState(), { initialized: true });
+  buildSkidSteerRobot();
+  saveSkidState();
+});
+
+robotDebugEls.resetCamera.addEventListener('click', () => {
+  applyCameraState(defaultCameraState());
+});
+
+applyCameraState(readSavedCameraState(), false);
+updateRobotMoveModeUI();
+setDebugPanelCollapsed(readDebugPanelCollapsed(), false);
+updateCameraDebug();
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  sharedUniforms.uPixelRatio.value = renderer.getPixelRatio();
+});
+
+const clock = new THREE.Clock();
+
+function tick() {
+  const dt = Math.min(0.05, clock.getDelta());
+  const elapsed = clock.elapsedTime;
+  sharedUniforms.uTime.value = elapsed;
+  updateEmbers(dt, elapsed);
+  controls.update();
+  composer.render();
+  requestAnimationFrame(tick);
+}
+
+(function boot() {
+  const panelCount = buildPanelFarm();
+  buildEmbers();
+  lblText.textContent = `${panelCount.toLocaleString()} panels - wireframe array ready`;
+  loader.classList.add('gone');
+  setTimeout(() => loader.remove(), 900);
+  tick();
+})();
+</script>
+</body>
+</html>

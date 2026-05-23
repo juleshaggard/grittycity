@@ -1,0 +1,2475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Bangkok — Particle Simulation</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html, body {
+    margin: 0; padding: 0; background: #ffffff; color: #2a2a2e;
+    font-family: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+    overflow: hidden; height: 100%;
+  }
+  #app { position: fixed; inset: 0; }
+  .hud {
+    position: fixed; left: 20px; bottom: 18px; font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(40, 40, 48, 0.55); pointer-events: none; user-select: none;
+  }
+  .hud b { color: rgba(20, 20, 24, 0.85); font-weight: 500; }
+  .corner {
+    position: fixed; right: 22px; top: 18px; font-size: 10px;
+    letter-spacing: 0.25em; text-transform: uppercase;
+    color: rgba(40, 40, 48, 0.5); text-align: right;
+    pointer-events: none; user-select: none;
+  }
+  .corner small { display: block; color: rgba(40, 40, 48, 0.35); font-size: 9px; margin-top: 4px; }
+  #loader {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 14px; background: #ffffff; z-index: 50;
+    transition: opacity 0.8s ease; pointer-events: none;
+  }
+  #loader.gone { opacity: 0; }
+  .ring {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 1px solid rgba(40,40,48,0.15);
+    border-top-color: rgba(20,20,24,0.75);
+    animation: spin 1.1s linear infinite;
+  }
+  .lbl {
+    font-size: 10.5px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: rgba(40,40,48,0.6);
+  }
+  #lblText { min-width: 280px; text-align: center; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  canvas { display: block; }
+
+  /* top-left page nav — switches between scenes */
+  .page-nav {
+    position: fixed;
+    top: 18px;
+    left: 22px;
+    z-index: 60;
+    display: flex;
+    gap: 20px;
+    font-size: 10.5px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+  .page-nav a {
+    color: rgba(40, 40, 48, 0.45);
+    text-decoration: none;
+    padding-bottom: 4px;
+    border-bottom: 1px solid transparent;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .page-nav a:hover { color: rgba(20, 20, 24, 0.85); }
+  .page-nav a.active {
+    color: rgba(20, 20, 24, 0.95);
+    border-bottom-color: rgba(20, 20, 24, 0.35);
+  }
+  .debug-menu {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 70;
+    width: 286px;
+    max-height: calc(100vh - 36px);
+    overflow: auto;
+    padding: 12px;
+    background: rgba(250, 250, 252, 0.94);
+    border: 1px solid rgba(40, 40, 48, 0.14);
+    color: rgba(28, 28, 32, 0.78);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: 0 12px 34px rgba(40, 40, 48, 0.08);
+  }
+  .debug-menu__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    color: rgba(20, 20, 24, 0.9);
+    letter-spacing: 0.18em;
+  }
+  .debug-menu__title {
+    display: grid;
+    gap: 3px;
+  }
+  .debug-menu__title small {
+    color: rgba(40, 40, 48, 0.42);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+  }
+  .debug-menu__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .debug-menu label {
+    display: grid;
+    gap: 4px;
+  }
+  .debug-menu input,
+  .debug-menu textarea {
+    width: 100%;
+    border: 1px solid rgba(40, 40, 48, 0.16);
+    background: rgba(255, 255, 255, 0.82);
+    color: rgba(20, 20, 24, 0.82);
+    font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0;
+    padding: 6px;
+    outline: none;
+  }
+  .debug-menu input:focus,
+  .debug-menu textarea:focus {
+    border-color: rgba(20, 20, 24, 0.38);
+  }
+  .debug-menu textarea {
+    height: 112px;
+    margin-top: 8px;
+    resize: none;
+    text-transform: none;
+  }
+  .debug-menu__actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .debug-menu button {
+    flex: 1;
+    min-width: 74px;
+    border: 1px solid rgba(40, 40, 48, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 7px 8px;
+    color: rgba(20, 20, 24, 0.76);
+    font: inherit;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .debug-menu button:hover {
+    background: rgba(252, 225, 50, 0.24);
+    border-color: rgba(40, 40, 48, 0.28);
+  }
+  .debug-menu__toggle {
+    flex: 0 0 auto !important;
+    min-width: 58px !important;
+    padding: 6px 8px !important;
+  }
+  .debug-menu.is-collapsed {
+    width: 150px;
+    overflow: visible;
+  }
+  .debug-menu.is-collapsed .debug-menu__head {
+    margin-bottom: 0;
+  }
+  .debug-menu.is-collapsed .debug-menu__body {
+    display: none;
+  }
+  @media (max-width: 700px) {
+    .page-nav {
+      top: 16px;
+      left: 18px;
+      gap: 16px;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+    }
+    .corner {
+      top: 48px;
+      left: 18px;
+      right: 18px;
+      max-width: calc(100vw - 36px);
+      text-align: left;
+      font-size: 9px;
+      line-height: 1.35;
+      letter-spacing: 0.2em;
+    }
+    .corner small {
+      font-size: 8px;
+      line-height: 1.4;
+    }
+    .hud {
+      left: 16px;
+      right: 16px;
+      bottom: 14px;
+      font-size: 10px;
+      line-height: 1.6;
+    }
+    .debug-menu {
+      left: 16px;
+      right: 16px;
+      bottom: 14px;
+      width: auto;
+    }
+    .debug-menu.is-collapsed {
+      left: auto;
+      width: 150px;
+    }
+  }
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="page-nav" aria-label="Scene pages">
+  <a class="active" href="city-particles.html">City</a>
+  <a href="solar-panel-farm.html">Solar farm</a>
+</nav>
+<div id="loader">
+  <div class="ring"></div>
+  <div class="lbl" id="lblText">Loading Bangkok map data…</div>
+</div>
+<div class="corner">
+  BANGKOK · 13°45′N 100°30′E
+  <small>OSM aerial · night · ~02:47 local</small>
+</div>
+<div class="hud">
+  <b>drag</b> to orbit &nbsp;·&nbsp; <b>scroll</b> to zoom &nbsp;·&nbsp; <b>right-drag</b> to pan
+</div>
+<div class="debug-menu" id="cityDebug">
+  <div class="debug-menu__head">
+    <div class="debug-menu__title">
+      <span>Debug</span>
+      <small>City camera</small>
+    </div>
+    <button class="debug-menu__toggle" id="toggleDebugPanel" type="button">Hide</button>
+  </div>
+  <div class="debug-menu__body">
+    <div class="debug-menu__grid">
+      <label>Cam X <input id="cameraX" type="number" step="1" /></label>
+      <label>Cam Y <input id="cameraY" type="number" step="1" /></label>
+      <label>Cam Z <input id="cameraZ" type="number" step="1" /></label>
+      <label>FOV <input id="cameraFov" type="number" min="20" max="100" step="1" /></label>
+      <label>Clip Near <input id="cameraNear" type="number" min="0.01" step="0.1" /></label>
+      <label>Clip Far <input id="cameraFar" type="number" min="1" step="100" /></label>
+      <label>Target X <input id="targetX" type="number" step="1" /></label>
+      <label>Target Y <input id="targetY" type="number" step="1" /></label>
+      <label>Target Z <input id="targetZ" type="number" step="1" /></label>
+      <label>Fade Near <input id="fadeNear" type="number" min="0" step="1" /></label>
+      <label>Fade Far <input id="fadeFar" type="number" min="1" step="1" /></label>
+      <label>Max Polar Deg <input id="maxPolar" type="number" min="1" max="179" step="1" /></label>
+    </div>
+    <textarea id="debugData" readonly spellcheck="false"></textarea>
+    <div class="debug-menu__actions">
+      <button id="copyDebugData" type="button">Copy</button>
+      <button id="resetCameraData" type="button">Reset Cam</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+// ============================================================
+// CONFIG — central Bangkok bbox (Rattanakosin, Silom, Sathorn,
+// Chinatown, Sukhumvit beginning + Chao Phraya river bend)
+// ============================================================
+const BBOX = { south: 13.715, west: 100.490, north: 13.770, east: 100.555 };
+const CENTER_LAT = (BBOX.south + BBOX.north) / 2;
+const CENTER_LON = (BBOX.west  + BBOX.east ) / 2;
+
+// equirectangular projection → meters, then scale to scene units
+const M_PER_DEG_LAT = 110574;
+const M_PER_DEG_LON = 111320 * Math.cos(CENTER_LAT * Math.PI / 180);
+const SCENE_SCALE = 0.18; // 1 scene unit ≈ ~5.5 m
+
+function project(lat, lon) {
+  return new THREE.Vector2(
+    (lon - CENTER_LON) * M_PER_DEG_LON * SCENE_SCALE,
+    -(lat - CENTER_LAT) * M_PER_DEG_LAT * SCENE_SCALE
+  );
+}
+
+// ---------- renderer / scene / camera ----------
+const container = document.getElementById('app');
+const debugEls = {
+  panel: document.getElementById('cityDebug'),
+  cameraX: document.getElementById('cameraX'),
+  cameraY: document.getElementById('cameraY'),
+  cameraZ: document.getElementById('cameraZ'),
+  cameraFov: document.getElementById('cameraFov'),
+  cameraNear: document.getElementById('cameraNear'),
+  cameraFar: document.getElementById('cameraFar'),
+  targetX: document.getElementById('targetX'),
+  targetY: document.getElementById('targetY'),
+  targetZ: document.getElementById('targetZ'),
+  fadeNear: document.getElementById('fadeNear'),
+  fadeFar: document.getElementById('fadeFar'),
+  maxPolar: document.getElementById('maxPolar'),
+  data: document.getElementById('debugData'),
+  togglePanel: document.getElementById('toggleDebugPanel'),
+  copy: document.getElementById('copyDebugData'),
+  resetCamera: document.getElementById('resetCameraData'),
+};
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0xffffff, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff); // pure white, no gradient/vignette
+
+const CITY_CAMERA_STATE_KEY = 'city-camera-transform-v1';
+const CITY_DEBUG_PANEL_STATE_KEY = 'city-debug-panel-v1';
+const DEFAULT_CAMERA_X = 360;
+const DEFAULT_CAMERA_Y = 270;
+const DEFAULT_CAMERA_Z = 480;
+const DEFAULT_TARGET_X = 0;
+const DEFAULT_TARGET_Y = 0;
+const DEFAULT_TARGET_Z = 0;
+const DEFAULT_CAMERA_FOV = 72;
+const DEFAULT_CAMERA_NEAR = 1;
+const DEFAULT_CAMERA_FAR = 8000;
+const DEFAULT_FADE_NEAR = 8;
+const DEFAULT_FADE_FAR = 70;
+const DEFAULT_MAX_POLAR_DEG = 99;
+
+const camera = new THREE.PerspectiveCamera(
+  DEFAULT_CAMERA_FOV,
+  window.innerWidth / window.innerHeight,
+  DEFAULT_CAMERA_NEAR,
+  DEFAULT_CAMERA_FAR
+);
+camera.position.set(DEFAULT_CAMERA_X, DEFAULT_CAMERA_Y, DEFAULT_CAMERA_Z);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 30;
+controls.maxDistance = 3500;
+controls.maxPolarAngle = degToRad(DEFAULT_MAX_POLAR_DEG);
+controls.target.set(DEFAULT_TARGET_X, DEFAULT_TARGET_Y, DEFAULT_TARGET_Z);
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function degToRad(deg) {
+  return deg * Math.PI / 180;
+}
+
+function radToDeg(rad) {
+  return rad * 180 / Math.PI;
+}
+
+function roundForDebug(value, digits = 2) {
+  return Number(value.toFixed(digits));
+}
+
+// ============================================================
+// GLOBE — radius for spherical wrap (applied in vertex shader)
+// Larger = subtler curve; smaller = more dramatic globe feel.
+// ============================================================
+const GLOBE_R = 1900;
+
+// ---------- soft sprite texture ----------
+function makeSpriteTexture() {
+  // softer/wider gradient so every particle has its own glow halo;
+  // when particles cluster the halos overlap into volumetric glow
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+  g.addColorStop(0.00, 'rgba(255,255,255,1.00)');
+  g.addColorStop(0.10, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.28, 'rgba(255,255,255,0.42)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.14)');
+  g.addColorStop(0.80, 'rgba(255,255,255,0.04)');
+  g.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const sprite = makeSpriteTexture();
+
+// ---------- background — soft radial gradient (warm-white center → cool-grey horizon) ----------
+function makeBackgroundTexture() {
+  const s = 1024;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(s/2, s/2 - 100, 40, s/2, s/2, s/1.4);
+  g.addColorStop(0.00, '#ffffff');
+  g.addColorStop(0.45, '#f5f5f8');
+  g.addColorStop(0.80, '#e6e7ec');
+  g.addColorStop(1.00, '#d8dae2');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// ---------- shared point shader ----------
+const sharedUniforms = {
+  uTime: { value: 0 },
+  uMap: { value: sprite },
+  uPixelRatio: { value: renderer.getPixelRatio() },
+  uSphereR: { value: GLOBE_R },
+  // INVERTED fade — only the very-close band fades; everything else stays sharp at any orbit distance
+  uFadeNear: { value: DEFAULT_FADE_NEAR }, // closer than this = fully faded (basically inside a building)
+  uFadeFar:  { value: DEFAULT_FADE_FAR },  // past this = fully saturated; well below the orbit minDistance
+  uBgColor:  { value: new THREE.Color(0xffffff) }, // pure white — particles bleed straight into background
+  uWobble:   { value: 0.28 },    // per-particle position jitter amplitude (gives "alive" shimmer)
+};
+
+let suppressCameraInput = false;
+
+function defaultCameraState() {
+  return {
+    x: DEFAULT_CAMERA_X,
+    y: DEFAULT_CAMERA_Y,
+    z: DEFAULT_CAMERA_Z,
+    targetX: DEFAULT_TARGET_X,
+    targetY: DEFAULT_TARGET_Y,
+    targetZ: DEFAULT_TARGET_Z,
+    fov: DEFAULT_CAMERA_FOV,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  };
+}
+
+function normalizeCameraState(state) {
+  const defaults = defaultCameraState();
+  const near = clamp(Number.isFinite(state.near) ? state.near : defaults.near, 0.01, 2000);
+  const far = Math.max(near + 1, Math.min(Number.isFinite(state.far) ? state.far : defaults.far, 50000));
+  const fadeNear = clamp(Number.isFinite(state.fadeNear) ? state.fadeNear : defaults.fadeNear, 0, 10000);
+  const fadeFar = Math.max(fadeNear + 0.1, Math.min(Number.isFinite(state.fadeFar) ? state.fadeFar : defaults.fadeFar, 20000));
+  return {
+    x: Number.isFinite(state.x) ? state.x : defaults.x,
+    y: Number.isFinite(state.y) ? state.y : defaults.y,
+    z: Number.isFinite(state.z) ? state.z : defaults.z,
+    targetX: Number.isFinite(state.targetX) ? state.targetX : defaults.targetX,
+    targetY: Number.isFinite(state.targetY) ? state.targetY : defaults.targetY,
+    targetZ: Number.isFinite(state.targetZ) ? state.targetZ : defaults.targetZ,
+    fov: clamp(Number.isFinite(state.fov) ? state.fov : defaults.fov, 20, 100),
+    near,
+    far,
+    fadeNear,
+    fadeFar,
+    maxPolarDeg: clamp(Number.isFinite(state.maxPolarDeg) ? state.maxPolarDeg : defaults.maxPolarDeg, 1, 179),
+  };
+}
+
+function readSavedCameraState() {
+  try {
+    const raw = localStorage.getItem(CITY_CAMERA_STATE_KEY);
+    return raw ? normalizeCameraState(JSON.parse(raw)) : defaultCameraState();
+  } catch (e) {
+    return defaultCameraState();
+  }
+}
+
+function cameraDebugPayload() {
+  return {
+    position: {
+      x: roundForDebug(camera.position.x, 2),
+      y: roundForDebug(camera.position.y, 2),
+      z: roundForDebug(camera.position.z, 2),
+    },
+    target: {
+      x: roundForDebug(controls.target.x, 2),
+      y: roundForDebug(controls.target.y, 2),
+      z: roundForDebug(controls.target.z, 2),
+    },
+    fov: roundForDebug(camera.fov, 2),
+    clipping: {
+      near: roundForDebug(camera.near, 3),
+      far: roundForDebug(camera.far, 2),
+    },
+    fade: {
+      near: roundForDebug(sharedUniforms.uFadeNear.value, 2),
+      far: roundForDebug(sharedUniforms.uFadeFar.value, 2),
+    },
+    orbit: {
+      maxPolarDeg: roundForDebug(radToDeg(controls.maxPolarAngle), 2),
+      minDistance: roundForDebug(controls.minDistance, 2),
+      maxDistance: roundForDebug(controls.maxDistance, 2),
+    },
+  };
+}
+
+function updateDebugData() {
+  if (debugEls.data) debugEls.data.value = JSON.stringify({ camera: cameraDebugPayload() }, null, 2);
+}
+
+function saveCameraState() {
+  try {
+    localStorage.setItem(CITY_CAMERA_STATE_KEY, JSON.stringify({
+      x: camera.position.x,
+      y: camera.position.y,
+      z: camera.position.z,
+      targetX: controls.target.x,
+      targetY: controls.target.y,
+      targetZ: controls.target.z,
+      fov: camera.fov,
+      near: camera.near,
+      far: camera.far,
+      fadeNear: sharedUniforms.uFadeNear.value,
+      fadeFar: sharedUniforms.uFadeFar.value,
+      maxPolarDeg: radToDeg(controls.maxPolarAngle),
+    }));
+  } catch (e) {
+    console.warn('Unable to save city camera transform:', e);
+  }
+}
+
+function cameraInputs() {
+  return [
+    debugEls.cameraX,
+    debugEls.cameraY,
+    debugEls.cameraZ,
+    debugEls.cameraFov,
+    debugEls.cameraNear,
+    debugEls.cameraFar,
+    debugEls.targetX,
+    debugEls.targetY,
+    debugEls.targetZ,
+    debugEls.fadeNear,
+    debugEls.fadeFar,
+    debugEls.maxPolar,
+  ].filter(Boolean);
+}
+
+function updateCameraDebug() {
+  if (!debugEls.cameraX) return;
+  if (cameraInputs().includes(document.activeElement)) {
+    updateDebugData();
+    return;
+  }
+  suppressCameraInput = true;
+  debugEls.cameraX.value = camera.position.x.toFixed(1);
+  debugEls.cameraY.value = camera.position.y.toFixed(1);
+  debugEls.cameraZ.value = camera.position.z.toFixed(1);
+  debugEls.cameraFov.value = camera.fov.toFixed(1);
+  debugEls.cameraNear.value = camera.near.toFixed(2);
+  debugEls.cameraFar.value = camera.far.toFixed(1);
+  debugEls.targetX.value = controls.target.x.toFixed(1);
+  debugEls.targetY.value = controls.target.y.toFixed(1);
+  debugEls.targetZ.value = controls.target.z.toFixed(1);
+  debugEls.fadeNear.value = sharedUniforms.uFadeNear.value.toFixed(1);
+  debugEls.fadeFar.value = sharedUniforms.uFadeFar.value.toFixed(1);
+  debugEls.maxPolar.value = radToDeg(controls.maxPolarAngle).toFixed(1);
+  suppressCameraInput = false;
+  updateDebugData();
+}
+
+function applyCameraState(state, persist = true) {
+  const next = normalizeCameraState(state);
+  camera.position.set(next.x, next.y, next.z);
+  camera.fov = next.fov;
+  camera.near = next.near;
+  camera.far = next.far;
+  camera.updateProjectionMatrix();
+  sharedUniforms.uFadeNear.value = next.fadeNear;
+  sharedUniforms.uFadeFar.value = next.fadeFar;
+  controls.target.set(next.targetX, next.targetY, next.targetZ);
+  controls.maxPolarAngle = degToRad(next.maxPolarDeg);
+  controls.update();
+  if (persist) saveCameraState();
+  updateCameraDebug();
+}
+
+function applyCameraDebugInputs() {
+  if (suppressCameraInput) return;
+  applyCameraState({
+    x: Number.isFinite(parseFloat(debugEls.cameraX.value)) ? parseFloat(debugEls.cameraX.value) : camera.position.x,
+    y: Number.isFinite(parseFloat(debugEls.cameraY.value)) ? parseFloat(debugEls.cameraY.value) : camera.position.y,
+    z: Number.isFinite(parseFloat(debugEls.cameraZ.value)) ? parseFloat(debugEls.cameraZ.value) : camera.position.z,
+    fov: Number.isFinite(parseFloat(debugEls.cameraFov.value)) ? parseFloat(debugEls.cameraFov.value) : camera.fov,
+    near: Number.isFinite(parseFloat(debugEls.cameraNear.value)) ? parseFloat(debugEls.cameraNear.value) : camera.near,
+    far: Number.isFinite(parseFloat(debugEls.cameraFar.value)) ? parseFloat(debugEls.cameraFar.value) : camera.far,
+    targetX: Number.isFinite(parseFloat(debugEls.targetX.value)) ? parseFloat(debugEls.targetX.value) : controls.target.x,
+    targetY: Number.isFinite(parseFloat(debugEls.targetY.value)) ? parseFloat(debugEls.targetY.value) : controls.target.y,
+    targetZ: Number.isFinite(parseFloat(debugEls.targetZ.value)) ? parseFloat(debugEls.targetZ.value) : controls.target.z,
+    fadeNear: Number.isFinite(parseFloat(debugEls.fadeNear.value)) ? parseFloat(debugEls.fadeNear.value) : sharedUniforms.uFadeNear.value,
+    fadeFar: Number.isFinite(parseFloat(debugEls.fadeFar.value)) ? parseFloat(debugEls.fadeFar.value) : sharedUniforms.uFadeFar.value,
+    maxPolarDeg: Number.isFinite(parseFloat(debugEls.maxPolar.value)) ? parseFloat(debugEls.maxPolar.value) : radToDeg(controls.maxPolarAngle),
+  });
+}
+
+function setDebugPanelCollapsed(collapsed, persist = true) {
+  debugEls.panel.classList.toggle('is-collapsed', collapsed);
+  debugEls.togglePanel.textContent = collapsed ? 'Show' : 'Hide';
+  debugEls.togglePanel.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  if (persist) {
+    try {
+      localStorage.setItem(CITY_DEBUG_PANEL_STATE_KEY, collapsed ? 'collapsed' : 'open');
+    } catch (e) {
+      console.warn('Unable to save city debug panel state:', e);
+    }
+  }
+}
+
+function readDebugPanelCollapsed() {
+  try {
+    return localStorage.getItem(CITY_DEBUG_PANEL_STATE_KEY) === 'collapsed';
+  } catch (e) {
+    return false;
+  }
+}
+
+for (const input of cameraInputs()) {
+  input.addEventListener('input', applyCameraDebugInputs);
+}
+
+controls.addEventListener('change', () => {
+  saveCameraState();
+  updateCameraDebug();
+});
+
+debugEls.togglePanel.addEventListener('click', () => {
+  setDebugPanelCollapsed(!debugEls.panel.classList.contains('is-collapsed'));
+});
+
+debugEls.copy.addEventListener('click', async () => {
+  const value = debugEls.data.value;
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch (e) {
+    debugEls.data.select();
+    document.execCommand('copy');
+  }
+});
+
+debugEls.resetCamera.addEventListener('click', () => {
+  applyCameraState(defaultCameraState());
+});
+
+applyCameraState(readSavedCameraState(), false);
+setDebugPanelCollapsed(readDebugPanelCollapsed(), false);
+updateCameraDebug();
+
+const vert = /* glsl */`
+  attribute float aSize;
+  attribute float aPhase;
+  varying vec3 vColor;
+  varying float vTwinkle;
+  varying float vFade;
+  varying float vBackface;
+  uniform float uTime;
+  uniform float uPixelRatio;
+  uniform float uSizeScale;
+  uniform float uSphereR;
+  uniform float uFadeNear;
+  uniform float uFadeFar;
+  uniform float uWobble;
+
+  // Wrap a flat (x, y, z) plane point onto a sphere of radius R.
+  // The plane's origin sits on top of the sphere (north pole),
+  // (x, z) become arc-lengths in two perpendicular directions,
+  // y becomes radial elevation above the surface.
+  vec3 wrapSphere(vec3 p) {
+    float R = uSphereR;
+    if (R < 1.0) return p;
+    float ax = p.z / R;
+    float az = -p.x / R;
+    float cx = cos(ax), sx = sin(ax);
+    vec3 d = vec3(0.0, cx, sx);
+    float cz = cos(az), sz = sin(az);
+    vec3 dir = vec3(d.x * cz - d.y * sz,
+                    d.x * sz + d.y * cz,
+                    d.z);
+    return vec3(0.0, -R, 0.0) + dir * (R + p.y);
+  }
+
+  void main() {
+    vColor = color;
+    vTwinkle = 0.78 + 0.22 * sin(uTime * 1.6 + aPhase * 3.3);
+    // small per-particle wobble so dots breathe in place — flowy feel
+    vec3 wob = vec3(
+      sin(uTime * 0.7 + aPhase * 2.3),
+      sin(uTime * 1.1 + aPhase * 1.7),
+      cos(uTime * 0.8 + aPhase * 2.9)
+    ) * uWobble;
+    vec3 wp = wrapSphere(position + wob);
+    // back-face cull: hide anything on the far hemisphere of the globe
+    vec3 outN = normalize(wp - vec3(0.0, -uSphereR, 0.0));
+    vec3 toCam = normalize(cameraPosition - wp);
+    vBackface = dot(outN, toCam);
+    vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+    gl_Position = projectionMatrix * mv;
+    float dist = -mv.z;
+    // INVERTED: 1.0 at the camera, 0.0 at uFadeFar — so the frag shader fades CLOSE particles
+    vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+    // close particles puff into soft bokeh-ish blobs while they fade out (DoF feel)
+    float size = aSize * uSizeScale * 140.0 * uPixelRatio;
+    float hazePuff = 1.0 + vFade * 1.6;
+    gl_PointSize = max(1.5, (size / max(0.001, dist)) * hazePuff);
+  }
+`;
+const frag = /* glsl */`
+  varying vec3 vColor;
+  varying float vTwinkle;
+  varying float vFade;
+  varying float vBackface;
+  uniform sampler2D uMap;
+  uniform vec3 uBgColor;
+  void main() {
+    if (vBackface < 0.0) discard; // hide back hemisphere of globe
+    vec4 tex = texture2D(uMap, gl_PointCoord);
+    if (tex.a < 0.02) discard;
+    vec3 col = mix(vColor * vTwinkle, uBgColor, vFade * 0.95);
+    float alpha = tex.a * (1.0 - vFade);
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+function makePointsMaterial(sizeScale = 1.0) {
+  return new THREE.ShaderMaterial({
+    uniforms: { ...sharedUniforms, uSizeScale: { value: sizeScale } },
+    vertexShader: vert, fragmentShader: frag,
+    vertexColors: true, transparent: true, depthWrite: false,
+    blending: THREE.NormalBlending,
+  });
+}
+// keep time-uniform shared by reference
+function linkTimeUniform(mat) {
+  mat.uniforms.uTime = sharedUniforms.uTime;
+  mat.uniforms.uMap = sharedUniforms.uMap;
+  mat.uniforms.uPixelRatio = sharedUniforms.uPixelRatio;
+}
+
+// ---------- palette (greyscale only) ----------
+const greyA  = new THREE.Color('#b0b0b5'); // primary grey (lighter)
+const greyB  = new THREE.Color('#8a8a90'); // mid grey for variation
+const greyC  = new THREE.Color('#cccdd0'); // very light grey accent
+// yellow/yellowB are repurposed to grey shades so all "accent" particles read as light grey
+const yellow  = greyC;
+const yellowB = greyB;
+const warmA = greyA, warmB = greyC, warmC = greyB;
+const coolA = greyB, coolB = greyC;
+const goldHi = greyC;
+
+// ============================================================
+// OVERPASS QUERY — fetch buildings + Chao Phraya river
+// ============================================================
+const lblText = document.getElementById('lblText');
+const loader  = document.getElementById('loader');
+
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+];
+
+const query = `
+[out:json][timeout:120];
+(
+  way["building"](${BBOX.south},${BBOX.west},${BBOX.north},${BBOX.east});
+  way["waterway"="river"](${BBOX.south},${BBOX.west},${BBOX.north},${BBOX.east});
+  way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified)$"](${BBOX.south},${BBOX.west},${BBOX.north},${BBOX.east});
+);
+out tags geom;
+`;
+
+const OSM_CACHE_DB = 'city-particles-cache';
+const OSM_CACHE_STORE = 'osm';
+const OSM_CACHE_KEY = `bangkok-osm-v2:${BBOX.south},${BBOX.west},${BBOX.north},${BBOX.east}`;
+const OSM_CACHE_REFRESH_MS = 1000 * 60 * 60 * 24 * 14;
+const OSM_CACHE_RETRY_MS = 1000 * 60 * 60 * 24;
+
+function formatCacheAge(ms) {
+  const hours = Math.max(0, Math.floor(ms / (1000 * 60 * 60)));
+  if (hours < 1) return 'fresh';
+  if (hours < 48) return `${hours}h old`;
+  return `${Math.floor(hours / 24)}d old`;
+}
+
+function isValidOSMRecord(record) {
+  return record && record.data && Array.isArray(record.data.elements);
+}
+
+function openOSMCacheDB() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      reject(new Error('IndexedDB unavailable'));
+      return;
+    }
+    const req = indexedDB.open(OSM_CACHE_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(OSM_CACHE_STORE)) {
+        db.createObjectStore(OSM_CACHE_STORE, { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB open failed'));
+  });
+}
+
+function requestAsPromise(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB request failed'));
+  });
+}
+
+function transactionDone(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB transaction failed'));
+    tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+  });
+}
+
+function readLocalOSMCache() {
+  try {
+    const raw = localStorage.getItem(OSM_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    console.warn('Unable to read local OSM cache:', e);
+    return null;
+  }
+}
+
+function writeLocalOSMCache(record) {
+  try {
+    localStorage.setItem(OSM_CACHE_KEY, JSON.stringify(record));
+  } catch (e) {
+    console.warn('Unable to write local OSM cache:', e);
+  }
+}
+
+async function readOSMCache() {
+  try {
+    const db = await openOSMCacheDB();
+    const tx = db.transaction(OSM_CACHE_STORE, 'readonly');
+    const record = await requestAsPromise(tx.objectStore(OSM_CACHE_STORE).get(OSM_CACHE_KEY));
+    db.close();
+    return isValidOSMRecord(record) ? record : null;
+  } catch (e) {
+    const record = readLocalOSMCache();
+    return isValidOSMRecord(record) ? record : null;
+  }
+}
+
+async function writeOSMCache(data, savedAt = Date.now(), checkedAt = Date.now()) {
+  const record = { key: OSM_CACHE_KEY, savedAt, checkedAt, data };
+  try {
+    const db = await openOSMCacheDB();
+    const tx = db.transaction(OSM_CACHE_STORE, 'readwrite');
+    tx.objectStore(OSM_CACHE_STORE).put(record);
+    await transactionDone(tx);
+    db.close();
+  } catch (e) {
+    writeLocalOSMCache(record);
+  }
+}
+
+async function markOSMCacheChecked(record) {
+  if (!isValidOSMRecord(record)) return;
+  await writeOSMCache(record.data, record.savedAt || Date.now(), Date.now());
+}
+
+async function queryOverpass({ quiet = false } = {}) {
+  for (let i = 0; i < OVERPASS_ENDPOINTS.length; i++) {
+    const ep = OVERPASS_ENDPOINTS[i];
+    if (!quiet) lblText.textContent = `Querying OSM (${i + 1}/${OVERPASS_ENDPOINTS.length})…`;
+    try {
+      const res = await fetch(ep, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!quiet) lblText.textContent = 'Parsing response…';
+      const data = await res.json();
+      await writeOSMCache(data);
+      return data;
+    } catch (e) {
+      console.warn('Overpass endpoint failed:', ep, e);
+    }
+  }
+  throw new Error('All Overpass endpoints failed');
+}
+
+async function refreshOSMCache(record) {
+  await markOSMCacheChecked(record);
+  try {
+    await queryOverpass({ quiet: true });
+    console.info('OSM cache refreshed');
+  } catch (e) {
+    console.warn('Background OSM cache refresh failed:', e);
+  }
+}
+
+async function fetchOverpass() {
+  const cached = await readOSMCache();
+  if (isValidOSMRecord(cached)) {
+    const now = Date.now();
+    const ageMs = Math.max(0, now - (cached.savedAt || now));
+    const checkedAgeMs = Math.max(0, now - (cached.checkedAt || 0));
+    lblText.textContent = `Loading cached OSM (${formatCacheAge(ageMs)})…`;
+
+    if (ageMs > OSM_CACHE_REFRESH_MS && checkedAgeMs > OSM_CACHE_RETRY_MS) {
+      refreshOSMCache(cached);
+    }
+    return cached.data;
+  }
+
+  return queryOverpass();
+}
+
+// ============================================================
+// BUILD SCENE FROM OSM DATA
+// ============================================================
+let riverPath = []; // array of THREE.Vector2 in scene coords
+let riverCurve = null;
+let projectedBuildings = null; // populated by projectBuildings, consumed by mesh/wireframe builders
+let roads = [];                // array of polylines [{x,z},...] from OSM highways
+let buildingHitMesh = null;
+let hoveredBuildingIndex = null;
+let pendingBuildingHoverEvent = null;
+let buildingHoverRaf = 0;
+const buildingHoverRecords = [];
+const buildingHighlights = new Map();
+const BUILDING_HOVER_FADE_SECONDS = 0.5;
+const BUILDING_HOVER_COLOR = new THREE.Color('#FCE132');
+
+function buildFromOSM(data) {
+  // -------- separate buildings + rivers + roads --------
+  const buildings = [];     // { geom: [{lat,lon}...], tags }
+  const riverWaysGeom = []; // [[{lat,lon}...], ...]
+  const roadWays = [];      // raw highway way geometries
+
+  for (const el of data.elements) {
+    if (el.type !== 'way') continue;
+    const tags = el.tags || {};
+    if (tags.building && el.geometry && el.geometry.length >= 3) {
+      buildings.push({ geom: el.geometry, tags });
+    } else if (tags.waterway === 'river' && el.geometry && el.geometry.length > 1) {
+      riverWaysGeom.push(el.geometry);
+    } else if (tags.highway && el.geometry && el.geometry.length >= 2) {
+      roadWays.push(el.geometry);
+    }
+  }
+
+  // project roads to scene-space polylines once
+  roads = roadWays.map(g => g.map(p => {
+    const xy = project(p.lat, p.lon);
+    return { x: xy.x, z: xy.y };
+  }));
+
+  lblText.textContent = `Placing ${buildings.length.toLocaleString()} buildings…`;
+
+  // -------- river curve from longest contiguous river way --------
+  // pick the longest river way as the spine (likely the Chao Phraya main channel)
+  riverWaysGeom.sort((a, b) => b.length - a.length);
+  if (riverWaysGeom.length) {
+    const main = riverWaysGeom[0];
+    riverPath = main.map(p => project(p.lat, p.lon));
+  } else {
+    // fallback: synthesise an S-curve
+    riverPath = [
+      new THREE.Vector2(-700,  500),
+      new THREE.Vector2(-300,  300),
+      new THREE.Vector2(-80,   120),
+      new THREE.Vector2(  60,  -40),
+      new THREE.Vector2( 220, -180),
+      new THREE.Vector2( 540, -560),
+    ];
+  }
+  // build a 3D curve at y=0
+  const curvePts = riverPath.map(v => new THREE.Vector3(v.x, 0, v.y));
+  riverCurve = new THREE.CatmullRomCurve3(curvePts, false, 'centripetal', 0.5);
+
+  // -------- render ALL river ways as a low grey ribbon of points --------
+  buildRiverPoints(riverWaysGeom);
+
+  // -------- buildings → project geometry only (NO particles; wireframes carry the form) --------
+  const osmProjected = projectBuildings(buildings);
+  // populate the rest of the sphere
+  const procCity   = buildProceduralCityData();
+  const dataCenters = buildDataCenterClusters();
+  const solarFarms  = buildSolarFarmGrids();
+  projectedBuildings = osmProjected
+    .concat(procCity)
+    .concat(dataCenters)
+    .concat(solarFarms);
+  console.log('[city] buildings →', {
+    osm: osmProjected.length,
+    proceduralCity: procCity.length,
+    dataCenters: dataCenters.length,
+    solarFarms: solarFarms.length,
+    total: projectedBuildings.length,
+  });
+  lblText.textContent =
+    `${osmProjected.length.toLocaleString()} osm · ${procCity.length.toLocaleString()} city · ` +
+    `${dataCenters.length.toLocaleString()} datacenter · ${solarFarms.length.toLocaleString()} solar`;
+}
+
+// helper: build a rectangle footprint at (cx, cz) of size (w, d) as closed pts[]
+function rectPts(cx, cz, w, d) {
+  const hw = w * 0.5, hd = d * 0.5;
+  return [
+    { x: cx - hw, z: cz - hd },
+    { x: cx + hw, z: cz - hd },
+    { x: cx + hw, z: cz + hd },
+    { x: cx - hw, z: cz + hd },
+    { x: cx - hw, z: cz - hd },
+  ];
+}
+
+const BUILDING_BOX_LINE_EDGES = [
+  [0,1], [1,3], [3,2], [2,0],
+  [4,5], [5,7], [7,6], [6,4],
+  [0,4], [1,5], [2,6], [3,7],
+];
+
+function wrapSpherePointCPU(x, y, z) {
+  const R = GLOBE_R;
+  if (R < 1) return [x, y, z];
+  const ax = z / R;
+  const az = -x / R;
+  const cx = Math.cos(ax), sx = Math.sin(ax);
+  const cz = Math.cos(az), sz = Math.sin(az);
+  const dx = 0;
+  const dy = cx;
+  const dz = sx;
+  const dirX = dx * cz - dy * sz;
+  const dirY = dx * sz + dy * cz;
+  const dirZ = dz;
+  return [dirX * (R + y), -R + dirY * (R + y), dirZ * (R + y)];
+}
+
+function getBuildingBoxBounds(B, shrink = 0.05) {
+  if (!B || !B.pts || B.pts.length < 3) return null;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const p of B.pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.z < minZ) minZ = p.z;
+    if (p.z > maxZ) maxZ = p.z;
+  }
+  minX += shrink; maxX -= shrink;
+  minZ += shrink; maxZ -= shrink;
+  if (maxX <= minX || maxZ <= minZ) return null;
+  return { minX, maxX, minZ, maxZ, h: Math.max(0.4, B.heightU) };
+}
+
+function getBuildingBoxCorners(bounds) {
+  const { minX, maxX, minZ, maxZ, h } = bounds;
+  return [
+    [minX, 0, minZ], [minX, 0, maxZ], [minX, h, minZ], [minX, h, maxZ],
+    [maxX, 0, minZ], [maxX, 0, maxZ], [maxX, h, minZ], [maxX, h, maxZ],
+  ];
+}
+
+function getBuildingBoxFaces(bounds) {
+  const { minX, maxX, minZ, maxZ, h } = bounds;
+  return [
+    { n:[ 0,-1, 0], v:[[minX,0,minZ],[maxX,0,minZ],[maxX,0,maxZ],[minX,0,maxZ]] },
+    { n:[ 0, 1, 0], v:[[minX,h,minZ],[minX,h,maxZ],[maxX,h,maxZ],[maxX,h,minZ]] },
+    { n:[ 1, 0, 0], v:[[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]] },
+    { n:[-1, 0, 0], v:[[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]] },
+    { n:[ 0, 0, 1], v:[[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]] },
+    { n:[ 0, 0,-1], v:[[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]] },
+  ];
+}
+
+function appendBuildingBoxMesh(positions, normals, indices, hitPositions, bounds, vi, ii, vbase) {
+  const faces = getBuildingBoxFaces(bounds);
+  for (const face of faces) {
+    for (let k = 0; k < 4; k++) {
+      const p = face.v[k];
+      positions[vi*3+0] = p[0];
+      positions[vi*3+1] = p[1];
+      positions[vi*3+2] = p[2];
+      normals[vi*3+0] = face.n[0];
+      normals[vi*3+1] = face.n[1];
+      normals[vi*3+2] = face.n[2];
+      if (hitPositions) {
+        const wp = wrapSpherePointCPU(p[0], p[1], p[2]);
+        hitPositions[vi*3+0] = wp[0];
+        hitPositions[vi*3+1] = wp[1];
+        hitPositions[vi*3+2] = wp[2];
+      }
+      vi++;
+    }
+    indices[ii++] = vbase;
+    indices[ii++] = vbase + 1;
+    indices[ii++] = vbase + 2;
+    indices[ii++] = vbase;
+    indices[ii++] = vbase + 2;
+    indices[ii++] = vbase + 3;
+    vbase += 4;
+  }
+  return { vi, ii, vbase };
+}
+
+function makeBuildingFillGeometry(bounds) {
+  const positions = new Float32Array(24 * 3);
+  const normals = new Float32Array(24 * 3);
+  const indices = new Uint32Array(36);
+  appendBuildingBoxMesh(positions, normals, indices, null, bounds, 0, 0, 0);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  geo.setIndex(new THREE.BufferAttribute(indices, 1));
+  return geo;
+}
+
+function makeBuildingLineGeometry(bounds) {
+  const corners = getBuildingBoxCorners(bounds);
+  const positions = [];
+  for (const edge of BUILDING_BOX_LINE_EDGES) {
+    const a = corners[edge[0]];
+    const b = corners[edge[1]];
+    positions.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  return geo;
+}
+
+// helper: sample a position uniformly in an annulus [innerR, outerR]
+function sampleAnnulus(innerR, outerR) {
+  const u = Math.random();
+  const r = Math.sqrt(innerR * innerR + u * (outerR * outerR - innerR * innerR));
+  const a = Math.random() * Math.PI * 2;
+  return { cx: Math.cos(a) * r, cz: Math.sin(a) * r };
+}
+
+// Data centers: tight grids of identical small flat boxes (server warehouses).
+// Each cluster is a rectangular array of nearly-square footprints with uniform low height.
+function buildDataCenterClusters() {
+  const out = [];
+  const NUM_CLUSTERS = 200;          // dense coverage so the grid patterns read everywhere
+  const innerR = 760, outerR = 2950;
+
+  for (let c = 0; c < NUM_CLUSTERS; c++) {
+    const { cx, cz } = sampleAnnulus(innerR, outerR);
+    const cols = 5 + Math.floor(Math.random() * 7);   // 5..11
+    const rows = 4 + Math.floor(Math.random() * 6);   // 4..9
+    const spacing = 3.6 + Math.random() * 1.4;
+    const w = 2.8 + Math.random() * 0.6;
+    const d = 2.8 + Math.random() * 0.6;
+    const h = 1.4 + Math.random() * 1.0; // uniform per cluster (warehouse-style)
+    const x0 = cx - ((cols - 1) * spacing) / 2;
+    const z0 = cz - ((rows - 1) * spacing) / 2;
+
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const x = x0 + i * spacing;
+        const z = z0 + j * spacing;
+        out.push({
+          pts: rectPts(x, z, w, d),
+          heightU: h,
+          areaM2: (w * d) / (SCENE_SCALE * SCENE_SCALE),
+          tags: { kind: 'datacenter' },
+        });
+      }
+    }
+  }
+  return out;
+}
+
+// Solar farms: rows of long thin near-ground rectangles (PV panel arrays).
+// Multiple parallel rows make the array read as a single farm from above.
+function buildSolarFarmGrids() {
+  const out = [];
+  const NUM_FARMS = 140;             // many farms so parallel-row patterns dot the dome
+  const innerR = 800, outerR = 2950;
+
+  for (let f = 0; f < NUM_FARMS; f++) {
+    const { cx, cz } = sampleAnnulus(innerR, outerR);
+    const cols = 6 + Math.floor(Math.random() * 8);   // 6..13 (panels per row)
+    const rows = 4 + Math.floor(Math.random() * 5);   // 4..8 (number of rows)
+    const colSpacing = 5.5 + Math.random() * 1.0;
+    const rowSpacing = 3.2 + Math.random() * 0.8;
+    const w = 4.8 + Math.random() * 0.5; // long axis
+    const d = 1.6 + Math.random() * 0.4; // narrow axis
+    const h = 0.22 + Math.random() * 0.18;
+    const x0 = cx - ((cols - 1) * colSpacing) / 2;
+    const z0 = cz - ((rows - 1) * rowSpacing) / 2;
+
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const x = x0 + i * colSpacing;
+        const z = z0 + j * rowSpacing;
+        out.push({
+          pts: rectPts(x, z, w, d),
+          heightU: h,
+          areaM2: (w * d) / (SCENE_SCALE * SCENE_SCALE),
+          tags: { kind: 'solar' },
+        });
+      }
+    }
+  }
+  return out;
+}
+
+// Procedurally scatter axis-aligned rectangular buildings in an annulus around
+// the OSM area so the whole visible dome reads as a city, not just Bangkok.
+// Each entry matches the {pts, heightU, areaM2, tags} shape that the mesh and
+// wireframe builders consume, so they slot into the same merged draw calls.
+function buildProceduralCityData() {
+  const N = 22000;       // dense scatter so the dome reads as continuously built-up
+  const innerR = 720;    // start just outside the Bangkok bbox so we don't double up
+  const outerR = 2980;   // wraps onto ~π/2 of arc — covers the entire visible hemisphere
+  const out = [];
+
+  for (let i = 0; i < N; i++) {
+    const { cx, cz } = sampleAnnulus(innerR, outerR);
+
+    // bias footprint + height toward small (heavy tail of taller towers)
+    const w = 2.5 + Math.random() * Math.random() * 22;
+    const d = 2.5 + Math.random() * Math.random() * 22;
+    const tall = Math.random() < 0.06; // occasional tower
+    const h = tall
+      ? 6 + Math.random() * 30
+      : 1.2 + Math.random() * 5;
+
+    out.push({
+      pts: rectPts(cx, cz, w, d),
+      heightU: h,
+      areaM2: (w * d) / (SCENE_SCALE * SCENE_SCALE),
+      tags: {},
+    });
+  }
+  return out;
+}
+
+// projection-only pass: computes per-building {pts, heightU, areaM2, tags}
+function projectBuildings(buildings) {
+  const out = new Array(buildings.length);
+  for (let i = 0; i < buildings.length; i++) {
+    const b = buildings[i];
+    const t = b.tags || {};
+
+    // ---- height resolution ----
+    let h = 0;
+    if (t['height'])               h = parseFloat(t['height']);
+    else if (t['building:height']) h = parseFloat(t['building:height']);
+    else if (t['building:levels']) h = parseFloat(t['building:levels']) * 3.3;
+    if (!Number.isFinite(h) || h <= 0) {
+      const kind = (t['building'] || '').toLowerCase();
+      if (kind === 'apartments' || kind === 'residential') h = 9 + Math.random() * 6;
+      else if (kind === 'commercial' || kind === 'office' || kind === 'retail') h = 12 + Math.random() * 14;
+      else if (kind === 'temple' || kind === 'cathedral' || kind === 'church' || kind === 'mosque') h = 14 + Math.random() * 6;
+      else h = 4 + Math.random() * 4;
+    }
+    const heightU = h * SCENE_SCALE;
+
+    // ---- project polygon to scene coords ----
+    const g = b.geom;
+    const pts = new Array(g.length);
+    for (let j = 0; j < g.length; j++) {
+      const p = project(g[j].lat, g[j].lon);
+      pts[j] = { x: p.x, z: p.y };
+    }
+
+    // ---- approximate footprint area (m²) for downstream callers ----
+    let area2 = 0;
+    for (let j = 0, k = pts.length - 1; j < pts.length; k = j++) {
+      area2 += (pts[k].x + pts[j].x) * (pts[k].z - pts[j].z);
+    }
+    const areaScene = Math.abs(area2) * 0.5;
+    const areaM2 = areaScene / (SCENE_SCALE * SCENE_SCALE);
+
+    out[i] = { pts, heightU, areaM2, tags: t };
+  }
+  return out;
+}
+
+// ---------- BUILDINGS → 3D wireframe-of-windows particle shells ----------
+// Each building's footprint polygon is walked, and particles are placed along
+// every edge at multiple vertical "floor" levels — so each building appears as
+// a 3D shape made entirely of glowing window points.
+function buildBuildingPoints(buildings) {
+  // -------- pre-process: project polygons + compute heights + estimate counts --------
+  const projected = new Array(buildings.length); // [{pts: [{x,z}], height, tags}]
+  let total = 0;
+
+  // tuning — balanced for "dense but not overwhelming"
+  const FLOOR_H = 3.3 * SCENE_SCALE;       // scene-units per floor
+  const PERIM_SPACING = 3.2 * SCENE_SCALE; // sample every ~3.2m along the wall
+  const ROOF_DOT_AREA = 50;                // ~1 rooftop dot per N sq-meters
+  const OUTWARD_OFFSET = 0.38;             // push particles outside the box surface
+
+  for (let i = 0; i < buildings.length; i++) {
+    const b = buildings[i];
+    const t = b.tags;
+
+    // ---- height resolution ----
+    let h = 0;
+    if (t['height'])               h = parseFloat(t['height']);
+    else if (t['building:height']) h = parseFloat(t['building:height']);
+    else if (t['building:levels']) h = parseFloat(t['building:levels']) * 3.3;
+    if (!Number.isFinite(h) || h <= 0) {
+      // sensible default by building kind
+      const kind = (t['building'] || '').toLowerCase();
+      if (kind === 'apartments' || kind === 'residential') h = 9 + Math.random() * 6;
+      else if (kind === 'commercial' || kind === 'office' || kind === 'retail') h = 12 + Math.random() * 14;
+      else if (kind === 'temple' || kind === 'cathedral' || kind === 'church' || kind === 'mosque') h = 14 + Math.random() * 6;
+      else h = 4 + Math.random() * 4;
+    }
+    const heightU = h * SCENE_SCALE; // in scene units
+
+    // ---- project polygon to scene coords ----
+    const g = b.geom;
+    const pts = new Array(g.length);
+    for (let j = 0; j < g.length; j++) {
+      const p = project(g[j].lat, g[j].lon);
+      pts[j] = { x: p.x, z: p.y };
+    }
+
+    // ---- approx polygon area (shoelace) for roof dot count ----
+    let area2 = 0;
+    for (let j = 0, k = pts.length - 1; j < pts.length; k = j++) {
+      area2 += (pts[k].x + pts[j].x) * (pts[k].z - pts[j].z);
+    }
+    const areaScene = Math.abs(area2) * 0.5;
+    const areaM2 = areaScene / (SCENE_SCALE * SCENE_SCALE);
+
+    // ---- perimeter sample count + floor count ----
+    let perim = 0;
+    for (let j = 1; j < pts.length; j++) {
+      const dx = pts[j].x - pts[j-1].x, dz = pts[j].z - pts[j-1].z;
+      perim += Math.hypot(dx, dz);
+    }
+    const perimSamples = Math.max(6, Math.min(110, Math.ceil(perim / PERIM_SPACING)));
+
+    // floors actually rendered
+    let floors;
+    if (heightU < FLOOR_H * 1.5) floors = 1;
+    else if (heightU < FLOOR_H * 4)  floors = 3;
+    else if (heightU < FLOOR_H * 10) floors = Math.min(6, Math.floor(heightU / FLOOR_H / 1.5));
+    else floors = Math.min(18, Math.floor(heightU / FLOOR_H / 1.3));
+
+    // roof dots — visible on low buildings, sparse on towers
+    let roofDots = 0;
+    if (heightU < FLOOR_H * 4) {
+      roofDots = Math.min(60, Math.floor(areaM2 / ROOF_DOT_AREA));
+    } else if (heightU < FLOOR_H * 10) {
+      roofDots = Math.min(20, Math.floor(areaM2 / (ROOF_DOT_AREA * 2.5)));
+    } else {
+      roofDots = Math.min(10, Math.floor(areaM2 / (ROOF_DOT_AREA * 6)));
+    }
+
+    const count = perimSamples * floors + roofDots;
+    projected[i] = { pts, heightU, areaM2, perimSamples, floors, roofDots, tags: t };
+    total += count;
+  }
+
+  lblText.textContent = `Generating ${total.toLocaleString()} window lights…`;
+
+  // -------- allocate one big buffer for ALL buildings --------
+  const positions = new Float32Array(total * 3);
+  const colors    = new Float32Array(total * 3);
+  const sizes     = new Float32Array(total);
+  const phases    = new Float32Array(total);
+
+  const tmp = new THREE.Color();
+  let k = 0;
+
+  // helper: point-in-polygon for roof-dot rejection
+  function inside(x, z, poly) {
+    let ins = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].x, zi = poly[i].z, xj = poly[j].x, zj = poly[j].z;
+      const hit = ((zi > z) !== (zj > z)) &&
+        (x < (xj - xi) * (z - zi) / ((zj - zi) || 1e-9) + xi);
+      if (hit) ins = !ins;
+    }
+    return ins;
+  }
+
+  for (let i = 0; i < projected.length; i++) {
+    const B = projected[i];
+    const { pts, heightU, perimSamples, floors, roofDots, tags } = B;
+    const tall = heightU > 18 * SCENE_SCALE;
+    const veryTall = heightU > 40 * SCENE_SCALE;
+    const isLandmark = !!(tags.historic || tags.amenity === 'place_of_worship' ||
+                          ['temple','cathedral','mosque','church'].includes(tags.building));
+
+    // ---- walk the perimeter and place `perimSamples` points uniformly ----
+    // build cumulative arc length, then sample at equal spacing
+    const edges = pts.length - 1;
+    const segLens = new Float32Array(edges);
+    let totalLen = 0;
+    for (let j = 0; j < edges; j++) {
+      const dx = pts[j+1].x - pts[j].x, dz = pts[j+1].z - pts[j].z;
+      const L = Math.hypot(dx, dz);
+      segLens[j] = L;
+      totalLen += L;
+    }
+    if (totalLen < 1e-4) {
+      // degenerate; skip
+      continue;
+    }
+
+    // polygon centroid — used to push perimeter samples OUTWARD along edge normals
+    // so they sit on the outside of the dithered box, not occluded inside it
+    let cx0 = 0, cz0 = 0;
+    for (const p of pts) { cx0 += p.x; cz0 += p.z; }
+    cx0 /= pts.length; cz0 /= pts.length;
+
+    for (let s = 0; s < perimSamples; s++) {
+      // distance along perimeter
+      let d = (s / perimSamples) * totalLen;
+      // find which edge
+      let eIdx = 0;
+      while (eIdx < edges - 1 && d > segLens[eIdx]) { d -= segLens[eIdx]; eIdx++; }
+      const a = pts[eIdx], b = pts[eIdx + 1];
+      const tt = segLens[eIdx] > 0 ? d / segLens[eIdx] : 0;
+      let wx = a.x + (b.x - a.x) * tt;
+      let wz = a.z + (b.z - a.z) * tt;
+
+      // outward edge normal (perpendicular to edge, pointing away from centroid)
+      const edx = b.x - a.x, edz = b.z - a.z;
+      const elen = segLens[eIdx] || 1;
+      let nx = edz / elen, nz = -edx / elen;
+      const mx = (a.x + b.x) * 0.5 - cx0;
+      const mz = (a.z + b.z) * 0.5 - cz0;
+      if (mx * nx + mz * nz < 0) { nx = -nx; nz = -nz; }
+      wx += nx * OUTWARD_OFFSET;
+      wz += nz * OUTWARD_OFFSET;
+
+      for (let f = 0; f < floors; f++) {
+        const yFrac = floors === 1 ? 0.18 : f / (floors - 1);
+        const y = 0.15 + yFrac * heightU;
+
+        // every window is "lit" — no random skip (user wants dense particle clouds)
+
+        // color — grey base with a strong yellow accent presence (~32% windows + all landmarks)
+        const r = Math.random();
+        if (isLandmark) {
+          tmp.copy(yellow).lerp(yellowB, Math.random() * 0.5);
+        } else if (r < 0.32) {
+          tmp.copy(yellow).lerp(yellowB, Math.random() * 0.40);
+        } else if (r < 0.62) {
+          tmp.copy(greyA).lerp(greyB, Math.random() * 0.7);
+        } else if (r < 0.86) {
+          tmp.copy(greyA);
+        } else {
+          tmp.copy(greyA).lerp(greyC, Math.random() * 0.6);
+        }
+
+        // tighten brightness so colours stay strongly visible on white
+        tmp.multiplyScalar(0.88 + Math.random() * 0.12);
+
+        const ix = k * 3;
+        positions[ix + 0] = wx + (Math.random() - 0.5) * 0.06;
+        positions[ix + 1] = y + (Math.random() - 0.5) * 0.06;
+        positions[ix + 2] = wz + (Math.random() - 0.5) * 0.06;
+        colors[ix + 0] = tmp.r;
+        colors[ix + 1] = tmp.g;
+        colors[ix + 2] = tmp.b;
+        sizes[k] = (tall ? 1.9 : 1.6) * (0.8 + Math.random() * 0.5);
+        phases[k] = Math.random() * Math.PI * 2;
+        k++;
+      }
+    }
+
+    // ---- rooftop dots (street-lit roofs, AC units, low buildings) ----
+    if (roofDots > 0) {
+      // compute footprint bbox for sampling
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const p of pts) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.z < minZ) minZ = p.z;
+        if (p.z > maxZ) maxZ = p.z;
+      }
+      let placed = 0, tries = 0;
+      while (placed < roofDots && tries < roofDots * 12) {
+        tries++;
+        const rx = minX + Math.random() * (maxX - minX);
+        const rz = minZ + Math.random() * (maxZ - minZ);
+        if (!inside(rx, rz, pts)) continue;
+        const y = heightU + 0.05 + Math.random() * 0.12;
+
+        const r = Math.random();
+        if (r < 0.30) tmp.copy(yellow).lerp(yellowB, Math.random() * 0.4);
+        else tmp.copy(greyA).lerp(greyB, Math.random() * 0.6);
+        tmp.multiplyScalar(0.85 + Math.random() * 0.15);
+
+        const ix = k * 3;
+        positions[ix + 0] = rx;
+        positions[ix + 1] = y;
+        positions[ix + 2] = rz;
+        colors[ix + 0] = tmp.r; colors[ix + 1] = tmp.g; colors[ix + 2] = tmp.b;
+        sizes[k] = 1.8 * (0.75 + Math.random() * 0.5);
+        phases[k] = Math.random() * Math.PI * 2;
+        k++;
+        placed++;
+      }
+    }
+  }
+
+  // trim to actual filled count
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, k * 3), 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(colors.subarray(0, k * 3), 3));
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(sizes.subarray(0, k), 1));
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(phases.subarray(0, k), 1));
+  const mat = makePointsMaterial(1.0);
+  scene.add(new THREE.Points(geo, mat));
+
+  lblText.textContent = `${k.toLocaleString()} window lights · ${buildings.length.toLocaleString()} buildings`;
+
+  // expose for the box-mesh pass
+  projectedBuildings = projected;
+
+  // thicken the field with ambient street/alley particles around every building
+  buildBuildingAmbient(buildings, projected);
+}
+
+// ---------- RIVER → faint dark blue point ribbon along all river ways ----------
+function buildRiverPoints(riverWays) {
+  if (!riverWays.length) return;
+  const pts = [];
+  for (const way of riverWays) {
+    for (let i = 0; i < way.length - 1; i++) {
+      const a = project(way[i].lat, way[i].lon);
+      const b = project(way[i+1].lat, way[i+1].lon);
+      const dx = b.x - a.x, dz = b.y - a.y;
+      const len = Math.hypot(dx, dz);
+      const steps = Math.max(2, Math.floor(len / 1.5));
+      const nx = -dz / (len || 1), nz = dx / (len || 1);
+      for (let s = 0; s < steps; s++) {
+        const t = s / steps;
+        // jitter across width (~14 scene units = ~80m river width approx)
+        const off = (Math.random() - 0.5) * 14;
+        pts.push(a.x + dx * t + nx * off);
+        pts.push(0.05);
+        pts.push(a.y + dz * t + nz * off);
+      }
+    }
+  }
+  if (!pts.length) return;
+  const positions = new Float32Array(pts);
+  const N = positions.length / 3;
+  const colors = new Float32Array(N * 3);
+  const sizes  = new Float32Array(N);
+  const phases = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    // light grey ribbon for the river — slightly darker than the building ambient
+    const v = 0.55 + Math.random() * 0.12;
+    colors[i*3+0] = v * greyB.r * 1.5;
+    colors[i*3+1] = v * greyB.g * 1.5;
+    colors[i*3+2] = v * greyB.b * 1.5;
+    sizes[i] = 0.8 + Math.random() * 0.6;
+    phases[i] = Math.random() * Math.PI * 2;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(sizes, 1));
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(phases, 1));
+  const mat = makePointsMaterial(0.8);
+  scene.add(new THREE.Points(geo, mat));
+}
+
+// ---------- BUILDING BOXES — merged 3D extrusions ----------
+// One axis-aligned box per building, sized from the polygon's bounding box +
+// its computed height. All boxes merge into a single BufferGeometry so the
+// whole city renders in one draw call. Sphere-wrap and depth-fade live in
+// the vertex shader so the boxes curve onto the globe just like the points.
+const meshVert = /* glsl */`
+  uniform float uSphereR;
+  uniform float uFadeNear;
+  uniform float uFadeFar;
+  varying vec3 vNormalW;
+  varying vec3 vWorldPos;
+  varying float vFade;
+
+  void main() {
+    vec3 wp;
+    vec3 wn;
+    if (uSphereR < 1.0) {
+      wp = position;
+      wn = normal;
+    } else {
+      float R = uSphereR;
+      float ax = position.z / R;
+      float az = -position.x / R;
+      float cx = cos(ax), sx = sin(ax);
+      float cz = cos(az), sz = sin(az);
+      mat3 Rx = mat3(
+        1.0, 0.0, 0.0,
+        0.0,  cx,  sx,
+        0.0, -sx,  cx
+      );
+      mat3 Rz = mat3(
+         cz, sz, 0.0,
+        -sz, cz, 0.0,
+        0.0, 0.0, 1.0
+      );
+      mat3 Rot = Rz * Rx;
+      vec3 local = vec3(0.0, R + position.y, 0.0);
+      wp = Rot * local + vec3(0.0, -R, 0.0);
+      wn = normalize(Rot * normal);
+    }
+    vNormalW = wn;
+    vWorldPos = wp;
+    vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+    gl_Position = projectionMatrix * mv;
+    float dist = -mv.z;
+    vFade = clamp((dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+  }
+`;
+const meshFrag = /* glsl */`
+  uniform vec3 uColor;
+  uniform vec3 uBgColor;
+  uniform float uTopBoost;
+  uniform float uSideShade;
+  uniform float uGrainScale;     // how fine the dot pattern is (units⁻¹)
+  uniform float uDiscardBase;    // base fraction of pixels removed (0..1)
+  uniform float uDiscardEdge;    // extra discard at glancing angles
+  uniform float uSphereR;
+  varying vec3 vNormalW;
+  varying vec3 vWorldPos;
+  varying float vFade;
+
+  // cheap 3d hash → [0,1)
+  float hash13(vec3 p3) {
+    p3 = fract(p3 * 0.1031);
+    p3 += dot(p3, p3.zyx + 31.32);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  void main() {
+    // back-face cull: hide anything on the far hemisphere of the globe
+    vec3 sphereOutN = normalize(vWorldPos - vec3(0.0, -uSphereR, 0.0));
+    vec3 sphereToCam = normalize(cameraPosition - vWorldPos);
+    if (dot(sphereOutN, sphereToCam) < 0.0) discard;
+
+    // -------- particle dither: discard a fraction of pixels so the box
+    //          surface reads as a cloud of dots, not a wall --------
+    float grain = hash13(vWorldPos * uGrainScale);
+
+    // glancing angles dissolve more (rims feel airy)
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float facing = abs(dot(normalize(vNormalW), viewDir));
+    float threshold = uDiscardBase + uDiscardEdge * (1.0 - facing);
+    // distant buildings dissolve further — true horizon haze
+    threshold += vFade * 0.30;
+
+    if (grain < threshold) discard;
+
+    // -------- shading on surviving pixels --------
+    vec3 lightDir = normalize(vec3(0.4, 0.95, 0.5));
+    float ndl = max(0.0, dot(vNormalW, lightDir));
+    float topness = clamp(vNormalW.y, 0.0, 1.0);
+    vec3 col = uColor * mix(uSideShade, uTopBoost, topness * 0.55 + ndl * 0.45);
+    col *= 0.94 + 0.06 * vNormalW.x;
+    col = mix(col, uBgColor, vFade * 0.55);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+const buildingHoverFrag = /* glsl */`
+  uniform vec3 uColor;
+  uniform vec3 uBgColor;
+  uniform float uAlpha;
+  uniform float uSphereR;
+  varying vec3 vNormalW;
+  varying vec3 vWorldPos;
+  varying float vFade;
+
+  void main() {
+    vec3 sphereOutN = normalize(vWorldPos - vec3(0.0, -uSphereR, 0.0));
+    vec3 sphereToCam = normalize(cameraPosition - vWorldPos);
+    if (dot(sphereOutN, sphereToCam) < 0.0) discard;
+
+    vec3 lightDir = normalize(vec3(0.36, 0.92, 0.28));
+    float ndl = max(0.0, dot(normalize(vNormalW), lightDir));
+    float topness = clamp(vNormalW.y, 0.0, 1.0);
+    vec3 col = uColor * (0.62 + 0.38 * (topness * 0.45 + ndl * 0.55));
+    col = mix(col, uBgColor, vFade * 0.32);
+    float alpha = uAlpha * (1.0 - vFade * 0.62);
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+function buildBuildingMeshes(projected) {
+  if (!projected || !projected.length) return;
+  let validCount = 0;
+  for (const B of projected) if (B && B.pts && B.pts.length >= 3) validCount++;
+  if (!validCount) return;
+
+  lblText.textContent = `Extruding ${validCount.toLocaleString()} buildings…`;
+  if (buildingHitMesh) {
+    buildingHitMesh.geometry.dispose();
+    buildingHitMesh.material.dispose();
+    buildingHitMesh = null;
+  }
+  buildingHoverRecords.length = 0;
+
+  const VERTS = validCount * 24;
+  const INDS  = validCount * 36;
+  const positions = new Float32Array(VERTS * 3);
+  const normals   = new Float32Array(VERTS * 3);
+  const hitPositions = new Float32Array(VERTS * 3);
+  const indices   = new Uint32Array(INDS);
+
+  let vi = 0, ii = 0, vbase = 0;
+
+  for (const B of projected) {
+    const bounds = getBuildingBoxBounds(B, 0.05);
+    if (!bounds) continue;
+    buildingHoverRecords.push(bounds);
+    const written = appendBuildingBoxMesh(positions, normals, indices, hitPositions, bounds, vi, ii, vbase);
+    vi = written.vi;
+    ii = written.ii;
+    vbase = written.vbase;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, vi * 3), 3));
+  geo.setAttribute('normal',   new THREE.BufferAttribute(normals.subarray(0, vi * 3), 3));
+  geo.setIndex(new THREE.BufferAttribute(indices.subarray(0, ii), 1));
+
+  const hitGeo = new THREE.BufferGeometry();
+  hitGeo.setAttribute('position', new THREE.BufferAttribute(hitPositions.subarray(0, vi * 3), 3));
+  hitGeo.setIndex(new THREE.BufferAttribute(indices.subarray(0, ii), 1));
+  hitGeo.computeBoundingSphere();
+  buildingHitMesh = new THREE.Mesh(hitGeo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  buildingHitMesh.frustumCulled = false;
+  buildingHitMesh.updateMatrixWorld(true);
+
+  // Depth-only occluder pass: invisible, but writes depth so the wireframes
+  // behind a building (including each building's own back edges) get hidden.
+  // DoubleSide rendering ensures every cube pixel has a depth value.
+  const occluderVert = `
+    uniform float uSphereR;
+    void main() {
+      vec3 wp;
+      if (uSphereR < 1.0) {
+        wp = position;
+      } else {
+        float R = uSphereR;
+        float ax = position.z / R;
+        float az = -position.x / R;
+        float cx = cos(ax), sx = sin(ax);
+        float cz = cos(az), sz = sin(az);
+        mat3 Rx = mat3(1.0, 0.0, 0.0,  0.0, cx, sx,  0.0, -sx, cx);
+        mat3 Rz = mat3(cz, sz, 0.0,  -sz, cz, 0.0,  0.0, 0.0, 1.0);
+        mat3 Rot = Rz * Rx;
+        wp = Rot * vec3(0.0, R + position.y, 0.0) + vec3(0.0, -R, 0.0);
+      }
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(wp, 1.0);
+    }
+  `;
+  const occluderFrag = `void main() { gl_FragColor = vec4(0.0); }`;
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uSphereR: sharedUniforms.uSphereR },
+    vertexShader: occluderVert,
+    fragmentShader: occluderFrag,
+    side: THREE.DoubleSide,
+    colorWrite: false,
+    depthWrite: true,
+    depthTest: true,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = -1; // draw before wireframes/particles so depth is populated
+  scene.add(mesh);
+}
+
+// ---------- BUILDING WIREFRAMES — thin grey line skeletons of every box ----------
+const wireVert = /* glsl */`
+  uniform float uSphereR;
+  uniform float uFadeNear;
+  uniform float uFadeFar;
+  varying float vFade;
+  varying float vBackface;
+
+  void main() {
+    vec3 wp;
+    if (uSphereR < 1.0) {
+      wp = position;
+    } else {
+      float R = uSphereR;
+      float ax = position.z / R;
+      float az = -position.x / R;
+      float cx = cos(ax), sx = sin(ax);
+      float cz = cos(az), sz = sin(az);
+      mat3 Rx = mat3(1.0, 0.0, 0.0,  0.0, cx, sx,  0.0, -sx, cx);
+      mat3 Rz = mat3(cz, sz, 0.0,  -sz, cz, 0.0,  0.0, 0.0, 1.0);
+      mat3 Rot = Rz * Rx;
+      vec3 local = vec3(0.0, R + position.y, 0.0);
+      wp = Rot * local + vec3(0.0, -R, 0.0);
+    }
+    vec3 outN = normalize(wp - vec3(0.0, -uSphereR, 0.0));
+    vec3 toCam = normalize(cameraPosition - wp);
+    vBackface = dot(outN, toCam);
+
+    vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+    gl_Position = projectionMatrix * mv;
+    float dist = -mv.z;
+    vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+  }
+`;
+const wireFrag = /* glsl */`
+  uniform vec3 uColor;
+  uniform vec3 uBgColor;
+  uniform float uAlpha;
+  varying float vFade;
+  varying float vBackface;
+
+  void main() {
+    if (vBackface < 0.0) discard;
+    vec3 col = mix(uColor, uBgColor, vFade * 0.85);
+    float alpha = uAlpha * (1.0 - vFade * 0.95);
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+function buildBuildingWireframes(projected) {
+  if (!projected || !projected.length) return;
+  let validCount = 0;
+  for (const B of projected) if (B && B.pts && B.pts.length >= 3) validCount++;
+  if (!validCount) return;
+
+  // 8 corners per box, 12 edges = 24 index entries
+  const positions = new Float32Array(validCount * 8 * 3);
+  const indices   = new Uint32Array(validCount * 24);
+  let vi = 0, ii = 0, vbase = 0;
+
+  // edge connectivity for a unit cube indexed (x*4 + y*2 + z)
+  const EDGES = [
+    0,1, 0,4, 1,5, 4,5,   // bottom rectangle
+    2,3, 2,6, 3,7, 6,7,   // top rectangle
+    0,2, 1,3, 4,6, 5,7,   // vertical pillars
+  ];
+
+  for (const B of projected) {
+    if (!B || !B.pts || B.pts.length < 3) continue;
+
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const p of B.pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.z < minZ) minZ = p.z;
+      if (p.z > maxZ) maxZ = p.z;
+    }
+    const shrink = 0.04;
+    minX += shrink; maxX -= shrink;
+    minZ += shrink; maxZ -= shrink;
+    if (maxX <= minX || maxZ <= minZ) continue;
+    const h = Math.max(0.4, B.heightU);
+
+    // emit 8 corners
+    const c = [
+      [minX, 0, minZ], [minX, 0, maxZ], [minX, h, minZ], [minX, h, maxZ],
+      [maxX, 0, minZ], [maxX, 0, maxZ], [maxX, h, minZ], [maxX, h, maxZ],
+    ];
+    for (let k = 0; k < 8; k++) {
+      positions[vi*3 + 0] = c[k][0];
+      positions[vi*3 + 1] = c[k][1];
+      positions[vi*3 + 2] = c[k][2];
+      vi++;
+    }
+    for (let k = 0; k < 24; k++) indices[ii++] = vbase + EDGES[k];
+    vbase += 8;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, vi * 3), 3));
+  geo.setIndex(new THREE.BufferAttribute(indices.subarray(0, ii), 1));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR:  sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar:  sharedUniforms.uFadeFar,
+      uBgColor:  sharedUniforms.uBgColor,
+      uColor:    { value: new THREE.Color('#a4a4aa') }, // light-mid grey wireframe
+      uAlpha:    { value: 0.55 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  scene.add(new THREE.LineSegments(geo, mat));
+}
+
+// ---------- AMBIENT STREET / ALLEY PARTICLES around buildings ----------
+// Sprays warm, dim points in the immediate vicinity of every building so the
+// gaps between footprints read as glowing streets / alleys / forecourts —
+// not empty black. This thickens the overall light density without burying
+// the building wireframes.
+function buildBuildingAmbient(buildings, projected) {
+  // budget proportional to building count, but capped
+  const N = Math.min(160000, Math.max(40000, buildings.length * 3));
+  const pos = new Float32Array(N * 3);
+  const col = new Float32Array(N * 3);
+  const sz  = new Float32Array(N);
+  const ph  = new Float32Array(N);
+  const tmp = new THREE.Color();
+
+  for (let i = 0; i < N; i++) {
+    // pick a random building, weight slightly toward larger ones via area
+    const B = projected[Math.floor(Math.random() * projected.length)];
+    if (!B || !B.pts.length) { i--; continue; }
+    // pick a random vertex from polygon as anchor
+    const v = B.pts[Math.floor(Math.random() * B.pts.length)];
+
+    // spray in an annulus around the building edge (mostly outside)
+    const r = 1.2 + Math.random() * Math.random() * 9; // bias close to wall
+    const a = Math.random() * Math.PI * 2;
+    const x = v.x + Math.cos(a) * r;
+    const z = v.z + Math.sin(a) * r;
+
+    // mostly street level, occasional low rooftop spillover
+    const y = Math.random() < 0.94
+      ? 0.1 + Math.random() * 0.5
+      : 0.1 + Math.random() * Math.min(B.heightU * 0.4, 6);
+
+    // grey ambience with frequent warm yellow lamp-spill
+    const rr = Math.random();
+    if (rr < 0.28) tmp.copy(yellow).lerp(yellowB, Math.random() * 0.45);
+    else if (rr < 0.66) tmp.copy(greyA).lerp(greyC, Math.random() * 0.6);
+    else tmp.copy(greyA).lerp(greyB, Math.random() * 0.7);
+
+    const distFromCenter = Math.hypot(x, z);
+    const dim = Math.max(0.7, 1 - distFromCenter / 2800);
+    tmp.multiplyScalar(dim);
+
+    const ix = i * 3;
+    pos[ix + 0] = x;
+    pos[ix + 1] = y;
+    pos[ix + 2] = z;
+    col[ix + 0] = tmp.r; col[ix + 1] = tmp.g; col[ix + 2] = tmp.b;
+    sz[i] = 0.9 + Math.random() * 0.9;
+    ph[i] = Math.random() * Math.PI * 2;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(sz, 1));
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(ph, 1));
+  scene.add(new THREE.Points(geo, makePointsMaterial(0.9)));
+}
+
+// ---------- TRAFFIC STREAMS along the river ----------
+let streamGeo, sT, sSpeed, sSide, sOff;
+const STREAM_COUNT = 2600;
+
+function buildStreams() {
+  if (!riverCurve) return;
+  streamGeo = new THREE.BufferGeometry();
+  const pos  = new Float32Array(STREAM_COUNT * 3);
+  const col  = new Float32Array(STREAM_COUNT * 3);
+  const size = new Float32Array(STREAM_COUNT);
+  const ph   = new Float32Array(STREAM_COUNT);
+  sT = new Float32Array(STREAM_COUNT);
+  sSpeed = new Float32Array(STREAM_COUNT);
+  sSide  = new Float32Array(STREAM_COUNT);
+  sOff   = new Float32Array(STREAM_COUNT);
+
+  for (let i = 0; i < STREAM_COUNT; i++) {
+    sT[i] = Math.random();
+    sSpeed[i] = 0.010 + Math.random() * 0.024;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    sSide[i] = side;
+    sOff[i] = (16 + Math.random() * 16) * side; // ~lanes ~80–180m off the river
+    size[i] = 1.4 + Math.random() * 1.8;
+    // yellow flow one direction, grey flow the other
+    const c = side > 0
+      ? yellow.clone().lerp(yellowB, Math.random() * 0.4)
+      : greyB.clone().lerp(greyA, Math.random() * 0.5);
+    col[i*3+0] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
+    ph[i] = Math.random() * 6.28;
+  }
+  streamGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  streamGeo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  streamGeo.setAttribute('aSize',    new THREE.BufferAttribute(size, 1));
+  streamGeo.setAttribute('aPhase',   new THREE.BufferAttribute(ph, 1));
+  const mat = makePointsMaterial(1.0);
+  scene.add(new THREE.Points(streamGeo, mat));
+}
+
+// ---------- TRAFFIC — particles flowing along OSM streets like cars ----------
+let trafficGeo = null;
+let trafficData = null;            // per-particle: {roadIdx, segIdx, t, dir, speed}
+let trafficRoadLens = null;        // per-road: cumulative segment lengths for fast advance
+const TRAFFIC_COUNT = 6000;
+
+function buildTraffic() {
+  if (!roads.length) return;
+
+  // pre-compute per-road segment lengths + total length for weighted seeding
+  trafficRoadLens = roads.map(r => {
+    const lens = new Float32Array(Math.max(0, r.length - 1));
+    let total = 0;
+    for (let i = 1; i < r.length; i++) {
+      const L = Math.hypot(r[i].x - r[i-1].x, r[i].z - r[i-1].z);
+      lens[i-1] = L;
+      total += L;
+    }
+    return { lens, total };
+  });
+  const grandTotal = trafficRoadLens.reduce((s, r) => s + r.total, 0);
+  if (grandTotal < 1) return;
+
+  trafficGeo = new THREE.BufferGeometry();
+  const pos = new Float32Array(TRAFFIC_COUNT * 3);
+  const col = new Float32Array(TRAFFIC_COUNT * 3);
+  const sz  = new Float32Array(TRAFFIC_COUNT);
+  const ph  = new Float32Array(TRAFFIC_COUNT);
+  trafficData = new Array(TRAFFIC_COUNT);
+
+  for (let i = 0; i < TRAFFIC_COUNT; i++) {
+    // pick a road weighted by length so longer roads get proportionally more particles
+    let pick = Math.random() * grandTotal;
+    let roadIdx = 0;
+    while (roadIdx < roads.length - 1 && pick > trafficRoadLens[roadIdx].total) {
+      pick -= trafficRoadLens[roadIdx].total;
+      roadIdx++;
+    }
+    const road = roads[roadIdx];
+    const meta = trafficRoadLens[roadIdx];
+    if (!road || road.length < 2 || meta.total < 1) { i--; continue; }
+
+    // pick a segment weighted by its length
+    let segPick = Math.random() * meta.total;
+    let segIdx = 0;
+    while (segIdx < meta.lens.length - 1 && segPick > meta.lens[segIdx]) {
+      segPick -= meta.lens[segIdx];
+      segIdx++;
+    }
+    const t = Math.random();
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const speed = 6 + Math.random() * 9; // scene-units per second
+
+    trafficData[i] = { roadIdx, segIdx, t, dir, speed };
+
+    const a = road[segIdx], b = road[segIdx + 1];
+    pos[i*3+0] = a.x + (b.x - a.x) * t;
+    pos[i*3+1] = 0.5 + Math.random() * 0.4;
+    pos[i*3+2] = a.z + (b.z - a.z) * t;
+
+    // mostly mid grey, some light grey accents — distinguishes from buildings
+    const c = Math.random() < 0.55
+      ? greyA.clone().lerp(greyB, Math.random() * 0.5)
+      : greyA.clone().lerp(greyC, Math.random() * 0.5);
+    col[i*3+0] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
+    sz[i] = 1.2 + Math.random() * 0.9;
+    ph[i] = Math.random() * 6.28;
+  }
+
+  trafficGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  trafficGeo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  trafficGeo.setAttribute('aSize',    new THREE.BufferAttribute(sz, 1));
+  trafficGeo.setAttribute('aPhase',   new THREE.BufferAttribute(ph, 1));
+  scene.add(new THREE.Points(trafficGeo, makePointsMaterial(0.95)));
+}
+
+function updateTraffic(dt) {
+  if (!trafficGeo || !roads.length) return;
+  const arr = trafficGeo.attributes.position.array;
+  for (let i = 0; i < TRAFFIC_COUNT; i++) {
+    const d = trafficData[i];
+    if (!d) continue;
+    const road = roads[d.roadIdx];
+    const meta = trafficRoadLens[d.roadIdx];
+
+    // advance along the current segment
+    const segLen = meta.lens[d.segIdx] || 1;
+    d.t += (d.dir * d.speed * dt) / segLen;
+
+    // hop across segments if we overflow; reverse at the road endpoints
+    let safety = 8;
+    while ((d.t > 1 || d.t < 0) && safety-- > 0) {
+      if (d.t > 1) {
+        const next = d.segIdx + 1;
+        if (next >= meta.lens.length) {
+          d.dir = -1;
+          d.t = 2 - d.t; // bounce
+        } else {
+          d.t = (d.t - 1) * segLen / (meta.lens[next] || 1);
+          d.segIdx = next;
+        }
+      } else {
+        const prev = d.segIdx - 1;
+        if (prev < 0) {
+          d.dir = 1;
+          d.t = -d.t; // bounce
+        } else {
+          d.t = 1 + d.t * segLen / (meta.lens[prev] || 1);
+          d.segIdx = prev;
+        }
+      }
+    }
+    d.t = Math.max(0, Math.min(1, d.t));
+
+    const a = road[d.segIdx], b = road[d.segIdx + 1];
+    arr[i*3+0] = a.x + (b.x - a.x) * d.t;
+    arr[i*3+2] = a.z + (b.z - a.z) * d.t;
+    // y stays as initialized (street level)
+  }
+  trafficGeo.attributes.position.needsUpdate = true;
+}
+
+// ---------- FLOW FIELD — curl-noise-driven particle wind through the city ----------
+let eGeo;
+const EMBER_COUNT = 14000;
+const FLOW_BOUND = 2600;  // spread the curl-noise flow across the whole visible dome
+
+function buildEmbers() {
+  eGeo = new THREE.BufferGeometry();
+  const pos = new Float32Array(EMBER_COUNT * 3);
+  const col = new Float32Array(EMBER_COUNT * 3);
+  const sz  = new Float32Array(EMBER_COUNT);
+  const ph  = new Float32Array(EMBER_COUNT);
+  for (let i = 0; i < EMBER_COUNT; i++) {
+    pos[i*3+0] = (Math.random() * 2 - 1) * FLOW_BOUND;
+    // most particles sit at street/building level so they look like wind THROUGH the city,
+    // some drift higher to give vertical depth
+    pos[i*3+1] = Math.random() < 0.7
+      ? 1 + Math.random() * 35
+      : 30 + Math.random() * 220;
+    pos[i*3+2] = (Math.random() * 2 - 1) * FLOW_BOUND;
+    // grey with strong yellow accent streaks to read as warm flow
+    const c = Math.random() < 0.35
+      ? yellow.clone().lerp(yellowB, Math.random() * 0.45)
+      : greyA.clone().lerp(greyB, Math.random() * 0.55);
+    col[i*3+0] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
+    sz[i] = 1.2 + Math.random() * 1.3;
+    ph[i] = Math.random() * 6.28;
+  }
+  eGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  eGeo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  eGeo.setAttribute('aSize',    new THREE.BufferAttribute(sz, 1));
+  eGeo.setAttribute('aPhase',   new THREE.BufferAttribute(ph, 1));
+  const mat = makePointsMaterial(0.95);
+  scene.add(new THREE.Points(eGeo, mat));
+}
+
+// ============================================================
+// RENDERING — direct render, no post effects
+// ============================================================
+const composer = {
+  render: () => renderer.render(scene, camera),
+  setSize: (w, h) => renderer.setSize(w, h),
+};
+
+const buildingHoverRaycaster = new THREE.Raycaster();
+const buildingHoverPointer = new THREE.Vector2();
+
+function disposeBuildingHighlight(highlight) {
+  highlight.group.traverse(obj => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) obj.material.dispose();
+  });
+}
+
+function createBuildingHighlight(index) {
+  const bounds = buildingHoverRecords[index];
+  if (!bounds) return null;
+
+  const group = new THREE.Group();
+  group.name = `building-hover-${index}`;
+
+  const fillMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: BUILDING_HOVER_COLOR },
+      uAlpha: { value: 0 },
+    },
+    vertexShader: meshVert,
+    fragmentShader: buildingHoverFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+  const fillMesh = new THREE.Mesh(makeBuildingFillGeometry(bounds), fillMat);
+  fillMesh.renderOrder = 2;
+  group.add(fillMesh);
+
+  const lineMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: BUILDING_HOVER_COLOR },
+      uAlpha: { value: 0 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  const lineMesh = new THREE.LineSegments(makeBuildingLineGeometry(bounds), lineMat);
+  lineMesh.renderOrder = 3;
+  group.add(lineMesh);
+
+  scene.add(group);
+  return {
+    group,
+    fillMat,
+    lineMat,
+    lastTouched: performance.now() / 1000,
+  };
+}
+
+function touchBuildingHighlight(index) {
+  if (index === null || !buildingHoverRecords[index]) return;
+  let highlight = buildingHighlights.get(index);
+  if (!highlight) {
+    highlight = createBuildingHighlight(index);
+    if (!highlight) return;
+    buildingHighlights.set(index, highlight);
+  }
+  highlight.lastTouched = performance.now() / 1000;
+}
+
+function pickBuildingFromPointer(event) {
+  if (!buildingHitMesh) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+
+  buildingHoverPointer.set(x * 2 - 1, -(y * 2 - 1));
+  buildingHoverRaycaster.setFromCamera(buildingHoverPointer, camera);
+  const hits = buildingHoverRaycaster.intersectObject(buildingHitMesh, false);
+  if (!hits.length || hits[0].faceIndex === undefined) return null;
+  const index = Math.floor(hits[0].faceIndex / 12);
+  return buildingHoverRecords[index] ? index : null;
+}
+
+function updateBuildingHoverFromPointer() {
+  buildingHoverRaf = 0;
+  if (!pendingBuildingHoverEvent) return;
+  const next = pickBuildingFromPointer(pendingBuildingHoverEvent);
+  hoveredBuildingIndex = next;
+  if (next !== null) touchBuildingHighlight(next);
+}
+
+function queueBuildingHover(event) {
+  pendingBuildingHoverEvent = { clientX: event.clientX, clientY: event.clientY };
+  if (!buildingHoverRaf) {
+    buildingHoverRaf = requestAnimationFrame(updateBuildingHoverFromPointer);
+  }
+}
+
+function clearBuildingHover() {
+  hoveredBuildingIndex = null;
+  pendingBuildingHoverEvent = null;
+}
+
+function updateBuildingHighlights(now) {
+  for (const [index, highlight] of buildingHighlights) {
+    if (index === hoveredBuildingIndex) highlight.lastTouched = now;
+    const t = Math.min(1, Math.max(0, (now - highlight.lastTouched) / BUILDING_HOVER_FADE_SECONDS));
+    const fade = index === hoveredBuildingIndex ? 1 : 1 - t;
+    const eased = 1 - Math.pow(1 - fade, 4);
+    highlight.fillMat.uniforms.uAlpha.value = eased * 0.52;
+    highlight.lineMat.uniforms.uAlpha.value = eased * 0.95;
+    if (eased <= 0.001) {
+      scene.remove(highlight.group);
+      disposeBuildingHighlight(highlight);
+      buildingHighlights.delete(index);
+    }
+  }
+}
+
+window.addEventListener('pointermove', queueBuildingHover, { passive: true });
+window.addEventListener('pointerleave', clearBuildingHover);
+window.addEventListener('blur', clearBuildingHover);
+
+// ---------- resize ----------
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  sharedUniforms.uPixelRatio.value = renderer.getPixelRatio();
+});
+
+// ---------- animate ----------
+const clock = new THREE.Clock();
+
+function updateStreams(dt) {
+  if (!streamGeo || !riverCurve) return;
+  const arr = streamGeo.attributes.position.array;
+  const tan = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  for (let i = 0; i < STREAM_COUNT; i++) {
+    sT[i] += sSpeed[i] * dt * sSide[i] * 0.5;
+    if (sT[i] > 1) sT[i] -= 1;
+    if (sT[i] < 0) sT[i] += 1;
+    riverCurve.getPoint(sT[i], p);
+    riverCurve.getTangent(sT[i], tan);
+    const nx = -tan.z, nz = tan.x;
+    const ix = i * 3;
+    arr[ix+0] = p.x + nx * sOff[i];
+    arr[ix+1] = 1.5 + Math.sin(sT[i] * 40 + i) * 0.3;
+    arr[ix+2] = p.z + nz * sOff[i];
+  }
+  streamGeo.attributes.position.needsUpdate = true;
+}
+
+function updateEmbers(dt) {
+  if (!eGeo) return;
+  const arr = eGeo.attributes.position.array;
+  const t = clock.elapsedTime;
+  // pseudo-curl-noise velocity field (divergence-free-ish) for swirling, flowy motion
+  // — each particle reads the field at its own position so neighbors stay coherent
+  for (let i = 0; i < EMBER_COUNT; i++) {
+    const ix = i * 3;
+    const px = arr[ix + 0], py = arr[ix + 1], pz = arr[ix + 2];
+    const f1 = 0.0035, f2 = 0.0055, f3 = 0.0042;
+    const vx = (Math.sin(pz * f1 + t * 0.32) + Math.cos(py * f2 + t * 0.41)) * 9;
+    const vy = (Math.sin(px * f3 + t * 0.27) - Math.cos(pz * f1 + t * 0.34)) * 2.2;
+    const vz = (Math.cos(px * f1 + t * 0.39) - Math.sin(py * f2 + t * 0.30)) * 9;
+    arr[ix + 0] = px + vx * dt;
+    arr[ix + 1] = py + vy * dt;
+    arr[ix + 2] = pz + vz * dt;
+    // wrap within flow bounds
+    const B = FLOW_BOUND;
+    if (arr[ix + 0] >  B) arr[ix + 0] = -B;
+    if (arr[ix + 0] < -B) arr[ix + 0] =  B;
+    if (arr[ix + 2] >  B) arr[ix + 2] = -B;
+    if (arr[ix + 2] < -B) arr[ix + 2] =  B;
+    if (arr[ix + 1] > 260) arr[ix + 1] = 1;
+    if (arr[ix + 1] < 0)   arr[ix + 1] = 260;
+  }
+  eGeo.attributes.position.needsUpdate = true;
+}
+
+function tick() {
+  const dt = Math.min(0.05, clock.getDelta());
+  sharedUniforms.uTime.value = clock.elapsedTime;
+  updateStreams(dt);
+  updateTraffic(dt);
+  updateEmbers(dt);
+  updateBuildingHighlights(performance.now() / 1000);
+  controls.update();
+  composer.render();
+  requestAnimationFrame(tick);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+(async function boot() {
+  try {
+    const data = await fetchOverpass();
+    buildFromOSM(data);
+    buildBuildingMeshes(projectedBuildings);   // depth-only invisible occluders
+    buildBuildingWireframes(projectedBuildings);
+    buildTraffic();
+    buildStreams();
+    buildEmbers();
+  } catch (e) {
+    console.error(e);
+    lblText.textContent = 'OSM unavailable — using procedural fallback';
+    proceduralFallback();
+  }
+  loader.classList.add('gone');
+  setTimeout(() => loader.remove(), 900);
+  tick();
+})();
+
+// ============================================================
+// FALLBACK — if Overpass fails, build a stylised Bangkok-like grid
+// ============================================================
+function proceduralFallback() {
+  // S-curve river through frame
+  const curvePts = [
+    new THREE.Vector3(-900,  0,  600),
+    new THREE.Vector3(-300,  0,  340),
+    new THREE.Vector3(-80,   0,  120),
+    new THREE.Vector3( 60,   0, -40),
+    new THREE.Vector3( 220,  0, -180),
+    new THREE.Vector3( 540,  0, -560),
+  ];
+  riverCurve = new THREE.CatmullRomCurve3(curvePts, false, 'centripetal', 0.5);
+
+  const CITY_COUNT = 110000;
+  const pos = new Float32Array(CITY_COUNT * 3);
+  const col = new Float32Array(CITY_COUNT * 3);
+  const sz  = new Float32Array(CITY_COUNT);
+  const ph  = new Float32Array(CITY_COUNT);
+  const c = new THREE.Color();
+  let k = 0;
+  for (let i = 0; i < CITY_COUNT * 3 && k < CITY_COUNT; i++) {
+    const x = (Math.random() * 2 - 1) * 1100;
+    const z = (Math.random() * 2 - 1) * 1100;
+    const r = Math.hypot(x - 120, z + 40);
+    const dens = Math.exp(-r / 520);
+    if (Math.random() > dens * 1.1) continue;
+    // suppress near river
+    let minD = Infinity;
+    for (let s = 0; s < 60; s++) {
+      const p = riverCurve.getPoint(s / 59);
+      const d = Math.hypot(p.x - x, p.z - z);
+      if (d < minD) minD = d;
+    }
+    if (minD < 26) continue;
+    const tall = Math.random() < 0.014 && dens > 0.55;
+    const y = tall ? Math.random() * 80 + 20 : Math.random() * 2.5;
+    const rr = Math.random();
+    if (tall && rr < 0.45) c.copy(coolA).lerp(coolB, Math.random() * 0.7);
+    else if (rr < 0.62) c.copy(warmA).lerp(warmB, Math.random() * 0.9);
+    else if (rr < 0.88) c.copy(warmA).lerp(warmC, Math.random() * 0.55);
+    else c.copy(warmB);
+    const dim = Math.max(0.3, 1 - r / 1100);
+    c.multiplyScalar(dim * (0.55 + Math.random() * 0.7));
+    const ix = k * 3;
+    pos[ix+0] = x; pos[ix+1] = y; pos[ix+2] = z;
+    col[ix+0] = c.r; col[ix+1] = c.g; col[ix+2] = c.b;
+    sz[k] = (tall ? 2.4 : 1.4) * (0.7 + Math.random() * 0.8);
+    ph[k] = Math.random() * 6.28;
+    k++;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0, k * 3), 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col.subarray(0, k * 3), 3));
+  geo.setAttribute('aSize',    new THREE.BufferAttribute(sz.subarray(0, k), 1));
+  geo.setAttribute('aPhase',   new THREE.BufferAttribute(ph.subarray(0, k), 1));
+  scene.add(new THREE.Points(geo, makePointsMaterial(1.0)));
+
+  buildStreams();
+  buildEmbers();
+}
+</script>
+</body>
+</html>
