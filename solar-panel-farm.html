@@ -100,6 +100,9 @@
     gap: 8px;
     margin-top: 8px;
   }
+  .robot-debug__actions--wrap button {
+    min-width: 120px;
+  }
   .robot-debug button {
     flex: 1;
     min-width: 74px;
@@ -230,10 +233,10 @@
 </div>
 <div class="corner">
   SOLAR ARRAY FARM - 20 DEG PANEL TILT
-  <small>wireframe panels - irradiance particles</small>
+  <small id="solarHudStatus">PANELS -- · GRID FLOW 1.00 · CAMERA CUSTOM</small>
 </div>
 <div class="hud">
-  <b>drag</b> to orbit &nbsp;-&nbsp; <b>scroll</b> to zoom &nbsp;-&nbsp; <b>right-drag</b> to pan
+  <b>drag</b> to orbit &nbsp;-&nbsp; <b>scroll</b> to zoom &nbsp;-&nbsp; <b>middle/right-drag</b> to pan
 </div>
 <div class="robot-debug" id="robotDebug">
   <div class="robot-debug__head">
@@ -257,6 +260,7 @@
       <label>Cam Y <input id="cameraY" type="number" step="1" /></label>
       <label>Cam Z <input id="cameraZ" type="number" step="1" /></label>
       <label>FOV <input id="cameraFov" type="number" min="20" max="100" step="1" /></label>
+      <label>Zoom <input id="cameraZoom" type="number" min="0.1" max="10" step="0.01" /></label>
       <label>Clip Near <input id="cameraNear" type="number" min="0.01" step="0.1" /></label>
       <label>Clip Far <input id="cameraFar" type="number" min="1" step="100" /></label>
       <label>Target X <input id="targetX" type="number" step="1" /></label>
@@ -264,6 +268,35 @@
       <label>Target Z <input id="targetZ" type="number" step="1" /></label>
       <label>Fade Near <input id="fadeNear" type="number" min="0" step="1" /></label>
       <label>Fade Far <input id="fadeFar" type="number" min="1" step="1" /></label>
+    </div>
+    <div class="robot-debug__section">Camera Shots</div>
+    <div class="robot-debug__actions robot-debug__actions--wrap">
+      <button id="shotLowOrbit" type="button">Low Orbit</button>
+      <button id="shotTopographic" type="button">Topographic</button>
+      <button id="shotMacro" type="button">Macro</button>
+      <button id="shotHorizonSweep" type="button">Horizon Sweep</button>
+    </div>
+    <div class="robot-debug__section">Camera Move</div>
+    <div class="robot-debug__grid">
+      <label>Time S <input id="cameraAnimDuration" type="number" min="0.1" max="120" step="0.1" /></label>
+    </div>
+    <div class="robot-debug__actions">
+      <button id="setCameraKeyA" type="button">Set A</button>
+      <button id="setCameraKeyB" type="button">Set B</button>
+    </div>
+    <div class="robot-debug__actions">
+      <button id="returnCameraKeyA" type="button">Return to A</button>
+      <button id="returnCameraKeyB" type="button">Return to B</button>
+    </div>
+    <div class="robot-debug__actions">
+      <button id="playCameraMove" type="button">Play</button>
+      <button id="resetCameraMove" type="button">Reset</button>
+    </div>
+    <div class="robot-debug__section">Particles</div>
+    <div class="robot-debug__grid">
+      <label>Panel Glints <input id="panelGlintDensity" type="number" min="0" max="4" step="0.05" /></label>
+      <label>Grid Particles <input id="gridParticleDensity" type="number" min="0" max="4" step="0.05" /></label>
+      <label>Atmosphere <input id="atmosphereDensity" type="number" min="0" max="4" step="0.05" /></label>
     </div>
     <textarea id="robotData" readonly spellcheck="false"></textarea>
     <div class="robot-debug__actions">
@@ -301,6 +334,7 @@ const robotDebugEls = {
   cameraY: document.getElementById('cameraY'),
   cameraZ: document.getElementById('cameraZ'),
   cameraFov: document.getElementById('cameraFov'),
+  cameraZoom: document.getElementById('cameraZoom'),
   cameraNear: document.getElementById('cameraNear'),
   cameraFar: document.getElementById('cameraFar'),
   targetX: document.getElementById('targetX'),
@@ -308,12 +342,29 @@ const robotDebugEls = {
   targetZ: document.getElementById('targetZ'),
   fadeNear: document.getElementById('fadeNear'),
   fadeFar: document.getElementById('fadeFar'),
+  cameraAnimDuration: document.getElementById('cameraAnimDuration'),
+  panelGlintDensity: document.getElementById('panelGlintDensity'),
+  gridParticleDensity: document.getElementById('gridParticleDensity'),
+  atmosphereDensity: document.getElementById('atmosphereDensity'),
   data: document.getElementById('robotData'),
   togglePanel: document.getElementById('toggleDebugPanel'),
   move: document.getElementById('toggleRobotMove'),
   copy: document.getElementById('copyRobotData'),
   reset: document.getElementById('resetRobotData'),
   resetCamera: document.getElementById('resetCameraData'),
+  setCameraKeyA: document.getElementById('setCameraKeyA'),
+  setCameraKeyB: document.getElementById('setCameraKeyB'),
+  returnCameraKeyA: document.getElementById('returnCameraKeyA'),
+  returnCameraKeyB: document.getElementById('returnCameraKeyB'),
+  playCameraMove: document.getElementById('playCameraMove'),
+  resetCameraMove: document.getElementById('resetCameraMove'),
+  shotLowOrbit: document.getElementById('shotLowOrbit'),
+  shotTopographic: document.getElementById('shotTopographic'),
+  shotMacro: document.getElementById('shotMacro'),
+  shotHorizonSweep: document.getElementById('shotHorizonSweep'),
+};
+const hudEls = {
+  status: document.getElementById('solarHudStatus'),
 };
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -326,17 +377,19 @@ container.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xffffff);
 
-const DEFAULT_CAMERA_X = 430;
-const DEFAULT_CAMERA_Y = 250;
-const DEFAULT_CAMERA_Z = 520;
-const DEFAULT_TARGET_X = 0;
-const DEFAULT_TARGET_Y = 18;
-const DEFAULT_TARGET_Z = 0;
+const DEFAULT_CAMERA_X = -62.6;
+const DEFAULT_CAMERA_Y = 3.7;
+const DEFAULT_CAMERA_Z = -255.1;
+const DEFAULT_TARGET_X = -181.3;
+const DEFAULT_TARGET_Y = -32.3;
+const DEFAULT_TARGET_Z = -196.7;
 const DEFAULT_CAMERA_FOV = 68;
+const DEFAULT_CAMERA_ZOOM = 1;
 const DEFAULT_CAMERA_NEAR = 1;
 const DEFAULT_CAMERA_FAR = 8000;
 const DEFAULT_FADE_NEAR = 8;
 const DEFAULT_FADE_FAR = 70;
+const SOLAR_ARRAY_GRID_SPACING = 210;
 
 const camera = new THREE.PerspectiveCamera(
   DEFAULT_CAMERA_FOV,
@@ -353,6 +406,11 @@ controls.minDistance = 45;
 controls.maxDistance = 2700;
 controls.maxPolarAngle = Math.PI * 0.58;
 controls.target.set(DEFAULT_TARGET_X, DEFAULT_TARGET_Y, DEFAULT_TARGET_Z);
+controls.mouseButtons = {
+  LEFT: THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.PAN,
+  RIGHT: THREE.MOUSE.PAN,
+};
 
 const GLOBE_R = 5200;
 const greyA  = new THREE.Color('#b0b0b5');
@@ -360,6 +418,7 @@ const greyB  = new THREE.Color('#8a8a90');
 const greyC  = new THREE.Color('#cccdd0');
 const yellow = greyC;
 const yellowB = greyB;
+const accentYellow = new THREE.Color('#FCE132');
 
 function makeSpriteTexture() {
   const s = 256;
@@ -394,11 +453,16 @@ const sharedUniforms = {
 
 const SKID_STATE_KEY = 'solar-skidsteer-transform-v1';
 const CAMERA_STATE_KEY = 'solar-camera-transform-v1';
+const CAMERA_ANIMATION_STATE_KEY = 'solar-camera-animation-v1';
+const PARTICLE_STATE_KEY = 'solar-particle-densities-v1';
 const DEBUG_PANEL_STATE_KEY = 'solar-debug-panel-v1';
 const DEFAULT_SKID_X = -170.81;
 const DEFAULT_SKID_Z = -238.74;
 const DEFAULT_SKID_ROTATION = -0.18;
 const DEFAULT_SKID_SCALE = 0.48;
+const DEFAULT_CAMERA_ANIMATION_DURATION = 4;
+const DEFAULT_PARTICLE_DENSITY = 1;
+const PARTICLE_DENSITY_MAX = 4;
 const skidState = {
   x: 0,
   z: 0,
@@ -406,10 +470,27 @@ const skidState = {
   scale: DEFAULT_SKID_SCALE,
   initialized: false,
 };
+const cameraAnimation = {
+  active: false,
+  startedAt: 0,
+  duration: DEFAULT_CAMERA_ANIMATION_DURATION,
+  keyA: null,
+  keyB: null,
+};
 let skidSteerGroup = null;
 let suppressRobotInput = false;
 let suppressCameraInput = false;
+let suppressParticleInput = false;
 let robotMoveMode = false;
+let activeCameraShotName = 'Custom';
+let solarPanelCount = 0;
+let serviceParticleGeo = null;
+let serviceParticleData = [];
+const particleDensityUniforms = {
+  panelGlints: { value: DEFAULT_PARTICLE_DENSITY },
+  gridParticles: { value: DEFAULT_PARTICLE_DENSITY },
+  atmosphere: { value: DEFAULT_PARTICLE_DENSITY },
+};
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -434,6 +515,7 @@ const pointVert = /* glsl */`
   varying float vTwinkle;
   varying float vFade;
   varying float vBackface;
+  varying float vDensitySeed;
   uniform float uTime;
   uniform float uPixelRatio;
   uniform float uSizeScale;
@@ -458,6 +540,7 @@ const pointVert = /* glsl */`
 
   void main() {
     vColor = color;
+    vDensitySeed = fract(sin(aPhase * 78.233 + aSize * 12.9898) * 43758.5453);
     vTwinkle = 0.78 + 0.22 * sin(uTime * 1.6 + aPhase * 3.3);
     vec3 wob = vec3(
       sin(uTime * 0.7 + aPhase * 2.3),
@@ -483,23 +566,28 @@ const pointFrag = /* glsl */`
   varying float vTwinkle;
   varying float vFade;
   varying float vBackface;
+  varying float vDensitySeed;
   uniform sampler2D uMap;
   uniform vec3 uBgColor;
+  uniform float uDensity;
 
   void main() {
     float horizonFade = smoothstep(-0.28, 0.08, vBackface);
+    float density = max(0.0, uDensity);
+    if (vDensitySeed > min(density, 1.0)) discard;
     vec4 tex = texture2D(uMap, gl_PointCoord);
     if (tex.a < 0.02) discard;
     vec3 col = mix(vColor * vTwinkle, uBgColor, vFade * 0.95);
-    float alpha = tex.a * (1.0 - vFade) * horizonFade;
+    float densityBoost = 1.0 + max(0.0, density - 1.0) * 0.32;
+    float alpha = tex.a * (1.0 - vFade) * horizonFade * densityBoost;
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(col, alpha);
   }
 `;
 
-function makePointsMaterial(sizeScale = 1.0) {
+function makePointsMaterial(sizeScale = 1.0, densityUniform = particleDensityUniforms.atmosphere) {
   return new THREE.ShaderMaterial({
-    uniforms: { ...sharedUniforms, uSizeScale: { value: sizeScale } },
+    uniforms: { ...sharedUniforms, uSizeScale: { value: sizeScale }, uDensity: densityUniform },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
     vertexColors: true,
@@ -596,6 +684,7 @@ const wireVert = /* glsl */`
   uniform float uFadeFar;
   varying float vFade;
   varying float vBackface;
+  varying float vDepthLayer;
 
   void main() {
     vec3 wp;
@@ -619,6 +708,7 @@ const wireVert = /* glsl */`
     gl_Position = projectionMatrix * mv;
     float dist = -mv.z;
     vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+    vDepthLayer = smoothstep(uFadeFar * 1.25, uFadeFar * 7.5, dist);
   }
 `;
 
@@ -628,11 +718,14 @@ const wireFrag = /* glsl */`
   uniform float uAlpha;
   varying float vFade;
   varying float vBackface;
+  varying float vDepthLayer;
 
   void main() {
     float horizonFade = smoothstep(-0.28, 0.08, vBackface);
-    vec3 col = mix(uColor, uBgColor, vFade * 0.85);
-    float alpha = uAlpha * (1.0 - vFade * 0.95) * horizonFade;
+    vec3 col = mix(uColor, uBgColor, clamp(vFade * 0.76 + vDepthLayer * 0.52, 0.0, 1.0));
+    float closeAlpha = 1.0 - vFade * 0.95;
+    float depthAlpha = mix(1.0, 0.16, vDepthLayer);
+    float alpha = uAlpha * closeAlpha * depthAlpha * horizonFade;
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(col, alpha);
   }
@@ -744,6 +837,7 @@ function defaultCameraState() {
     targetY: DEFAULT_TARGET_Y,
     targetZ: DEFAULT_TARGET_Z,
     fov: DEFAULT_CAMERA_FOV,
+    zoom: DEFAULT_CAMERA_ZOOM,
     near: DEFAULT_CAMERA_NEAR,
     far: DEFAULT_CAMERA_FAR,
     fadeNear: DEFAULT_FADE_NEAR,
@@ -751,12 +845,68 @@ function defaultCameraState() {
   };
 }
 
+const SOLAR_CAMERA_SHOTS = {
+  'Low Orbit': {
+    x: -62.6,
+    y: 3.7,
+    z: -255.1,
+    targetX: -181.3,
+    targetY: -32.3,
+    targetZ: -196.7,
+    fov: 68,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+  },
+  Topographic: {
+    x: -22,
+    y: 1180,
+    z: -18,
+    targetX: -12,
+    targetY: 0,
+    targetZ: -24,
+    fov: 54,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: 180,
+  },
+  Macro: {
+    x: -156,
+    y: 18,
+    z: -214,
+    targetX: -178,
+    targetY: 8,
+    targetZ: -226,
+    fov: 42,
+    near: 0.2,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: 4,
+    fadeFar: DEFAULT_FADE_FAR,
+  },
+  'Horizon Sweep': {
+    x: -820,
+    y: 210,
+    z: -900,
+    targetX: -40,
+    targetY: 18,
+    targetZ: -70,
+    fov: 64,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: 220,
+  },
+};
+
 function normalizeCameraState(state) {
   const defaults = defaultCameraState();
   const near = clamp(Number.isFinite(state.near) ? state.near : defaults.near, 0.01, 2000);
   const far = Math.max(near + 1, Math.min(Number.isFinite(state.far) ? state.far : defaults.far, 50000));
   const fadeNear = clamp(Number.isFinite(state.fadeNear) ? state.fadeNear : defaults.fadeNear, 0, 10000);
   const fadeFar = Math.max(fadeNear + 0.1, Math.min(Number.isFinite(state.fadeFar) ? state.fadeFar : defaults.fadeFar, 20000));
+  const zoom = clamp(Number.isFinite(state.zoom) ? state.zoom : defaults.zoom, 0.1, 10);
   return {
     x: Number.isFinite(state.x) ? state.x : defaults.x,
     y: Number.isFinite(state.y) ? state.y : defaults.y,
@@ -765,6 +915,7 @@ function normalizeCameraState(state) {
     targetY: Number.isFinite(state.targetY) ? state.targetY : defaults.targetY,
     targetZ: Number.isFinite(state.targetZ) ? state.targetZ : defaults.targetZ,
     fov: clamp(Number.isFinite(state.fov) ? state.fov : defaults.fov, 20, 100),
+    zoom,
     near,
     far,
     fadeNear,
@@ -797,6 +948,7 @@ function cameraDebugPayload() {
       z: roundForDebug(controls.target.z, 2),
     },
     fov: roundForDebug(camera.fov, 2),
+    zoom: roundForDebug(camera.zoom, 3),
     clipping: {
       near: roundForDebug(camera.near, 3),
       far: roundForDebug(camera.far, 2),
@@ -805,7 +957,109 @@ function cameraDebugPayload() {
       near: roundForDebug(sharedUniforms.uFadeNear.value, 2),
       far: roundForDebug(sharedUniforms.uFadeFar.value, 2),
     },
+    orbit: {
+      distance: roundForDebug(camera.position.distanceTo(controls.target), 2),
+      minDistance: roundForDebug(controls.minDistance, 2),
+      maxDistance: roundForDebug(controls.maxDistance, 2),
+    },
   };
+}
+
+function currentCameraState() {
+  return {
+    x: camera.position.x,
+    y: camera.position.y,
+    z: camera.position.z,
+    targetX: controls.target.x,
+    targetY: controls.target.y,
+    targetZ: controls.target.z,
+    fov: camera.fov,
+    zoom: camera.zoom,
+    near: camera.near,
+    far: camera.far,
+    fadeNear: sharedUniforms.uFadeNear.value,
+    fadeFar: sharedUniforms.uFadeFar.value,
+  };
+}
+
+function cameraStatePayload(state) {
+  const next = normalizeCameraState(state);
+  return {
+    position: {
+      x: roundForDebug(next.x, 2),
+      y: roundForDebug(next.y, 2),
+      z: roundForDebug(next.z, 2),
+    },
+    target: {
+      x: roundForDebug(next.targetX, 2),
+      y: roundForDebug(next.targetY, 2),
+      z: roundForDebug(next.targetZ, 2),
+    },
+    fov: roundForDebug(next.fov, 2),
+    zoom: roundForDebug(next.zoom, 3),
+    clipping: {
+      near: roundForDebug(next.near, 3),
+      far: roundForDebug(next.far, 2),
+    },
+    fade: {
+      near: roundForDebug(next.fadeNear, 2),
+      far: roundForDebug(next.fadeFar, 2),
+    },
+    orbit: {
+      distance: roundForDebug(Math.hypot(next.x - next.targetX, next.y - next.targetY, next.z - next.targetZ), 2),
+    },
+  };
+}
+
+function normalizeAnimationDuration(value) {
+  return clamp(Number.isFinite(value) ? value : DEFAULT_CAMERA_ANIMATION_DURATION, 0.1, 120);
+}
+
+function defaultCameraAnimationState() {
+  const defaults = defaultCameraState();
+  return {
+    duration: DEFAULT_CAMERA_ANIMATION_DURATION,
+    keyA: defaults,
+    keyB: defaults,
+  };
+}
+
+function normalizeCameraAnimationState(state = {}) {
+  const defaults = defaultCameraAnimationState();
+  const source = state && typeof state === 'object' ? state : {};
+  const duration = Number.isFinite(source.duration) ? source.duration : source.durationSeconds;
+  return {
+    duration: normalizeAnimationDuration(duration),
+    keyA: normalizeCameraState(source.keyA || defaults.keyA),
+    keyB: normalizeCameraState(source.keyB || defaults.keyB),
+  };
+}
+
+function readSavedCameraAnimationState() {
+  try {
+    const raw = localStorage.getItem(CAMERA_ANIMATION_STATE_KEY);
+    return raw ? normalizeCameraAnimationState(JSON.parse(raw)) : defaultCameraAnimationState();
+  } catch (e) {
+    return defaultCameraAnimationState();
+  }
+}
+
+function cameraAnimationPayload() {
+  return {
+    active: cameraAnimation.active,
+    durationSeconds: roundForDebug(cameraAnimation.duration, 2),
+    keyframeA: cameraStatePayload(cameraAnimation.keyA || defaultCameraState()),
+    keyframeB: cameraStatePayload(cameraAnimation.keyB || defaultCameraState()),
+  };
+}
+
+function saveCameraAnimationState() {
+  try {
+    const next = normalizeCameraAnimationState(cameraAnimation);
+    localStorage.setItem(CAMERA_ANIMATION_STATE_KEY, JSON.stringify(next));
+  } catch (e) {
+    console.warn('Unable to save camera animation:', e);
+  }
 }
 
 function saveCameraState() {
@@ -818,6 +1072,7 @@ function saveCameraState() {
       targetY: controls.target.y,
       targetZ: controls.target.z,
       fov: camera.fov,
+      zoom: camera.zoom,
       near: camera.near,
       far: camera.far,
       fadeNear: sharedUniforms.uFadeNear.value,
@@ -832,6 +1087,7 @@ function applyCameraState(state, persist = true) {
   const next = normalizeCameraState(state);
   camera.position.set(next.x, next.y, next.z);
   camera.fov = next.fov;
+  camera.zoom = next.zoom;
   camera.near = next.near;
   camera.far = next.far;
   camera.updateProjectionMatrix();
@@ -841,6 +1097,118 @@ function applyCameraState(state, persist = true) {
   controls.update();
   if (persist) saveCameraState();
   updateCameraDebug();
+}
+
+function applyCameraShot(name) {
+  const shot = SOLAR_CAMERA_SHOTS[name];
+  if (!shot) return;
+  stopCameraAnimation(false);
+  activeCameraShotName = name;
+  applyCameraState(shot, true);
+  updateCameraAnimationDebug();
+}
+
+function easeInOutExpo(t) {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t < 0.5
+    ? Math.pow(2, 20 * t - 10) / 2
+    : (2 - Math.pow(2, -20 * t + 10)) / 2;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function lerpCameraStates(a, b, t) {
+  const from = normalizeCameraState(a);
+  const to = normalizeCameraState(b);
+  return {
+    x: lerp(from.x, to.x, t),
+    y: lerp(from.y, to.y, t),
+    z: lerp(from.z, to.z, t),
+    targetX: lerp(from.targetX, to.targetX, t),
+    targetY: lerp(from.targetY, to.targetY, t),
+    targetZ: lerp(from.targetZ, to.targetZ, t),
+    fov: lerp(from.fov, to.fov, t),
+    zoom: lerp(from.zoom, to.zoom, t),
+    near: lerp(from.near, to.near, t),
+    far: lerp(from.far, to.far, t),
+    fadeNear: lerp(from.fadeNear, to.fadeNear, t),
+    fadeFar: lerp(from.fadeFar, to.fadeFar, t),
+  };
+}
+
+function updateCameraAnimationDebug() {
+  if (robotDebugEls.cameraAnimDuration && robotDebugEls.cameraAnimDuration !== document.activeElement) {
+    robotDebugEls.cameraAnimDuration.value = cameraAnimation.duration.toFixed(1);
+  }
+  if (robotDebugEls.playCameraMove) {
+    robotDebugEls.playCameraMove.textContent = cameraAnimation.active ? 'Playing' : 'Play';
+    robotDebugEls.playCameraMove.classList.toggle('active', cameraAnimation.active);
+  }
+  updateDebugData();
+}
+
+function applyCameraAnimationDurationInput() {
+  const duration = parseFloat(robotDebugEls.cameraAnimDuration.value);
+  cameraAnimation.duration = normalizeAnimationDuration(Number.isFinite(duration) ? duration : cameraAnimation.duration);
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function stopCameraAnimation(updateUI = true) {
+  if (!cameraAnimation.active) return;
+  cameraAnimation.active = false;
+  controls.enabled = true;
+  if (updateUI) updateCameraAnimationDebug();
+}
+
+function setCameraKeyframe(slot) {
+  stopCameraAnimation(false);
+  cameraAnimation[slot] = currentCameraState();
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function returnToCameraKeyframe(slot) {
+  stopCameraAnimation(false);
+  applyCameraState(cameraAnimation[slot] || defaultCameraState(), true);
+  updateCameraAnimationDebug();
+}
+
+function resetCameraAnimation() {
+  stopCameraAnimation(false);
+  Object.assign(cameraAnimation, defaultCameraAnimationState(), { active: false, startedAt: 0 });
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function startCameraAnimation() {
+  const next = normalizeCameraAnimationState(cameraAnimation);
+  cameraAnimation.duration = next.duration;
+  cameraAnimation.keyA = next.keyA;
+  cameraAnimation.keyB = next.keyB;
+  cameraAnimation.active = true;
+  cameraAnimation.startedAt = performance.now();
+  controls.enabled = false;
+  applyCameraState(cameraAnimation.keyA, false);
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function updateCameraAnimation(now) {
+  if (!cameraAnimation.active) return;
+  const durationMs = Math.max(100, cameraAnimation.duration * 1000);
+  const t = clamp((now - cameraAnimation.startedAt) / durationMs, 0, 1);
+  const eased = easeInOutExpo(t);
+  applyCameraState(lerpCameraStates(cameraAnimation.keyA, cameraAnimation.keyB, eased), false);
+  if (t >= 1) {
+    cameraAnimation.active = false;
+    controls.enabled = true;
+    applyCameraState(cameraAnimation.keyB, true);
+    updateCameraAnimationDebug();
+  }
 }
 
 function readSavedSkidState(farmYaw) {
@@ -878,6 +1246,57 @@ function ensureSkidState(farmYaw) {
   Object.assign(skidState, readSavedSkidState(farmYaw), { initialized: true });
 }
 
+function defaultParticleState() {
+  return {
+    panelGlints: DEFAULT_PARTICLE_DENSITY,
+    gridParticles: DEFAULT_PARTICLE_DENSITY,
+    atmosphere: DEFAULT_PARTICLE_DENSITY,
+  };
+}
+
+function normalizeParticleState(state = {}) {
+  const defaults = defaultParticleState();
+  return {
+    panelGlints: clamp(Number.isFinite(state.panelGlints) ? state.panelGlints : defaults.panelGlints, 0, PARTICLE_DENSITY_MAX),
+    gridParticles: clamp(Number.isFinite(state.gridParticles) ? state.gridParticles : defaults.gridParticles, 0, PARTICLE_DENSITY_MAX),
+    atmosphere: clamp(Number.isFinite(state.atmosphere) ? state.atmosphere : defaults.atmosphere, 0, PARTICLE_DENSITY_MAX),
+  };
+}
+
+function readSavedParticleState() {
+  try {
+    const raw = localStorage.getItem(PARTICLE_STATE_KEY);
+    return raw ? normalizeParticleState(JSON.parse(raw)) : defaultParticleState();
+  } catch (e) {
+    return defaultParticleState();
+  }
+}
+
+function saveParticleState() {
+  try {
+    localStorage.setItem(PARTICLE_STATE_KEY, JSON.stringify(particleDebugPayload()));
+  } catch (e) {
+    console.warn('Unable to save solar particle densities:', e);
+  }
+}
+
+function applyParticleState(state, persist = true) {
+  const next = normalizeParticleState(state);
+  particleDensityUniforms.panelGlints.value = next.panelGlints;
+  particleDensityUniforms.gridParticles.value = next.gridParticles;
+  particleDensityUniforms.atmosphere.value = next.atmosphere;
+  if (persist) saveParticleState();
+  updateParticleDebug();
+}
+
+function particleDebugPayload() {
+  return {
+    panelGlints: roundForDebug(particleDensityUniforms.panelGlints.value, 3),
+    gridParticles: roundForDebug(particleDensityUniforms.gridParticles.value, 3),
+    atmosphere: roundForDebug(particleDensityUniforms.atmosphere.value, 3),
+  };
+}
+
 function robotDebugPayload() {
   return {
     x: roundForDebug(skidState.x, 2),
@@ -892,13 +1311,25 @@ function debugPayload() {
   return {
     skidSteer: robotDebugPayload(),
     camera: cameraDebugPayload(),
+    cameraAnimation: cameraAnimationPayload(),
+    particles: particleDebugPayload(),
   };
+}
+
+function updateSceneHud() {
+  if (!hudEls.status) return;
+  hudEls.status.textContent = [
+    `PANELS ${solarPanelCount ? solarPanelCount.toLocaleString() : '--'}`,
+    `GRID FLOW ${particleDensityUniforms.gridParticles.value.toFixed(2)}`,
+    `CAMERA ${activeCameraShotName.toUpperCase()}`,
+  ].join(' · ');
 }
 
 function updateDebugData() {
   if (robotDebugEls.data) {
     robotDebugEls.data.value = JSON.stringify(debugPayload(), null, 2);
   }
+  updateSceneHud();
 }
 
 function updateRobotDebug() {
@@ -918,6 +1349,7 @@ function cameraInputs() {
     robotDebugEls.cameraY,
     robotDebugEls.cameraZ,
     robotDebugEls.cameraFov,
+    robotDebugEls.cameraZoom,
     robotDebugEls.cameraNear,
     robotDebugEls.cameraFar,
     robotDebugEls.targetX,
@@ -925,6 +1357,14 @@ function cameraInputs() {
     robotDebugEls.targetZ,
     robotDebugEls.fadeNear,
     robotDebugEls.fadeFar,
+  ].filter(Boolean);
+}
+
+function particleInputs() {
+  return [
+    robotDebugEls.panelGlintDensity,
+    robotDebugEls.gridParticleDensity,
+    robotDebugEls.atmosphereDensity,
   ].filter(Boolean);
 }
 
@@ -939,6 +1379,7 @@ function updateCameraDebug() {
   robotDebugEls.cameraY.value = camera.position.y.toFixed(1);
   robotDebugEls.cameraZ.value = camera.position.z.toFixed(1);
   robotDebugEls.cameraFov.value = camera.fov.toFixed(1);
+  robotDebugEls.cameraZoom.value = camera.zoom.toFixed(2);
   robotDebugEls.cameraNear.value = camera.near.toFixed(2);
   robotDebugEls.cameraFar.value = camera.far.toFixed(1);
   robotDebugEls.targetX.value = controls.target.x.toFixed(1);
@@ -947,6 +1388,20 @@ function updateCameraDebug() {
   robotDebugEls.fadeNear.value = sharedUniforms.uFadeNear.value.toFixed(1);
   robotDebugEls.fadeFar.value = sharedUniforms.uFadeFar.value.toFixed(1);
   suppressCameraInput = false;
+  updateDebugData();
+}
+
+function updateParticleDebug() {
+  if (!robotDebugEls.panelGlintDensity) return;
+  if (particleInputs().includes(document.activeElement)) {
+    updateDebugData();
+    return;
+  }
+  suppressParticleInput = true;
+  robotDebugEls.panelGlintDensity.value = particleDensityUniforms.panelGlints.value.toFixed(2);
+  robotDebugEls.gridParticleDensity.value = particleDensityUniforms.gridParticles.value.toFixed(2);
+  robotDebugEls.atmosphereDensity.value = particleDensityUniforms.atmosphere.value.toFixed(2);
+  suppressParticleInput = false;
   updateDebugData();
 }
 
@@ -972,10 +1427,12 @@ function applyRobotDebugInputs() {
 
 function applyCameraDebugInputs() {
   if (suppressCameraInput) return;
+  activeCameraShotName = 'Custom';
   const x = parseFloat(robotDebugEls.cameraX.value);
   const y = parseFloat(robotDebugEls.cameraY.value);
   const z = parseFloat(robotDebugEls.cameraZ.value);
   const fov = parseFloat(robotDebugEls.cameraFov.value);
+  const zoom = parseFloat(robotDebugEls.cameraZoom.value);
   const near = parseFloat(robotDebugEls.cameraNear.value);
   const far = parseFloat(robotDebugEls.cameraFar.value);
   const targetX = parseFloat(robotDebugEls.targetX.value);
@@ -989,6 +1446,7 @@ function applyCameraDebugInputs() {
     y: Number.isFinite(y) ? y : camera.position.y,
     z: Number.isFinite(z) ? z : camera.position.z,
     fov: Number.isFinite(fov) ? fov : camera.fov,
+    zoom: Number.isFinite(zoom) ? zoom : camera.zoom,
     near: Number.isFinite(near) ? near : camera.near,
     far: Number.isFinite(far) ? far : camera.far,
     targetX: Number.isFinite(targetX) ? targetX : controls.target.x,
@@ -996,6 +1454,18 @@ function applyCameraDebugInputs() {
     targetZ: Number.isFinite(targetZ) ? targetZ : controls.target.z,
     fadeNear: Number.isFinite(fadeNear) ? fadeNear : sharedUniforms.uFadeNear.value,
     fadeFar: Number.isFinite(fadeFar) ? fadeFar : sharedUniforms.uFadeFar.value,
+  });
+}
+
+function applyParticleDebugInputs() {
+  if (suppressParticleInput) return;
+  const panelGlints = parseFloat(robotDebugEls.panelGlintDensity.value);
+  const gridParticles = parseFloat(robotDebugEls.gridParticleDensity.value);
+  const atmosphere = parseFloat(robotDebugEls.atmosphereDensity.value);
+  applyParticleState({
+    panelGlints: Number.isFinite(panelGlints) ? panelGlints : particleDensityUniforms.panelGlints.value,
+    gridParticles: Number.isFinite(gridParticles) ? gridParticles : particleDensityUniforms.gridParticles.value,
+    atmosphere: Number.isFinite(atmosphere) ? atmosphere : particleDensityUniforms.atmosphere.value,
   });
 }
 
@@ -1146,19 +1616,50 @@ function buildPanelFarm() {
   const panels = [];
   const yaw = -0.18;
   const pitch = -0.34;
-  const blocks = [
-    { cx: -230, cz: -126, cols: 28, rows: 18 },
-    { cx:  206, cz: -126, cols: 28, rows: 18 },
-    { cx: -210, cz:  150, cols: 24, rows: 16 },
-    { cx:  238, cz:  150, cols: 30, rows: 16 },
-    { cx:   14, cz:  392, cols: 34, rows: 10 },
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const gridSpacing = SOLAR_ARRAY_GRID_SPACING;
+  const arraySlots = [
+    { gx: -4, gz: -4, cols: 24, rows: 16 },
+    { gx: -2, gz: -4, cols: 28, rows: 16 },
+    { gx:  0, gz: -4, cols: 28, rows: 16 },
+    { gx:  2, gz: -4, cols: 28, rows: 16 },
+    { gx:  4, gz: -4, cols: 24, rows: 16 },
+
+    { gx: -4, gz: -2, cols: 24, rows: 18 },
+    { gx: -2, gz: -2, cols: 30, rows: 18 },
+    { gx:  0, gz: -2, cols: 30, rows: 18 },
+    { gx:  2, gz: -2, cols: 30, rows: 18 },
+    { gx:  4, gz: -2, cols: 24, rows: 18 },
+
+    { gx: -4, gz:  0, cols: 24, rows: 18 },
+    { gx: -2, gz:  0, cols: 30, rows: 18 },
+    { gx:  0, gz:  0, cols: 30, rows: 18 },
+    { gx:  2, gz:  0, cols: 30, rows: 18 },
+    { gx:  4, gz:  0, cols: 24, rows: 18 },
+
+    { gx: -4, gz:  2, cols: 24, rows: 16 },
+    { gx: -2, gz:  2, cols: 28, rows: 16 },
+    { gx:  0, gz:  2, cols: 28, rows: 16 },
+    { gx:  2, gz:  2, cols: 28, rows: 16 },
+    { gx:  4, gz:  2, cols: 24, rows: 16 },
   ];
+  const blocks = arraySlots.map(slot => {
+    const localX = slot.gx * gridSpacing;
+    const localZ = slot.gz * gridSpacing;
+    return {
+      cx: localX * cy - localZ * sy,
+      cz: localX * sy + localZ * cy,
+      localX,
+      localZ,
+      cols: slot.cols,
+      rows: slot.rows,
+    };
+  });
   const panelW = 10.5;
   const panelD = 4.25;
   const panelT = 0.42;
   const colGap = 2.2;
   const rowGap = 4.8;
-  const cy = Math.cos(yaw), sy = Math.sin(yaw);
   const tmp = new THREE.Vector3();
 
   for (const block of blocks) {
@@ -1166,7 +1667,6 @@ function buildPanelFarm() {
       for (let c = 0; c < block.cols; c++) {
         const lx = (c - (block.cols - 1) * 0.5) * (panelW + colGap);
         const lz = (r - (block.rows - 1) * 0.5) * (panelD + rowGap);
-        const jitter = Math.sin(c * 1.7 + r * 0.8) * 0.08;
         tmp.set(
           block.cx + lx * cy - lz * sy,
           0,
@@ -1178,8 +1678,8 @@ function buildPanelFarm() {
           w: panelW,
           d: panelD,
           t: panelT,
-          yaw: yaw + jitter,
-          pitch: pitch + Math.sin(r * 0.75) * 0.018,
+          yaw,
+          pitch,
         });
       }
     }
@@ -1188,6 +1688,8 @@ function buildPanelFarm() {
   const wirePositions = [];
   const railPositions = [];
   const supportPositions = [];
+  const cellPositions = [];
+  const leadingEdgePositions = [];
   const glintPositions = [];
   const glintColors = [];
   const glintSizes = [];
@@ -1204,6 +1706,16 @@ function buildPanelFarm() {
     for (const e of edges) addLine(wirePositions, corners[e[0]], corners[e[1]]);
 
     const transform = makeTransform(p.cx, p.cz, p.yaw, p.pitch);
+    const cellY = p.t * 0.88;
+    for (const x of [-p.w * 0.24, 0, p.w * 0.24]) {
+      addLine(cellPositions, transform(x, cellY, -p.d * 0.42), transform(x, cellY, p.d * 0.42));
+    }
+    for (const z of [-p.d * 0.18, p.d * 0.18]) {
+      addLine(cellPositions, transform(-p.w * 0.42, cellY, z), transform(p.w * 0.42, cellY, z));
+    }
+    addLine(cellPositions, transform(-p.w * 0.38, cellY, -p.d * 0.34), transform(p.w * 0.38, cellY, p.d * 0.34));
+    addLine(leadingEdgePositions, transform(-p.w * 0.5, p.t * 0.78, p.d * 0.5), transform(p.w * 0.5, p.t * 0.78, p.d * 0.5));
+
     const topZs = [-p.d * 0.17, p.d * 0.17];
     for (const z of topZs) {
       addLine(railPositions, transform(-p.w * 0.46, p.t * 0.76, z), transform(p.w * 0.46, p.t * 0.76, z));
@@ -1223,7 +1735,8 @@ function buildPanelFarm() {
       const gz = -p.d * 0.40 + Math.random() * p.d * 0.80;
       const g = transform(gx, p.t * 0.86, gz);
       glintPositions.push(g[0], g[1] + 0.08, g[2]);
-      if (Math.random() < 0.58) lineColor.copy(yellow).lerp(yellowB, Math.random() * 0.4);
+      if (Math.random() < 0.035) lineColor.copy(accentYellow).lerp(greyC, Math.random() * 0.18);
+      else if (Math.random() < 0.58) lineColor.copy(yellow).lerp(yellowB, Math.random() * 0.4);
       else lineColor.copy(greyA).lerp(greyC, Math.random() * 0.45);
       glintColors.push(lineColor.r, lineColor.g, lineColor.b);
       glintSizes.push(1.15 + Math.random() * 1.25);
@@ -1239,8 +1752,8 @@ function buildPanelFarm() {
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar: sharedUniforms.uFadeFar,
       uBgColor: sharedUniforms.uBgColor,
-      uColor: { value: new THREE.Color('#8d8d93') },
-      uAlpha: { value: 0.68 },
+      uColor: { value: new THREE.Color('#77787f') },
+      uAlpha: { value: 0.74 },
     },
     vertexShader: wireVert,
     fragmentShader: wireFrag,
@@ -1250,6 +1763,44 @@ function buildPanelFarm() {
   });
   scene.add(new THREE.LineSegments(wireGeo, wireMat));
 
+  const cellGeo = new THREE.BufferGeometry();
+  cellGeo.setAttribute('position', new THREE.Float32BufferAttribute(cellPositions, 3));
+  const cellMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#bbbcc2') },
+      uAlpha: { value: 0.24 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  scene.add(new THREE.LineSegments(cellGeo, cellMat));
+
+  const edgeGeo = new THREE.BufferGeometry();
+  edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(leadingEdgePositions, 3));
+  const edgeMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#5f6067') },
+      uAlpha: { value: 0.70 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  scene.add(new THREE.LineSegments(edgeGeo, edgeMat));
+
   const detailGeo = new THREE.BufferGeometry();
   detailGeo.setAttribute('position', new THREE.Float32BufferAttribute(railPositions.concat(supportPositions), 3));
   const detailMat = new THREE.ShaderMaterial({
@@ -1258,8 +1809,8 @@ function buildPanelFarm() {
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar: sharedUniforms.uFadeFar,
       uBgColor: sharedUniforms.uBgColor,
-      uColor: { value: new THREE.Color('#b5b5bb') },
-      uAlpha: { value: 0.42 },
+      uColor: { value: new THREE.Color('#aeb0b7') },
+      uAlpha: { value: 0.34 },
     },
     vertexShader: wireVert,
     fragmentShader: wireFrag,
@@ -1274,10 +1825,11 @@ function buildPanelFarm() {
   glintGeo.setAttribute('color', new THREE.Float32BufferAttribute(glintColors, 3));
   glintGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(glintSizes, 1));
   glintGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(glintPhases, 1));
-  scene.add(new THREE.Points(glintGeo, makePointsMaterial(1.08)));
+  scene.add(new THREE.Points(glintGeo, makePointsMaterial(1.08, particleDensityUniforms.panelGlints)));
 
   buildServiceGrid(blocks, yaw);
   buildInverterBoxes(yaw);
+  buildServiceMachines(yaw);
   buildSkidSteerRobot(yaw);
   return panels.length;
 }
@@ -1290,31 +1842,66 @@ function buildServiceGrid(blocks, yaw) {
   const particleCol = [];
   const particleSize = [];
   const particlePhase = [];
+  serviceParticleData = [];
   const c = new THREE.Color();
 
   function local(x, z) {
     return [x * cy - z * sy, 0.16, x * sy + z * cy];
   }
-  const serviceRuns = [
-    [-585, -22, 585, -22],
-    [-560, 282, 560, 282],
-    [-24, -360, -24, 500],
-    [28, -360, 28, 500],
-    [-610, -342, 610, -342],
-    [-610, 520, 610, 520],
-  ];
+
+  function addWrappedRun(run) {
+    const [x0, z0, x1, z1] = run;
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const segments = Math.max(10, Math.ceil(len / 34));
+    let prev = local(x0, z0);
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      const next = local(
+        x0 + (x1 - x0) * t,
+        z0 + (z1 - z0) * t
+      );
+      addLine(linePositions, prev, next);
+      prev = next;
+    }
+  }
+
+  const serviceRuns = [];
+  const domeExtent = 3250;
+  const minorExtent = 2700;
+  const gridSpacing = SOLAR_ARRAY_GRID_SPACING;
+  const gridHalf = gridSpacing * 7;
+  for (let z = -gridHalf; z <= gridHalf; z += gridSpacing) {
+    serviceRuns.push([-domeExtent, z, domeExtent, z]);
+  }
+  for (let x = -gridHalf; x <= gridHalf; x += gridSpacing) {
+    serviceRuns.push([x, -minorExtent, x, minorExtent]);
+  }
+
   for (const run of serviceRuns) {
     const a = local(run[0], run[1]);
     const b = local(run[2], run[3]);
-    addLine(linePositions, a, b);
+    addWrappedRun(run);
     const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
-    const steps = Math.floor(len / 3.8);
+    const steps = Math.floor(len / 8.5);
     for (let i = 0; i < steps; i++) {
       const t = i / Math.max(1, steps - 1);
+      const y = 0.22 + Math.random() * 0.2;
       const x = a[0] + (b[0] - a[0]) * t + (Math.random() - 0.5) * 1.4;
       const z = a[2] + (b[2] - a[2]) * t + (Math.random() - 0.5) * 1.4;
-      particlePos.push(x, 0.22 + Math.random() * 0.2, z);
-      if (Math.random() < 0.22) c.copy(yellow).lerp(yellowB, Math.random() * 0.5);
+      particlePos.push(x, y, z);
+      serviceParticleData.push({
+        ax: a[0],
+        az: a[2],
+        bx: b[0],
+        bz: b[2],
+        t,
+        y,
+        speed: (0.012 + Math.random() * 0.034) * (Math.random() < 0.5 ? -1 : 1),
+        jitter: 0.25 + Math.random() * 0.65,
+        phase: Math.random() * Math.PI * 2,
+      });
+      if (Math.random() < 0.055) c.copy(accentYellow).lerp(greyC, Math.random() * 0.18);
+      else if (Math.random() < 0.22) c.copy(yellow).lerp(yellowB, Math.random() * 0.5);
       else c.copy(greyA).lerp(greyB, Math.random() * 0.6);
       particleCol.push(c.r, c.g, c.b);
       particleSize.push(0.95 + Math.random() * 0.7);
@@ -1330,8 +1917,8 @@ function buildServiceGrid(blocks, yaw) {
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar: sharedUniforms.uFadeFar,
       uBgColor: sharedUniforms.uBgColor,
-      uColor: { value: new THREE.Color('#ababaf') },
-      uAlpha: { value: 0.32 },
+      uColor: { value: new THREE.Color('#c4c5ca') },
+      uAlpha: { value: 0.20 },
     },
     vertexShader: wireVert,
     fragmentShader: wireFrag,
@@ -1345,7 +1932,30 @@ function buildServiceGrid(blocks, yaw) {
   pointGeo.setAttribute('color', new THREE.Float32BufferAttribute(particleCol, 3));
   pointGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(particleSize, 1));
   pointGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(particlePhase, 1));
-  scene.add(new THREE.Points(pointGeo, makePointsMaterial(0.9)));
+  serviceParticleGeo = pointGeo;
+  scene.add(new THREE.Points(pointGeo, makePointsMaterial(0.9, particleDensityUniforms.gridParticles)));
+}
+
+function updateServiceGridParticles(dt, elapsed) {
+  if (!serviceParticleGeo || !serviceParticleData.length) return;
+  const arr = serviceParticleGeo.attributes.position.array;
+  for (let i = 0; i < serviceParticleData.length; i++) {
+    const d = serviceParticleData[i];
+    d.t += d.speed * dt;
+    if (d.t > 1) d.t -= 1;
+    if (d.t < 0) d.t += 1;
+    const dx = d.bx - d.ax;
+    const dz = d.bz - d.az;
+    const len = Math.max(0.001, Math.hypot(dx, dz));
+    const nx = -dz / len;
+    const nz = dx / len;
+    const sway = Math.sin(elapsed * 1.7 + d.phase) * d.jitter;
+    const ix = i * 3;
+    arr[ix + 0] = d.ax + dx * d.t + nx * sway;
+    arr[ix + 1] = d.y + Math.sin(elapsed * 2.1 + d.phase) * 0.05;
+    arr[ix + 2] = d.az + dz * d.t + nz * sway;
+  }
+  serviceParticleGeo.attributes.position.needsUpdate = true;
 }
 
 function buildInverterBoxes(yaw) {
@@ -1358,6 +1968,10 @@ function buildInverterBoxes(yaw) {
     [232, 506, 18, 8, 11],
   ];
   const wires = [];
+  const nodePositions = [];
+  const nodeColors = [];
+  const nodeSizes = [];
+  const nodePhases = [];
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
   for (const box of boxes) {
     const x = box[0] * cy - box[1] * sy;
@@ -1368,6 +1982,10 @@ function buildInverterBoxes(yaw) {
       [6,7], [7,4], [0,4], [1,5], [2,6], [3,7],
     ];
     for (const e of edges) addLine(wires, corners[e[0]], corners[e[1]]);
+    nodePositions.push(x, 1.55 + box[3] * 0.64, z);
+    nodeColors.push(accentYellow.r, accentYellow.g, accentYellow.b);
+    nodeSizes.push(2.2 + Math.random() * 0.7);
+    nodePhases.push(Math.random() * Math.PI * 2);
   }
 
   const wireGeo = new THREE.BufferGeometry();
@@ -1378,8 +1996,8 @@ function buildInverterBoxes(yaw) {
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar: sharedUniforms.uFadeFar,
       uBgColor: sharedUniforms.uBgColor,
-      uColor: { value: new THREE.Color('#8f8f95') },
-      uAlpha: { value: 0.58 },
+      uColor: { value: new THREE.Color('#7e7f86') },
+      uAlpha: { value: 0.62 },
     },
     vertexShader: wireVert,
     fragmentShader: wireFrag,
@@ -1387,6 +2005,154 @@ function buildInverterBoxes(yaw) {
     depthWrite: false,
   });
   scene.add(new THREE.LineSegments(wireGeo, wireMat));
+
+  const nodeGeo = new THREE.BufferGeometry();
+  nodeGeo.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions, 3));
+  nodeGeo.setAttribute('color', new THREE.Float32BufferAttribute(nodeColors, 3));
+  nodeGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(nodeSizes, 1));
+  nodeGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(nodePhases, 1));
+  scene.add(new THREE.Points(nodeGeo, makePointsMaterial(1.2, particleDensityUniforms.gridParticles)));
+}
+
+function buildServiceMachines(farmYaw) {
+  const machines = [
+    { lx: -640, lz: -640, rot:  0.18, scale: 0.34, variant: 'arm' },
+    { lx:  -60, lz: -650, rot: -0.38, scale: 0.30, variant: 'mast' },
+    { lx:  570, lz: -620, rot:  0.54, scale: 0.32, variant: 'cart' },
+    { lx: -850, lz: -225, rot: -0.15, scale: 0.31, variant: 'cart' },
+    { lx: -250, lz: -205, rot:  0.68, scale: 0.36, variant: 'arm' },
+    { lx:  360, lz: -225, rot: -0.74, scale: 0.29, variant: 'mast' },
+    { lx:  900, lz: -185, rot:  0.24, scale: 0.33, variant: 'arm' },
+    { lx: -620, lz:  210, rot:  0.88, scale: 0.30, variant: 'mast' },
+    { lx:   20, lz:  215, rot: -0.56, scale: 0.35, variant: 'arm' },
+    { lx:  650, lz:  245, rot:  0.36, scale: 0.31, variant: 'cart' },
+  ];
+  const bodyPositions = [];
+  const accentPositions = [];
+  const toolPositions = [];
+
+  function appendMachine(machine) {
+    const [originX, originZ] = localToWorld(machine.lx, machine.lz, farmYaw);
+    const yaw = farmYaw + machine.rot;
+    const scale = machine.scale;
+
+    function place(lx, lz) {
+      return localToWorld(lx * scale, lz * scale, yaw, originX, originZ);
+    }
+    function point(lx, y, lz) {
+      const [x, z] = place(lx, lz);
+      return [x, y * scale, z];
+    }
+    function box(lx, lz, w, h, d, baseY, pitch = 0, target = bodyPositions) {
+      const [x, z] = place(lx, lz);
+      return addWireBox(target, x, z, w * scale, h * scale, d * scale, yaw, pitch, baseY * scale);
+    }
+
+    box(-11, 0, 5.2, 4.8, 28, 2.8);
+    box( 11, 0, 5.2, 4.8, 28, 2.8);
+    box(0, -2, 22, 8.5, 23, 6.7);
+    box(0, -10, 15, 6.4, 8.5, 12.2);
+    box(0, 6, 15, 11, 11, 16.6);
+
+    for (const lx of [-11, 11]) {
+      for (const lz of [-10, 2, 12]) {
+        const p = point(lx, 2.8, lz);
+        addCircle(accentPositions, p, 2.25 * scale, 'x', 16);
+      }
+    }
+
+    if (machine.variant === 'cart') {
+      box(0, 19, 25, 4.5, 14, 6.2, 0, accentPositions);
+      addLine(accentPositions, point(-11, 8.4, 13), point(11, 8.4, 13));
+      addLine(accentPositions, point(-8, 8.4, 25), point(8, 8.4, 25));
+      addLine(toolPositions, point(-7, 8.8, 26), point(7, 8.8, 26));
+      return;
+    }
+
+    const shoulder = point(0, machine.variant === 'mast' ? 30 : 25, 4);
+    const elbow = machine.variant === 'mast'
+      ? point(0, 48, 8)
+      : point(12, 38, 22);
+    const wrist = machine.variant === 'mast'
+      ? point(-6, 42, 29)
+      : point(-5, 31, 40);
+    const tool = machine.variant === 'mast'
+      ? point(-9, 34, 43)
+      : point(-10, 25, 51);
+
+    addJoint(accentPositions, shoulder, 3.3 * scale);
+    addJoint(accentPositions, elbow, 3.0 * scale);
+    addJoint(accentPositions, wrist, 2.35 * scale);
+    addLink(bodyPositions, shoulder, elbow, 2.6 * scale);
+    addLink(bodyPositions, elbow, wrist, 2.25 * scale);
+    addLink(bodyPositions, wrist, tool, 1.8 * scale);
+    addLine(toolPositions, tool, point(-16, 23, 56));
+    addLine(toolPositions, tool, point(-4, 23, 57));
+  }
+
+  for (const machine of machines) appendMachine(machine);
+
+  const group = new THREE.Group();
+  group.name = 'service-machines';
+
+  const bodyGeo = new THREE.BufferGeometry();
+  bodyGeo.setAttribute('position', new THREE.Float32BufferAttribute(bodyPositions, 3));
+  const bodyMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#696a71') },
+      uAlpha: { value: 0.58 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  group.add(new THREE.LineSegments(bodyGeo, bodyMat));
+
+  const accentGeo = new THREE.BufferGeometry();
+  accentGeo.setAttribute('position', new THREE.Float32BufferAttribute(accentPositions, 3));
+  const accentMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: new THREE.Color('#a3a4aa') },
+      uAlpha: { value: 0.42 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  group.add(new THREE.LineSegments(accentGeo, accentMat));
+
+  const toolGeo = new THREE.BufferGeometry();
+  toolGeo.setAttribute('position', new THREE.Float32BufferAttribute(toolPositions, 3));
+  const toolMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: accentYellow },
+      uAlpha: { value: 0.62 },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+  group.add(new THREE.LineSegments(toolGeo, toolMat));
+
+  scene.add(group);
 }
 
 let eGeo;
@@ -1422,7 +2188,7 @@ function buildEmbers() {
   eGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   eGeo.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
   eGeo.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
-  scene.add(new THREE.Points(eGeo, makePointsMaterial(0.95)));
+  scene.add(new THREE.Points(eGeo, makePointsMaterial(0.95, particleDensityUniforms.atmosphere)));
 }
 
 function updateEmbers(dt, elapsed) {
@@ -1547,6 +2313,12 @@ for (const input of cameraInputs()) {
   input.addEventListener('input', applyCameraDebugInputs);
 }
 
+for (const input of particleInputs()) {
+  input.addEventListener('input', applyParticleDebugInputs);
+}
+
+robotDebugEls.cameraAnimDuration.addEventListener('input', applyCameraAnimationDurationInput);
+
 controls.addEventListener('change', () => {
   saveCameraState();
   updateCameraDebug();
@@ -1578,13 +2350,46 @@ robotDebugEls.reset.addEventListener('click', () => {
 });
 
 robotDebugEls.resetCamera.addEventListener('click', () => {
+  stopCameraAnimation(false);
+  activeCameraShotName = 'Custom';
   applyCameraState(defaultCameraState());
+  updateCameraAnimationDebug();
+});
+
+robotDebugEls.setCameraKeyA.addEventListener('click', () => setCameraKeyframe('keyA'));
+robotDebugEls.setCameraKeyB.addEventListener('click', () => setCameraKeyframe('keyB'));
+robotDebugEls.returnCameraKeyA.addEventListener('click', () => returnToCameraKeyframe('keyA'));
+robotDebugEls.returnCameraKeyB.addEventListener('click', () => returnToCameraKeyframe('keyB'));
+robotDebugEls.playCameraMove.addEventListener('click', startCameraAnimation);
+robotDebugEls.resetCameraMove.addEventListener('click', resetCameraAnimation);
+robotDebugEls.shotLowOrbit.addEventListener('click', () => applyCameraShot('Low Orbit'));
+robotDebugEls.shotTopographic.addEventListener('click', () => applyCameraShot('Topographic'));
+robotDebugEls.shotMacro.addEventListener('click', () => applyCameraShot('Macro'));
+robotDebugEls.shotHorizonSweep.addEventListener('click', () => applyCameraShot('Horizon Sweep'));
+
+window.addEventListener('keydown', (event) => {
+  const target = event.target;
+  const isTyping = target && (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable
+  );
+  if (isTyping || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (event.key.toLowerCase() === 'p') {
+    event.preventDefault();
+    startCameraAnimation();
+  }
 });
 
 applyCameraState(readSavedCameraState(), false);
+Object.assign(cameraAnimation, readSavedCameraAnimationState(), { active: false, startedAt: 0 });
+applyParticleState(readSavedParticleState(), false);
 updateRobotMoveModeUI();
 setDebugPanelCollapsed(readDebugPanelCollapsed(), false);
 updateCameraDebug();
+updateCameraAnimationDebug();
+updateParticleDebug();
 
 window.addEventListener('resize', () => {
   const w = window.innerWidth, h = window.innerHeight;
@@ -1601,7 +2406,9 @@ function tick() {
   const dt = Math.min(0.05, clock.getDelta());
   const elapsed = clock.elapsedTime;
   sharedUniforms.uTime.value = elapsed;
+  updateServiceGridParticles(dt, elapsed);
   updateEmbers(dt, elapsed);
+  updateCameraAnimation(performance.now());
   controls.update();
   composer.render();
   requestAnimationFrame(tick);
@@ -1609,8 +2416,10 @@ function tick() {
 
 (function boot() {
   const panelCount = buildPanelFarm();
+  solarPanelCount = panelCount;
   buildEmbers();
   lblText.textContent = `${panelCount.toLocaleString()} panels - wireframe array ready`;
+  updateSceneHud();
   loader.classList.add('gone');
   setTimeout(() => loader.remove(), 900);
   tick();

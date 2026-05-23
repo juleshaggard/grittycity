@@ -103,6 +103,11 @@
     font-size: 8px;
     letter-spacing: 0.14em;
   }
+  .debug-menu__section {
+    margin: 11px 0 7px;
+    color: rgba(20, 20, 24, 0.78);
+    letter-spacing: 0.18em;
+  }
   .debug-menu__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -111,6 +116,10 @@
   .debug-menu label {
     display: grid;
     gap: 4px;
+  }
+  .debug-menu__check {
+    grid-template-columns: 1fr auto;
+    align-items: center;
   }
   .debug-menu input,
   .debug-menu textarea {
@@ -127,6 +136,14 @@
   .debug-menu textarea:focus {
     border-color: rgba(20, 20, 24, 0.38);
   }
+  .debug-menu input[type="color"] {
+    height: 27px;
+    padding: 2px;
+  }
+  .debug-menu input[type="checkbox"] {
+    width: auto;
+    justify-self: end;
+  }
   .debug-menu textarea {
     height: 112px;
     margin-top: 8px;
@@ -137,6 +154,12 @@
     display: flex;
     gap: 8px;
     margin-top: 8px;
+  }
+  .debug-menu__actions--wrap {
+    flex-wrap: wrap;
+  }
+  .debug-menu__actions--wrap button {
+    min-width: 120px;
   }
   .debug-menu button {
     flex: 1;
@@ -153,6 +176,11 @@
   .debug-menu button:hover {
     background: rgba(252, 225, 50, 0.24);
     border-color: rgba(40, 40, 48, 0.28);
+  }
+  .debug-menu button.active {
+    background: rgba(252, 225, 50, 0.42);
+    border-color: rgba(40, 40, 48, 0.34);
+    color: rgba(20, 20, 24, 0.9);
   }
   .debug-menu__toggle {
     flex: 0 0 auto !important;
@@ -224,7 +252,7 @@
 </div>
 <div class="corner">
   BANGKOK · 13°45′N 100°30′E
-  <small>OSM aerial · night · ~02:47 local</small>
+  <small id="cityHudStatus">OSM BUILDINGS -- · PARTICLE DENSITY 1.00 · CAMERA CUSTOM</small>
 </div>
 <div class="hud">
   <b>drag</b> to orbit &nbsp;·&nbsp; <b>scroll</b> to zoom &nbsp;·&nbsp; <b>right-drag</b> to pan
@@ -238,11 +266,13 @@
     <button class="debug-menu__toggle" id="toggleDebugPanel" type="button">Hide</button>
   </div>
   <div class="debug-menu__body">
+    <div class="debug-menu__section">Camera</div>
     <div class="debug-menu__grid">
       <label>Cam X <input id="cameraX" type="number" step="1" /></label>
       <label>Cam Y <input id="cameraY" type="number" step="1" /></label>
       <label>Cam Z <input id="cameraZ" type="number" step="1" /></label>
       <label>FOV <input id="cameraFov" type="number" min="20" max="100" step="1" /></label>
+      <label>Zoom <input id="cameraZoom" type="number" min="0.1" max="10" step="0.01" /></label>
       <label>Clip Near <input id="cameraNear" type="number" min="0.01" step="0.1" /></label>
       <label>Clip Far <input id="cameraFar" type="number" min="1" step="100" /></label>
       <label>Target X <input id="targetX" type="number" step="1" /></label>
@@ -252,10 +282,59 @@
       <label>Fade Far <input id="fadeFar" type="number" min="1" step="1" /></label>
       <label>Max Polar Deg <input id="maxPolar" type="number" min="1" max="179" step="1" /></label>
     </div>
+    <div class="debug-menu__section">Camera Shots</div>
+    <div class="debug-menu__actions debug-menu__actions--wrap">
+      <button id="shotLowOrbit" type="button">Low Orbit</button>
+      <button id="shotTopographic" type="button">Topographic</button>
+      <button id="shotMacro" type="button">Macro</button>
+      <button id="shotHorizonSweep" type="button">Horizon Sweep</button>
+    </div>
+    <div class="debug-menu__section">Camera Move</div>
+    <div class="debug-menu__grid">
+      <label>Time S <input id="cameraAnimDuration" type="number" min="0.1" max="120" step="0.1" /></label>
+    </div>
+    <div class="debug-menu__actions">
+      <button id="setCameraKeyA" type="button">Set A</button>
+      <button id="setCameraKeyB" type="button">Set B</button>
+    </div>
+    <div class="debug-menu__actions">
+      <button id="returnCameraKeyA" type="button">Return to A</button>
+      <button id="returnCameraKeyB" type="button">Return to B</button>
+    </div>
+    <div class="debug-menu__actions">
+      <button id="playCameraMove" type="button">Play</button>
+      <button id="resetCameraMove" type="button">Reset</button>
+    </div>
+    <div class="debug-menu__section">Particles</div>
+    <div class="debug-menu__grid">
+      <label>Point Scale <input id="particleScale" type="number" min="0.1" max="5" step="0.05" /></label>
+      <label>Point Alpha <input id="particleAlpha" type="number" min="0" max="3" step="0.05" /></label>
+      <label>Point Density <input id="particleDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Bldg Density <input id="particleBuildingsDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>River Density <input id="particleRiverDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Street Density <input id="particleStreetDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Stream Density <input id="particleStreamDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Traffic Density <input id="particleTrafficDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Wind Density <input id="particleWindDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Point Color <input id="particleColor" type="color" /></label>
+      <label>Color Mix <input id="particleColorMix" type="number" min="0" max="1" step="0.05" /></label>
+      <label>Point Blur <input id="particleBlur" type="number" min="0" max="1" step="0.05" /></label>
+      <label>Wobble <input id="particleWobble" type="number" min="0" max="4" step="0.05" /></label>
+      <label>Twinkle Speed <input id="twinkleSpeed" type="number" min="0" max="8" step="0.1" /></label>
+      <label>Twinkle Amt <input id="twinkleAmount" type="number" min="0" max="1" step="0.05" /></label>
+      <label>River Speed <input id="streamSpeed" type="number" min="0" max="5" step="0.05" /></label>
+      <label>Traffic Speed <input id="trafficSpeed" type="number" min="0" max="5" step="0.05" /></label>
+      <label>Flow Speed <input id="emberSpeed" type="number" min="0" max="5" step="0.05" /></label>
+    </div>
+    <div class="debug-menu__section">Interaction</div>
+    <div class="debug-menu__grid">
+      <label class="debug-menu__check">Building Hover <input id="buildingHoverEnabled" type="checkbox" /></label>
+    </div>
     <textarea id="debugData" readonly spellcheck="false"></textarea>
     <div class="debug-menu__actions">
       <button id="copyDebugData" type="button">Copy</button>
       <button id="resetCameraData" type="button">Reset Cam</button>
+      <button id="resetParticleData" type="button">Reset Particles</button>
     </div>
   </div>
 </div>
@@ -305,6 +384,7 @@ const debugEls = {
   cameraY: document.getElementById('cameraY'),
   cameraZ: document.getElementById('cameraZ'),
   cameraFov: document.getElementById('cameraFov'),
+  cameraZoom: document.getElementById('cameraZoom'),
   cameraNear: document.getElementById('cameraNear'),
   cameraFar: document.getElementById('cameraFar'),
   targetX: document.getElementById('targetX'),
@@ -313,10 +393,44 @@ const debugEls = {
   fadeNear: document.getElementById('fadeNear'),
   fadeFar: document.getElementById('fadeFar'),
   maxPolar: document.getElementById('maxPolar'),
+  cameraAnimDuration: document.getElementById('cameraAnimDuration'),
+  particleScale: document.getElementById('particleScale'),
+  particleAlpha: document.getElementById('particleAlpha'),
+  particleDensity: document.getElementById('particleDensity'),
+  particleBuildingsDensity: document.getElementById('particleBuildingsDensity'),
+  particleRiverDensity: document.getElementById('particleRiverDensity'),
+  particleStreetDensity: document.getElementById('particleStreetDensity'),
+  particleStreamDensity: document.getElementById('particleStreamDensity'),
+  particleTrafficDensity: document.getElementById('particleTrafficDensity'),
+  particleWindDensity: document.getElementById('particleWindDensity'),
+  particleColor: document.getElementById('particleColor'),
+  particleColorMix: document.getElementById('particleColorMix'),
+  particleBlur: document.getElementById('particleBlur'),
+  particleWobble: document.getElementById('particleWobble'),
+  twinkleSpeed: document.getElementById('twinkleSpeed'),
+  twinkleAmount: document.getElementById('twinkleAmount'),
+  streamSpeed: document.getElementById('streamSpeed'),
+  trafficSpeed: document.getElementById('trafficSpeed'),
+  emberSpeed: document.getElementById('emberSpeed'),
+  buildingHoverEnabled: document.getElementById('buildingHoverEnabled'),
   data: document.getElementById('debugData'),
   togglePanel: document.getElementById('toggleDebugPanel'),
   copy: document.getElementById('copyDebugData'),
   resetCamera: document.getElementById('resetCameraData'),
+  resetParticles: document.getElementById('resetParticleData'),
+  setCameraKeyA: document.getElementById('setCameraKeyA'),
+  setCameraKeyB: document.getElementById('setCameraKeyB'),
+  returnCameraKeyA: document.getElementById('returnCameraKeyA'),
+  returnCameraKeyB: document.getElementById('returnCameraKeyB'),
+  playCameraMove: document.getElementById('playCameraMove'),
+  resetCameraMove: document.getElementById('resetCameraMove'),
+  shotLowOrbit: document.getElementById('shotLowOrbit'),
+  shotTopographic: document.getElementById('shotTopographic'),
+  shotMacro: document.getElementById('shotMacro'),
+  shotHorizonSweep: document.getElementById('shotHorizonSweep'),
+};
+const hudEls = {
+  status: document.getElementById('cityHudStatus'),
 };
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -329,7 +443,11 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xffffff); // pure white, no gradient/vignette
 
 const CITY_CAMERA_STATE_KEY = 'city-camera-transform-v1';
+const CITY_CAMERA_ANIMATION_STATE_KEY = 'city-camera-animation-v2';
+const CITY_PARTICLE_STATE_KEY = 'city-particle-system-v2';
 const CITY_DEBUG_PANEL_STATE_KEY = 'city-debug-panel-v1';
+const CITY_BUILDING_HOVER_STATE_KEY = 'city-building-hover-v1';
+const CITY_FADE_FAR_MIGRATION_KEY = 'city-fade-far-360-v1';
 const DEFAULT_CAMERA_X = 360;
 const DEFAULT_CAMERA_Y = 270;
 const DEFAULT_CAMERA_Z = 480;
@@ -337,11 +455,32 @@ const DEFAULT_TARGET_X = 0;
 const DEFAULT_TARGET_Y = 0;
 const DEFAULT_TARGET_Z = 0;
 const DEFAULT_CAMERA_FOV = 72;
+const DEFAULT_CAMERA_ZOOM = 1;
 const DEFAULT_CAMERA_NEAR = 1;
 const DEFAULT_CAMERA_FAR = 8000;
 const DEFAULT_FADE_NEAR = 8;
-const DEFAULT_FADE_FAR = 70;
+const DEFAULT_FADE_FAR = 360;
 const DEFAULT_MAX_POLAR_DEG = 99;
+const DEFAULT_PARTICLE_SCALE = 1;
+const DEFAULT_PARTICLE_ALPHA = 1;
+const DEFAULT_PARTICLE_DENSITY = 4;
+const DEFAULT_PARTICLE_BUILDING_DENSITY = 1;
+const DEFAULT_PARTICLE_RIVER_DENSITY = 1.3;
+const DEFAULT_PARTICLE_STREET_DENSITY = 4;
+const DEFAULT_PARTICLE_STREAM_DENSITY = 2.65;
+const DEFAULT_PARTICLE_TRAFFIC_DENSITY = 4;
+const DEFAULT_PARTICLE_WIND_DENSITY = 1;
+const PARTICLE_DENSITY_MAX = 10;
+const DEFAULT_PARTICLE_COLOR = '#a4a4aa';
+const DEFAULT_PARTICLE_COLOR_MIX = 1;
+const DEFAULT_PARTICLE_BLUR = 0.72;
+const DEFAULT_PARTICLE_WOBBLE = 0.28;
+const DEFAULT_TWINKLE_SPEED = 1.6;
+const DEFAULT_TWINKLE_AMOUNT = 0.22;
+const DEFAULT_STREAM_SPEED = 1;
+const DEFAULT_TRAFFIC_SPEED = 1;
+const DEFAULT_EMBER_SPEED = 1;
+const DEFAULT_CAMERA_ANIMATION_DURATION = 4;
 
 const camera = new THREE.PerspectiveCamera(
   DEFAULT_CAMERA_FOV,
@@ -373,6 +512,16 @@ function radToDeg(rad) {
 
 function roundForDebug(value, digits = 2) {
   return Number(value.toFixed(digits));
+}
+
+function normalizeHexColor(value, fallback = DEFAULT_PARTICLE_COLOR) {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(trimmed)) {
+    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`.toLowerCase();
+  }
+  return fallback;
 }
 
 // ============================================================
@@ -430,10 +579,66 @@ const sharedUniforms = {
   uFadeNear: { value: DEFAULT_FADE_NEAR }, // closer than this = fully faded (basically inside a building)
   uFadeFar:  { value: DEFAULT_FADE_FAR },  // past this = fully saturated; well below the orbit minDistance
   uBgColor:  { value: new THREE.Color(0xffffff) }, // pure white — particles bleed straight into background
-  uWobble:   { value: 0.28 },    // per-particle position jitter amplitude (gives "alive" shimmer)
+  uWobble:   { value: DEFAULT_PARTICLE_WOBBLE }, // per-particle position jitter amplitude (gives "alive" shimmer)
+  uPointScale: { value: DEFAULT_PARTICLE_SCALE },
+  uPointAlpha: { value: DEFAULT_PARTICLE_ALPHA },
+  uPointDensity: { value: DEFAULT_PARTICLE_DENSITY },
+  uPointColor: { value: new THREE.Color(DEFAULT_PARTICLE_COLOR) },
+  uPointColorMix: { value: DEFAULT_PARTICLE_COLOR_MIX },
+  uPointBlur: { value: DEFAULT_PARTICLE_BLUR },
+  uTwinkleSpeed: { value: DEFAULT_TWINKLE_SPEED },
+  uTwinkleAmount: { value: DEFAULT_TWINKLE_AMOUNT },
 };
 
 let suppressCameraInput = false;
+let suppressParticleInput = false;
+let activeCameraShotName = 'Custom';
+const particleSettings = {
+  streamSpeed: DEFAULT_STREAM_SPEED,
+  trafficSpeed: DEFAULT_TRAFFIC_SPEED,
+  emberSpeed: DEFAULT_EMBER_SPEED,
+};
+const RIVER_PARTICLE_POOL_MULTIPLIER = 4;
+const STREET_PARTICLE_POOL_MULTIPLIER = 4;
+const STREAM_PARTICLE_POOL_MULTIPLIER = 10;
+const TRAFFIC_PARTICLE_POOL_MULTIPLIER = 10;
+const WIND_PARTICLE_POOL_MULTIPLIER = 10;
+const particleDensityUniforms = {
+  buildings: { value: DEFAULT_PARTICLE_BUILDING_DENSITY },
+  river: { value: DEFAULT_PARTICLE_RIVER_DENSITY },
+  streets: { value: DEFAULT_PARTICLE_STREET_DENSITY },
+  streams: { value: DEFAULT_PARTICLE_STREAM_DENSITY },
+  traffic: { value: DEFAULT_PARTICLE_TRAFFIC_DENSITY },
+  wind: { value: DEFAULT_PARTICLE_WIND_DENSITY },
+};
+let buildingHitMesh = null;
+let buildingHitFaceMap = [];
+let hoveredBuildingIndex = null;
+let pendingBuildingHoverEvent = null;
+let buildingHoverRaf = 0;
+let buildingHoverTimer = 0;
+let buildingHoverLastPickAt = 0;
+let buildingHoverEnabled = true;
+let controlsInteracting = false;
+const buildingHoverRecords = [];
+const buildingHoverSpatialIndex = new Map();
+const buildingHighlights = new Map();
+let projectedBuildings = null;
+const BUILDING_HOVER_FADE_SECONDS = 0.5;
+const BUILDING_HOVER_COLOR = new THREE.Color('#FCE132');
+const BUILDING_HOVER_CELL_SIZE = 96;
+const BUILDING_HOVER_SEARCH_CELLS = 3;
+const BUILDING_HOVER_SEARCH_RADIUS = 260;
+const BUILDING_HOVER_MAX_CANDIDATES = 140;
+const BUILDING_HOVER_MAX_RADIUS = 2200;
+const BUILDING_HOVER_THROTTLE_MS = 80;
+const cameraAnimation = {
+  active: false,
+  startedAt: 0,
+  duration: DEFAULT_CAMERA_ANIMATION_DURATION,
+  keyA: null,
+  keyB: null,
+};
 
 function defaultCameraState() {
   return {
@@ -444,6 +649,7 @@ function defaultCameraState() {
     targetY: DEFAULT_TARGET_Y,
     targetZ: DEFAULT_TARGET_Z,
     fov: DEFAULT_CAMERA_FOV,
+    zoom: DEFAULT_CAMERA_ZOOM,
     near: DEFAULT_CAMERA_NEAR,
     far: DEFAULT_CAMERA_FAR,
     fadeNear: DEFAULT_FADE_NEAR,
@@ -452,12 +658,97 @@ function defaultCameraState() {
   };
 }
 
+function defaultCameraKeyAState() {
+  return {
+    x: 0,
+    y: 2706.87,
+    z: 0,
+    targetX: 0,
+    targetY: 0,
+    targetZ: 0,
+    fov: 21,
+    zoom: DEFAULT_CAMERA_ZOOM,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: 2000,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  };
+}
+
+function defaultCameraKeyBState() {
+  return {
+    ...defaultCameraState(),
+    fadeFar: 360,
+  };
+}
+
+const CITY_CAMERA_SHOTS = {
+  'Low Orbit': {
+    x: 245,
+    y: 56,
+    z: 325,
+    targetX: 8,
+    targetY: 28,
+    targetZ: -36,
+    fov: 64,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+    maxPolarDeg: 101,
+  },
+  Topographic: {
+    x: 34,
+    y: 910,
+    z: 42,
+    targetX: 0,
+    targetY: 0,
+    targetZ: 0,
+    fov: 58,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+    maxPolarDeg: 8,
+  },
+  Macro: {
+    x: 82,
+    y: 34,
+    z: 122,
+    targetX: -12,
+    targetY: 24,
+    targetZ: -22,
+    fov: 46,
+    near: 0.25,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: 4,
+    fadeFar: 260,
+    maxPolarDeg: 104,
+  },
+  'Horizon Sweep': {
+    x: -520,
+    y: 130,
+    z: 690,
+    targetX: 64,
+    targetY: 36,
+    targetZ: -82,
+    fov: 70,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+    maxPolarDeg: 97,
+  },
+};
+
 function normalizeCameraState(state) {
   const defaults = defaultCameraState();
   const near = clamp(Number.isFinite(state.near) ? state.near : defaults.near, 0.01, 2000);
   const far = Math.max(near + 1, Math.min(Number.isFinite(state.far) ? state.far : defaults.far, 50000));
   const fadeNear = clamp(Number.isFinite(state.fadeNear) ? state.fadeNear : defaults.fadeNear, 0, 10000);
   const fadeFar = Math.max(fadeNear + 0.1, Math.min(Number.isFinite(state.fadeFar) ? state.fadeFar : defaults.fadeFar, 20000));
+  const zoom = clamp(Number.isFinite(state.zoom) ? state.zoom : defaults.zoom, 0.1, 10);
   return {
     x: Number.isFinite(state.x) ? state.x : defaults.x,
     y: Number.isFinite(state.y) ? state.y : defaults.y,
@@ -466,6 +757,7 @@ function normalizeCameraState(state) {
     targetY: Number.isFinite(state.targetY) ? state.targetY : defaults.targetY,
     targetZ: Number.isFinite(state.targetZ) ? state.targetZ : defaults.targetZ,
     fov: clamp(Number.isFinite(state.fov) ? state.fov : defaults.fov, 20, 100),
+    zoom,
     near,
     far,
     fadeNear,
@@ -477,7 +769,14 @@ function normalizeCameraState(state) {
 function readSavedCameraState() {
   try {
     const raw = localStorage.getItem(CITY_CAMERA_STATE_KEY);
-    return raw ? normalizeCameraState(JSON.parse(raw)) : defaultCameraState();
+    if (!raw) return defaultCameraState();
+    const parsed = JSON.parse(raw);
+    if (localStorage.getItem(CITY_FADE_FAR_MIGRATION_KEY) !== 'done') {
+      parsed.fadeFar = DEFAULT_FADE_FAR;
+      localStorage.setItem(CITY_CAMERA_STATE_KEY, JSON.stringify(parsed));
+      localStorage.setItem(CITY_FADE_FAR_MIGRATION_KEY, 'done');
+    }
+    return normalizeCameraState(parsed);
   } catch (e) {
     return defaultCameraState();
   }
@@ -496,6 +795,7 @@ function cameraDebugPayload() {
       z: roundForDebug(controls.target.z, 2),
     },
     fov: roundForDebug(camera.fov, 2),
+    zoom: roundForDebug(camera.zoom, 3),
     clipping: {
       near: roundForDebug(camera.near, 3),
       far: roundForDebug(camera.far, 2),
@@ -505,6 +805,7 @@ function cameraDebugPayload() {
       far: roundForDebug(sharedUniforms.uFadeFar.value, 2),
     },
     orbit: {
+      distance: roundForDebug(camera.position.distanceTo(controls.target), 2),
       maxPolarDeg: roundForDebug(radToDeg(controls.maxPolarAngle), 2),
       minDistance: roundForDebug(controls.minDistance, 2),
       maxDistance: roundForDebug(controls.maxDistance, 2),
@@ -512,8 +813,221 @@ function cameraDebugPayload() {
   };
 }
 
+function currentCameraState() {
+  return {
+    x: camera.position.x,
+    y: camera.position.y,
+    z: camera.position.z,
+    targetX: controls.target.x,
+    targetY: controls.target.y,
+    targetZ: controls.target.z,
+    fov: camera.fov,
+    zoom: camera.zoom,
+    near: camera.near,
+    far: camera.far,
+    fadeNear: sharedUniforms.uFadeNear.value,
+    fadeFar: sharedUniforms.uFadeFar.value,
+    maxPolarDeg: radToDeg(controls.maxPolarAngle),
+  };
+}
+
+function cameraStatePayload(state) {
+  const next = normalizeCameraState(state);
+  return {
+    position: {
+      x: roundForDebug(next.x, 2),
+      y: roundForDebug(next.y, 2),
+      z: roundForDebug(next.z, 2),
+    },
+    target: {
+      x: roundForDebug(next.targetX, 2),
+      y: roundForDebug(next.targetY, 2),
+      z: roundForDebug(next.targetZ, 2),
+    },
+    fov: roundForDebug(next.fov, 2),
+    zoom: roundForDebug(next.zoom, 3),
+    clipping: {
+      near: roundForDebug(next.near, 3),
+      far: roundForDebug(next.far, 2),
+    },
+    fade: {
+      near: roundForDebug(next.fadeNear, 2),
+      far: roundForDebug(next.fadeFar, 2),
+    },
+    orbit: {
+      distance: roundForDebug(Math.hypot(next.x - next.targetX, next.y - next.targetY, next.z - next.targetZ), 2),
+      maxPolarDeg: roundForDebug(next.maxPolarDeg, 2),
+    },
+  };
+}
+
+function normalizeAnimationDuration(value) {
+  return clamp(Number.isFinite(value) ? value : DEFAULT_CAMERA_ANIMATION_DURATION, 0.1, 120);
+}
+
+function defaultCameraAnimationState() {
+  return {
+    duration: DEFAULT_CAMERA_ANIMATION_DURATION,
+    keyA: defaultCameraKeyAState(),
+    keyB: defaultCameraKeyBState(),
+  };
+}
+
+function normalizeCameraAnimationState(state = {}) {
+  const defaults = defaultCameraAnimationState();
+  const source = state && typeof state === 'object' ? state : {};
+  const duration = Number.isFinite(source.duration) ? source.duration : source.durationSeconds;
+  return {
+    duration: normalizeAnimationDuration(duration),
+    keyA: normalizeCameraState(source.keyA || defaults.keyA),
+    keyB: normalizeCameraState(source.keyB || defaults.keyB),
+  };
+}
+
+function readSavedCameraAnimationState() {
+  try {
+    const raw = localStorage.getItem(CITY_CAMERA_ANIMATION_STATE_KEY);
+    return raw ? normalizeCameraAnimationState(JSON.parse(raw)) : defaultCameraAnimationState();
+  } catch (e) {
+    return defaultCameraAnimationState();
+  }
+}
+
+function cameraAnimationPayload() {
+  return {
+    active: cameraAnimation.active,
+    durationSeconds: roundForDebug(cameraAnimation.duration, 2),
+    keyframeA: cameraStatePayload(cameraAnimation.keyA || defaultCameraState()),
+    keyframeB: cameraStatePayload(cameraAnimation.keyB || defaultCameraState()),
+  };
+}
+
+function saveCameraAnimationState() {
+  try {
+    const next = normalizeCameraAnimationState(cameraAnimation);
+    localStorage.setItem(CITY_CAMERA_ANIMATION_STATE_KEY, JSON.stringify(next));
+  } catch (e) {
+    console.warn('Unable to save city camera animation:', e);
+  }
+}
+
+function defaultParticleState() {
+  return {
+    pointScale: DEFAULT_PARTICLE_SCALE,
+    pointAlpha: DEFAULT_PARTICLE_ALPHA,
+    pointDensity: DEFAULT_PARTICLE_DENSITY,
+    buildingDensity: DEFAULT_PARTICLE_BUILDING_DENSITY,
+    riverDensity: DEFAULT_PARTICLE_RIVER_DENSITY,
+    streetDensity: DEFAULT_PARTICLE_STREET_DENSITY,
+    streamDensity: DEFAULT_PARTICLE_STREAM_DENSITY,
+    trafficDensity: DEFAULT_PARTICLE_TRAFFIC_DENSITY,
+    windDensity: DEFAULT_PARTICLE_WIND_DENSITY,
+    pointColor: DEFAULT_PARTICLE_COLOR,
+    pointColorMix: DEFAULT_PARTICLE_COLOR_MIX,
+    pointBlur: DEFAULT_PARTICLE_BLUR,
+    wobble: DEFAULT_PARTICLE_WOBBLE,
+    twinkleSpeed: DEFAULT_TWINKLE_SPEED,
+    twinkleAmount: DEFAULT_TWINKLE_AMOUNT,
+    streamSpeed: DEFAULT_STREAM_SPEED,
+    trafficSpeed: DEFAULT_TRAFFIC_SPEED,
+    emberSpeed: DEFAULT_EMBER_SPEED,
+  };
+}
+
+function normalizeParticleState(state = {}) {
+  const defaults = defaultParticleState();
+  const densities = state && typeof state.densities === 'object' ? state.densities : {};
+  return {
+    pointScale: clamp(Number.isFinite(state.pointScale) ? state.pointScale : defaults.pointScale, 0.1, 5),
+    pointAlpha: clamp(Number.isFinite(state.pointAlpha) ? state.pointAlpha : defaults.pointAlpha, 0, 3),
+    pointDensity: clamp(Number.isFinite(state.pointDensity) ? state.pointDensity : defaults.pointDensity, 0, PARTICLE_DENSITY_MAX),
+    buildingDensity: clamp(Number.isFinite(state.buildingDensity) ? state.buildingDensity : Number.isFinite(densities.buildings) ? densities.buildings : defaults.buildingDensity, 0, PARTICLE_DENSITY_MAX),
+    riverDensity: clamp(Number.isFinite(state.riverDensity) ? state.riverDensity : Number.isFinite(densities.river) ? densities.river : defaults.riverDensity, 0, PARTICLE_DENSITY_MAX),
+    streetDensity: clamp(Number.isFinite(state.streetDensity) ? state.streetDensity : Number.isFinite(densities.streets) ? densities.streets : defaults.streetDensity, 0, PARTICLE_DENSITY_MAX),
+    streamDensity: clamp(Number.isFinite(state.streamDensity) ? state.streamDensity : Number.isFinite(densities.streams) ? densities.streams : defaults.streamDensity, 0, PARTICLE_DENSITY_MAX),
+    trafficDensity: clamp(Number.isFinite(state.trafficDensity) ? state.trafficDensity : Number.isFinite(densities.traffic) ? densities.traffic : defaults.trafficDensity, 0, PARTICLE_DENSITY_MAX),
+    windDensity: clamp(Number.isFinite(state.windDensity) ? state.windDensity : Number.isFinite(densities.wind) ? densities.wind : defaults.windDensity, 0, PARTICLE_DENSITY_MAX),
+    pointColor: normalizeHexColor(state.pointColor, defaults.pointColor),
+    pointColorMix: clamp(Number.isFinite(state.pointColorMix) ? state.pointColorMix : defaults.pointColorMix, 0, 1),
+    pointBlur: clamp(Number.isFinite(state.pointBlur) ? state.pointBlur : defaults.pointBlur, 0, 1),
+    wobble: clamp(Number.isFinite(state.wobble) ? state.wobble : defaults.wobble, 0, 4),
+    twinkleSpeed: clamp(Number.isFinite(state.twinkleSpeed) ? state.twinkleSpeed : defaults.twinkleSpeed, 0, 8),
+    twinkleAmount: clamp(Number.isFinite(state.twinkleAmount) ? state.twinkleAmount : defaults.twinkleAmount, 0, 1),
+    streamSpeed: clamp(Number.isFinite(state.streamSpeed) ? state.streamSpeed : defaults.streamSpeed, 0, 5),
+    trafficSpeed: clamp(Number.isFinite(state.trafficSpeed) ? state.trafficSpeed : defaults.trafficSpeed, 0, 5),
+    emberSpeed: clamp(Number.isFinite(state.emberSpeed) ? state.emberSpeed : defaults.emberSpeed, 0, 5),
+  };
+}
+
+function readSavedParticleState() {
+  try {
+    const raw = localStorage.getItem(CITY_PARTICLE_STATE_KEY);
+    return raw ? normalizeParticleState(JSON.parse(raw)) : defaultParticleState();
+  } catch (e) {
+    return defaultParticleState();
+  }
+}
+
+function particleDebugPayload() {
+  return {
+    pointScale: roundForDebug(sharedUniforms.uPointScale.value, 3),
+    pointAlpha: roundForDebug(sharedUniforms.uPointAlpha.value, 3),
+    pointDensity: roundForDebug(sharedUniforms.uPointDensity.value, 3),
+    densities: {
+      buildings: roundForDebug(particleDensityUniforms.buildings.value, 3),
+      river: roundForDebug(particleDensityUniforms.river.value, 3),
+      streets: roundForDebug(particleDensityUniforms.streets.value, 3),
+      streams: roundForDebug(particleDensityUniforms.streams.value, 3),
+      traffic: roundForDebug(particleDensityUniforms.traffic.value, 3),
+      wind: roundForDebug(particleDensityUniforms.wind.value, 3),
+    },
+    pointColor: `#${sharedUniforms.uPointColor.value.getHexString()}`,
+    pointColorMix: roundForDebug(sharedUniforms.uPointColorMix.value, 3),
+    pointBlur: roundForDebug(sharedUniforms.uPointBlur.value, 3),
+    wobble: roundForDebug(sharedUniforms.uWobble.value, 3),
+    twinkleSpeed: roundForDebug(sharedUniforms.uTwinkleSpeed.value, 3),
+    twinkleAmount: roundForDebug(sharedUniforms.uTwinkleAmount.value, 3),
+    streamSpeed: roundForDebug(particleSettings.streamSpeed, 3),
+    trafficSpeed: roundForDebug(particleSettings.trafficSpeed, 3),
+    emberSpeed: roundForDebug(particleSettings.emberSpeed, 3),
+  };
+}
+
+function buildingHoverDebugPayload() {
+  let hoverableBuildings = 0;
+  for (const bounds of buildingHoverRecords) {
+    if (bounds.hoverable) hoverableBuildings++;
+  }
+  return {
+    buildingHoverEnabled,
+    hoverThrottleFps: roundForDebug(1000 / BUILDING_HOVER_THROTTLE_MS, 1),
+    hoverableBuildings,
+    totalBuildings: buildingHoverRecords.length,
+    spatialCells: buildingHoverSpatialIndex.size,
+    activeHighlights: buildingHighlights.size,
+  };
+}
+
+function updateSceneHud() {
+  if (!hudEls.status) return;
+  const count = buildingHoverRecords.length || (projectedBuildings ? projectedBuildings.length : 0);
+  hudEls.status.textContent = [
+    `OSM BUILDINGS ${count ? count.toLocaleString() : '--'}`,
+    `PARTICLE DENSITY ${sharedUniforms.uPointDensity.value.toFixed(2)}`,
+    `CAMERA ${activeCameraShotName.toUpperCase()}`,
+  ].join(' · ');
+}
+
 function updateDebugData() {
-  if (debugEls.data) debugEls.data.value = JSON.stringify({ camera: cameraDebugPayload() }, null, 2);
+  if (debugEls.data) {
+    debugEls.data.value = JSON.stringify({
+      camera: cameraDebugPayload(),
+      cameraAnimation: cameraAnimationPayload(),
+      particles: particleDebugPayload(),
+      interaction: buildingHoverDebugPayload(),
+    }, null, 2);
+  }
+  updateSceneHud();
 }
 
 function saveCameraState() {
@@ -526,6 +1040,7 @@ function saveCameraState() {
       targetY: controls.target.y,
       targetZ: controls.target.z,
       fov: camera.fov,
+      zoom: camera.zoom,
       near: camera.near,
       far: camera.far,
       fadeNear: sharedUniforms.uFadeNear.value,
@@ -537,12 +1052,21 @@ function saveCameraState() {
   }
 }
 
+function saveParticleState() {
+  try {
+    localStorage.setItem(CITY_PARTICLE_STATE_KEY, JSON.stringify(particleDebugPayload()));
+  } catch (e) {
+    console.warn('Unable to save city particle settings:', e);
+  }
+}
+
 function cameraInputs() {
   return [
     debugEls.cameraX,
     debugEls.cameraY,
     debugEls.cameraZ,
     debugEls.cameraFov,
+    debugEls.cameraZoom,
     debugEls.cameraNear,
     debugEls.cameraFar,
     debugEls.targetX,
@@ -551,6 +1075,29 @@ function cameraInputs() {
     debugEls.fadeNear,
     debugEls.fadeFar,
     debugEls.maxPolar,
+  ].filter(Boolean);
+}
+
+function particleInputs() {
+  return [
+    debugEls.particleScale,
+    debugEls.particleAlpha,
+    debugEls.particleDensity,
+    debugEls.particleBuildingsDensity,
+    debugEls.particleRiverDensity,
+    debugEls.particleStreetDensity,
+    debugEls.particleStreamDensity,
+    debugEls.particleTrafficDensity,
+    debugEls.particleWindDensity,
+    debugEls.particleColor,
+    debugEls.particleColorMix,
+    debugEls.particleBlur,
+    debugEls.particleWobble,
+    debugEls.twinkleSpeed,
+    debugEls.twinkleAmount,
+    debugEls.streamSpeed,
+    debugEls.trafficSpeed,
+    debugEls.emberSpeed,
   ].filter(Boolean);
 }
 
@@ -565,6 +1112,7 @@ function updateCameraDebug() {
   debugEls.cameraY.value = camera.position.y.toFixed(1);
   debugEls.cameraZ.value = camera.position.z.toFixed(1);
   debugEls.cameraFov.value = camera.fov.toFixed(1);
+  debugEls.cameraZoom.value = camera.zoom.toFixed(2);
   debugEls.cameraNear.value = camera.near.toFixed(2);
   debugEls.cameraFar.value = camera.far.toFixed(1);
   debugEls.targetX.value = controls.target.x.toFixed(1);
@@ -577,10 +1125,47 @@ function updateCameraDebug() {
   updateDebugData();
 }
 
+function updateParticleDebug() {
+  if (!debugEls.particleScale) return;
+  if (particleInputs().includes(document.activeElement)) {
+    updateDebugData();
+    return;
+  }
+  suppressParticleInput = true;
+  debugEls.particleScale.value = sharedUniforms.uPointScale.value.toFixed(2);
+  debugEls.particleAlpha.value = sharedUniforms.uPointAlpha.value.toFixed(2);
+  debugEls.particleDensity.value = sharedUniforms.uPointDensity.value.toFixed(2);
+  debugEls.particleBuildingsDensity.value = particleDensityUniforms.buildings.value.toFixed(2);
+  debugEls.particleRiverDensity.value = particleDensityUniforms.river.value.toFixed(2);
+  debugEls.particleStreetDensity.value = particleDensityUniforms.streets.value.toFixed(2);
+  debugEls.particleStreamDensity.value = particleDensityUniforms.streams.value.toFixed(2);
+  debugEls.particleTrafficDensity.value = particleDensityUniforms.traffic.value.toFixed(2);
+  debugEls.particleWindDensity.value = particleDensityUniforms.wind.value.toFixed(2);
+  debugEls.particleColor.value = `#${sharedUniforms.uPointColor.value.getHexString()}`;
+  debugEls.particleColorMix.value = sharedUniforms.uPointColorMix.value.toFixed(2);
+  debugEls.particleBlur.value = sharedUniforms.uPointBlur.value.toFixed(2);
+  debugEls.particleWobble.value = sharedUniforms.uWobble.value.toFixed(2);
+  debugEls.twinkleSpeed.value = sharedUniforms.uTwinkleSpeed.value.toFixed(2);
+  debugEls.twinkleAmount.value = sharedUniforms.uTwinkleAmount.value.toFixed(2);
+  debugEls.streamSpeed.value = particleSettings.streamSpeed.toFixed(2);
+  debugEls.trafficSpeed.value = particleSettings.trafficSpeed.toFixed(2);
+  debugEls.emberSpeed.value = particleSettings.emberSpeed.toFixed(2);
+  suppressParticleInput = false;
+  updateDebugData();
+}
+
+function updateBuildingHoverDebug() {
+  if (debugEls.buildingHoverEnabled) {
+    debugEls.buildingHoverEnabled.checked = buildingHoverEnabled;
+  }
+  updateDebugData();
+}
+
 function applyCameraState(state, persist = true) {
   const next = normalizeCameraState(state);
   camera.position.set(next.x, next.y, next.z);
   camera.fov = next.fov;
+  camera.zoom = next.zoom;
   camera.near = next.near;
   camera.far = next.far;
   camera.updateProjectionMatrix();
@@ -593,13 +1178,152 @@ function applyCameraState(state, persist = true) {
   updateCameraDebug();
 }
 
+function applyCameraShot(name) {
+  const shot = CITY_CAMERA_SHOTS[name];
+  if (!shot) return;
+  stopCameraAnimation(false);
+  activeCameraShotName = name;
+  applyCameraState(shot, true);
+  updateCameraAnimationDebug();
+}
+
+function easeInOutExpo(t) {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t < 0.5
+    ? Math.pow(2, 20 * t - 10) / 2
+    : (2 - Math.pow(2, -20 * t + 10)) / 2;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function lerpCameraStates(a, b, t) {
+  const from = normalizeCameraState(a);
+  const to = normalizeCameraState(b);
+  return {
+    x: lerp(from.x, to.x, t),
+    y: lerp(from.y, to.y, t),
+    z: lerp(from.z, to.z, t),
+    targetX: lerp(from.targetX, to.targetX, t),
+    targetY: lerp(from.targetY, to.targetY, t),
+    targetZ: lerp(from.targetZ, to.targetZ, t),
+    fov: lerp(from.fov, to.fov, t),
+    zoom: lerp(from.zoom, to.zoom, t),
+    near: lerp(from.near, to.near, t),
+    far: lerp(from.far, to.far, t),
+    fadeNear: lerp(from.fadeNear, to.fadeNear, t),
+    fadeFar: lerp(from.fadeFar, to.fadeFar, t),
+    maxPolarDeg: lerp(from.maxPolarDeg, to.maxPolarDeg, t),
+  };
+}
+
+function updateCameraAnimationDebug() {
+  if (debugEls.cameraAnimDuration && debugEls.cameraAnimDuration !== document.activeElement) {
+    debugEls.cameraAnimDuration.value = cameraAnimation.duration.toFixed(1);
+  }
+  if (debugEls.playCameraMove) {
+    debugEls.playCameraMove.textContent = cameraAnimation.active ? 'Playing' : 'Play';
+    debugEls.playCameraMove.classList.toggle('active', cameraAnimation.active);
+  }
+  updateDebugData();
+}
+
+function applyCameraAnimationDurationInput() {
+  const duration = parseFloat(debugEls.cameraAnimDuration.value);
+  cameraAnimation.duration = normalizeAnimationDuration(Number.isFinite(duration) ? duration : cameraAnimation.duration);
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function stopCameraAnimation(updateUI = true) {
+  if (!cameraAnimation.active) return;
+  cameraAnimation.active = false;
+  controls.enabled = true;
+  if (updateUI) updateCameraAnimationDebug();
+}
+
+function setCameraKeyframe(slot) {
+  stopCameraAnimation(false);
+  cameraAnimation[slot] = currentCameraState();
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function returnToCameraKeyframe(slot) {
+  stopCameraAnimation(false);
+  applyCameraState(cameraAnimation[slot] || defaultCameraState(), true);
+  updateCameraAnimationDebug();
+}
+
+function resetCameraAnimation() {
+  stopCameraAnimation(false);
+  Object.assign(cameraAnimation, defaultCameraAnimationState(), { active: false, startedAt: 0 });
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function startCameraAnimation() {
+  const next = normalizeCameraAnimationState(cameraAnimation);
+  cameraAnimation.duration = next.duration;
+  cameraAnimation.keyA = next.keyA;
+  cameraAnimation.keyB = next.keyB;
+  cameraAnimation.active = true;
+  cameraAnimation.startedAt = performance.now();
+  controls.enabled = false;
+  applyCameraState(cameraAnimation.keyA, false);
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function updateCameraAnimation(now) {
+  if (!cameraAnimation.active) return;
+  const durationMs = Math.max(100, cameraAnimation.duration * 1000);
+  const t = clamp((now - cameraAnimation.startedAt) / durationMs, 0, 1);
+  const eased = easeInOutExpo(t);
+  applyCameraState(lerpCameraStates(cameraAnimation.keyA, cameraAnimation.keyB, eased), false);
+  if (t >= 1) {
+    cameraAnimation.active = false;
+    controls.enabled = true;
+    applyCameraState(cameraAnimation.keyB, true);
+    updateCameraAnimationDebug();
+  }
+}
+
+function applyParticleState(state, persist = true) {
+  const next = normalizeParticleState(state);
+  sharedUniforms.uPointScale.value = next.pointScale;
+  sharedUniforms.uPointAlpha.value = next.pointAlpha;
+  sharedUniforms.uPointDensity.value = next.pointDensity;
+  particleDensityUniforms.buildings.value = next.buildingDensity;
+  particleDensityUniforms.river.value = next.riverDensity;
+  particleDensityUniforms.streets.value = next.streetDensity;
+  particleDensityUniforms.streams.value = next.streamDensity;
+  particleDensityUniforms.traffic.value = next.trafficDensity;
+  particleDensityUniforms.wind.value = next.windDensity;
+  sharedUniforms.uPointColor.value.set(next.pointColor);
+  sharedUniforms.uPointColorMix.value = next.pointColorMix;
+  sharedUniforms.uPointBlur.value = next.pointBlur;
+  sharedUniforms.uWobble.value = next.wobble;
+  sharedUniforms.uTwinkleSpeed.value = next.twinkleSpeed;
+  sharedUniforms.uTwinkleAmount.value = next.twinkleAmount;
+  particleSettings.streamSpeed = next.streamSpeed;
+  particleSettings.trafficSpeed = next.trafficSpeed;
+  particleSettings.emberSpeed = next.emberSpeed;
+  if (persist) saveParticleState();
+  updateParticleDebug();
+}
+
 function applyCameraDebugInputs() {
   if (suppressCameraInput) return;
+  activeCameraShotName = 'Custom';
   applyCameraState({
     x: Number.isFinite(parseFloat(debugEls.cameraX.value)) ? parseFloat(debugEls.cameraX.value) : camera.position.x,
     y: Number.isFinite(parseFloat(debugEls.cameraY.value)) ? parseFloat(debugEls.cameraY.value) : camera.position.y,
     z: Number.isFinite(parseFloat(debugEls.cameraZ.value)) ? parseFloat(debugEls.cameraZ.value) : camera.position.z,
     fov: Number.isFinite(parseFloat(debugEls.cameraFov.value)) ? parseFloat(debugEls.cameraFov.value) : camera.fov,
+    zoom: Number.isFinite(parseFloat(debugEls.cameraZoom.value)) ? parseFloat(debugEls.cameraZoom.value) : camera.zoom,
     near: Number.isFinite(parseFloat(debugEls.cameraNear.value)) ? parseFloat(debugEls.cameraNear.value) : camera.near,
     far: Number.isFinite(parseFloat(debugEls.cameraFar.value)) ? parseFloat(debugEls.cameraFar.value) : camera.far,
     targetX: Number.isFinite(parseFloat(debugEls.targetX.value)) ? parseFloat(debugEls.targetX.value) : controls.target.x,
@@ -608,6 +1332,30 @@ function applyCameraDebugInputs() {
     fadeNear: Number.isFinite(parseFloat(debugEls.fadeNear.value)) ? parseFloat(debugEls.fadeNear.value) : sharedUniforms.uFadeNear.value,
     fadeFar: Number.isFinite(parseFloat(debugEls.fadeFar.value)) ? parseFloat(debugEls.fadeFar.value) : sharedUniforms.uFadeFar.value,
     maxPolarDeg: Number.isFinite(parseFloat(debugEls.maxPolar.value)) ? parseFloat(debugEls.maxPolar.value) : radToDeg(controls.maxPolarAngle),
+  });
+}
+
+function applyParticleDebugInputs() {
+  if (suppressParticleInput) return;
+  applyParticleState({
+    pointScale: Number.isFinite(parseFloat(debugEls.particleScale.value)) ? parseFloat(debugEls.particleScale.value) : sharedUniforms.uPointScale.value,
+    pointAlpha: Number.isFinite(parseFloat(debugEls.particleAlpha.value)) ? parseFloat(debugEls.particleAlpha.value) : sharedUniforms.uPointAlpha.value,
+    pointDensity: Number.isFinite(parseFloat(debugEls.particleDensity.value)) ? parseFloat(debugEls.particleDensity.value) : sharedUniforms.uPointDensity.value,
+    buildingDensity: Number.isFinite(parseFloat(debugEls.particleBuildingsDensity.value)) ? parseFloat(debugEls.particleBuildingsDensity.value) : particleDensityUniforms.buildings.value,
+    riverDensity: Number.isFinite(parseFloat(debugEls.particleRiverDensity.value)) ? parseFloat(debugEls.particleRiverDensity.value) : particleDensityUniforms.river.value,
+    streetDensity: Number.isFinite(parseFloat(debugEls.particleStreetDensity.value)) ? parseFloat(debugEls.particleStreetDensity.value) : particleDensityUniforms.streets.value,
+    streamDensity: Number.isFinite(parseFloat(debugEls.particleStreamDensity.value)) ? parseFloat(debugEls.particleStreamDensity.value) : particleDensityUniforms.streams.value,
+    trafficDensity: Number.isFinite(parseFloat(debugEls.particleTrafficDensity.value)) ? parseFloat(debugEls.particleTrafficDensity.value) : particleDensityUniforms.traffic.value,
+    windDensity: Number.isFinite(parseFloat(debugEls.particleWindDensity.value)) ? parseFloat(debugEls.particleWindDensity.value) : particleDensityUniforms.wind.value,
+    pointColor: normalizeHexColor(debugEls.particleColor.value, `#${sharedUniforms.uPointColor.value.getHexString()}`),
+    pointColorMix: Number.isFinite(parseFloat(debugEls.particleColorMix.value)) ? parseFloat(debugEls.particleColorMix.value) : sharedUniforms.uPointColorMix.value,
+    pointBlur: Number.isFinite(parseFloat(debugEls.particleBlur.value)) ? parseFloat(debugEls.particleBlur.value) : sharedUniforms.uPointBlur.value,
+    wobble: Number.isFinite(parseFloat(debugEls.particleWobble.value)) ? parseFloat(debugEls.particleWobble.value) : sharedUniforms.uWobble.value,
+    twinkleSpeed: Number.isFinite(parseFloat(debugEls.twinkleSpeed.value)) ? parseFloat(debugEls.twinkleSpeed.value) : sharedUniforms.uTwinkleSpeed.value,
+    twinkleAmount: Number.isFinite(parseFloat(debugEls.twinkleAmount.value)) ? parseFloat(debugEls.twinkleAmount.value) : sharedUniforms.uTwinkleAmount.value,
+    streamSpeed: Number.isFinite(parseFloat(debugEls.streamSpeed.value)) ? parseFloat(debugEls.streamSpeed.value) : particleSettings.streamSpeed,
+    trafficSpeed: Number.isFinite(parseFloat(debugEls.trafficSpeed.value)) ? parseFloat(debugEls.trafficSpeed.value) : particleSettings.trafficSpeed,
+    emberSpeed: Number.isFinite(parseFloat(debugEls.emberSpeed.value)) ? parseFloat(debugEls.emberSpeed.value) : particleSettings.emberSpeed,
   });
 }
 
@@ -632,13 +1380,45 @@ function readDebugPanelCollapsed() {
   }
 }
 
+function readBuildingHoverEnabled() {
+  try {
+    return localStorage.getItem(CITY_BUILDING_HOVER_STATE_KEY) !== 'off';
+  } catch (e) {
+    return true;
+  }
+}
+
+function saveBuildingHoverEnabled() {
+  try {
+    localStorage.setItem(CITY_BUILDING_HOVER_STATE_KEY, buildingHoverEnabled ? 'on' : 'off');
+  } catch (e) {
+    console.warn('Unable to save city building hover state:', e);
+  }
+}
+
 for (const input of cameraInputs()) {
   input.addEventListener('input', applyCameraDebugInputs);
 }
 
+for (const input of particleInputs()) {
+  input.addEventListener('input', applyParticleDebugInputs);
+}
+
+debugEls.cameraAnimDuration.addEventListener('input', applyCameraAnimationDurationInput);
+debugEls.buildingHoverEnabled.addEventListener('change', () => {
+  setBuildingHoverEnabled(debugEls.buildingHoverEnabled.checked);
+});
+
 controls.addEventListener('change', () => {
   saveCameraState();
   updateCameraDebug();
+});
+controls.addEventListener('start', () => {
+  controlsInteracting = true;
+  clearBuildingHover();
+});
+controls.addEventListener('end', () => {
+  controlsInteracting = false;
 });
 
 debugEls.togglePanel.addEventListener('click', () => {
@@ -656,12 +1436,51 @@ debugEls.copy.addEventListener('click', async () => {
 });
 
 debugEls.resetCamera.addEventListener('click', () => {
+  stopCameraAnimation(false);
+  activeCameraShotName = 'Custom';
   applyCameraState(defaultCameraState());
+  updateCameraAnimationDebug();
+});
+
+debugEls.resetParticles.addEventListener('click', () => {
+  applyParticleState(defaultParticleState());
+});
+
+debugEls.setCameraKeyA.addEventListener('click', () => setCameraKeyframe('keyA'));
+debugEls.setCameraKeyB.addEventListener('click', () => setCameraKeyframe('keyB'));
+debugEls.returnCameraKeyA.addEventListener('click', () => returnToCameraKeyframe('keyA'));
+debugEls.returnCameraKeyB.addEventListener('click', () => returnToCameraKeyframe('keyB'));
+debugEls.playCameraMove.addEventListener('click', startCameraAnimation);
+debugEls.resetCameraMove.addEventListener('click', resetCameraAnimation);
+debugEls.shotLowOrbit.addEventListener('click', () => applyCameraShot('Low Orbit'));
+debugEls.shotTopographic.addEventListener('click', () => applyCameraShot('Topographic'));
+debugEls.shotMacro.addEventListener('click', () => applyCameraShot('Macro'));
+debugEls.shotHorizonSweep.addEventListener('click', () => applyCameraShot('Horizon Sweep'));
+
+window.addEventListener('keydown', (event) => {
+  const target = event.target;
+  const isTyping = target && (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable
+  );
+  if (isTyping || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (event.key.toLowerCase() === 'p') {
+    event.preventDefault();
+    startCameraAnimation();
+  }
 });
 
 applyCameraState(readSavedCameraState(), false);
+Object.assign(cameraAnimation, readSavedCameraAnimationState(), { active: false, startedAt: 0 });
+applyParticleState(readSavedParticleState(), false);
+setBuildingHoverEnabled(readBuildingHoverEnabled(), false);
 setDebugPanelCollapsed(readDebugPanelCollapsed(), false);
 updateCameraDebug();
+updateCameraAnimationDebug();
+updateParticleDebug();
+updateBuildingHoverDebug();
 
 const vert = /* glsl */`
   attribute float aSize;
@@ -670,6 +1489,7 @@ const vert = /* glsl */`
   varying float vTwinkle;
   varying float vFade;
   varying float vBackface;
+  varying float vDensitySeed;
   uniform float uTime;
   uniform float uPixelRatio;
   uniform float uSizeScale;
@@ -677,6 +1497,9 @@ const vert = /* glsl */`
   uniform float uFadeNear;
   uniform float uFadeFar;
   uniform float uWobble;
+  uniform float uPointScale;
+  uniform float uTwinkleSpeed;
+  uniform float uTwinkleAmount;
 
   // Wrap a flat (x, y, z) plane point onto a sphere of radius R.
   // The plane's origin sits on top of the sphere (north pole),
@@ -698,7 +1521,9 @@ const vert = /* glsl */`
 
   void main() {
     vColor = color;
-    vTwinkle = 0.78 + 0.22 * sin(uTime * 1.6 + aPhase * 3.3);
+    vDensitySeed = fract(sin(aPhase * 78.233 + aSize * 12.9898) * 43758.5453);
+    float twinkleWave = 0.5 + 0.5 * sin(uTime * uTwinkleSpeed + aPhase * 3.3);
+    vTwinkle = 1.0 - uTwinkleAmount + uTwinkleAmount * twinkleWave;
     // small per-particle wobble so dots breathe in place — flowy feel
     vec3 wob = vec3(
       sin(uTime * 0.7 + aPhase * 2.3),
@@ -716,7 +1541,7 @@ const vert = /* glsl */`
     // INVERTED: 1.0 at the camera, 0.0 at uFadeFar — so the frag shader fades CLOSE particles
     vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
     // close particles puff into soft bokeh-ish blobs while they fade out (DoF feel)
-    float size = aSize * uSizeScale * 140.0 * uPixelRatio;
+    float size = aSize * uSizeScale * uPointScale * 140.0 * uPixelRatio;
     float hazePuff = 1.0 + vFade * 1.6;
     gl_PointSize = max(1.5, (size / max(0.001, dist)) * hazePuff);
   }
@@ -726,21 +1551,36 @@ const frag = /* glsl */`
   varying float vTwinkle;
   varying float vFade;
   varying float vBackface;
+  varying float vDensitySeed;
   uniform sampler2D uMap;
   uniform vec3 uBgColor;
+  uniform float uPointAlpha;
+  uniform float uPointDensity;
+  uniform float uSystemDensity;
+  uniform float uPoolMultiplier;
+  uniform vec3 uPointColor;
+  uniform float uPointColorMix;
+  uniform float uPointBlur;
   void main() {
     if (vBackface < 0.0) discard; // hide back hemisphere of globe
+    float density = max(0.0, uPointDensity * uSystemDensity);
+    float visibleDensity = clamp(density / max(1.0, uPoolMultiplier), 0.0, 1.0);
+    if (vDensitySeed > visibleDensity) discard;
     vec4 tex = texture2D(uMap, gl_PointCoord);
-    if (tex.a < 0.02) discard;
-    vec3 col = mix(vColor * vTwinkle, uBgColor, vFade * 0.95);
-    float alpha = tex.a * (1.0 - vFade);
+    float blurPower = mix(2.4, 0.45, clamp(uPointBlur, 0.0, 1.0));
+    float pointAlpha = pow(tex.a, blurPower);
+    if (pointAlpha < 0.01) discard;
+    vec3 sourceColor = mix(vColor, uPointColor, clamp(uPointColorMix, 0.0, 1.0));
+    vec3 col = mix(sourceColor * vTwinkle, uBgColor, vFade * 0.95);
+    float densityBoost = 1.0 + min(max(0.0, density - 1.0), 12.0) * 0.035;
+    float alpha = pointAlpha * (1.0 - vFade) * uPointAlpha * densityBoost;
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(col, alpha);
   }
 `;
-function makePointsMaterial(sizeScale = 1.0) {
+function makePointsMaterial(sizeScale = 1.0, densityUniform = particleDensityUniforms.buildings, poolMultiplier = 1) {
   return new THREE.ShaderMaterial({
-    uniforms: { ...sharedUniforms, uSizeScale: { value: sizeScale } },
+    uniforms: { ...sharedUniforms, uSizeScale: { value: sizeScale }, uSystemDensity: densityUniform, uPoolMultiplier: { value: poolMultiplier } },
     vertexShader: vert, fragmentShader: frag,
     vertexColors: true, transparent: true, depthWrite: false,
     blending: THREE.NormalBlending,
@@ -751,18 +1591,27 @@ function linkTimeUniform(mat) {
   mat.uniforms.uTime = sharedUniforms.uTime;
   mat.uniforms.uMap = sharedUniforms.uMap;
   mat.uniforms.uPixelRatio = sharedUniforms.uPixelRatio;
+  mat.uniforms.uWobble = sharedUniforms.uWobble;
+  mat.uniforms.uPointScale = sharedUniforms.uPointScale;
+  mat.uniforms.uPointAlpha = sharedUniforms.uPointAlpha;
+  mat.uniforms.uPointDensity = sharedUniforms.uPointDensity;
+  if (!mat.uniforms.uSystemDensity) mat.uniforms.uSystemDensity = particleDensityUniforms.buildings;
+  if (!mat.uniforms.uPoolMultiplier) mat.uniforms.uPoolMultiplier = { value: 1 };
+  mat.uniforms.uPointColor = sharedUniforms.uPointColor;
+  mat.uniforms.uPointColorMix = sharedUniforms.uPointColorMix;
+  mat.uniforms.uPointBlur = sharedUniforms.uPointBlur;
+  mat.uniforms.uTwinkleSpeed = sharedUniforms.uTwinkleSpeed;
+  mat.uniforms.uTwinkleAmount = sharedUniforms.uTwinkleAmount;
 }
 
-// ---------- palette (greyscale only) ----------
+// ---------- palette (mostly greyscale, with tiny intentional yellow accents) ----------
 const greyA  = new THREE.Color('#b0b0b5'); // primary grey (lighter)
 const greyB  = new THREE.Color('#8a8a90'); // mid grey for variation
 const greyC  = new THREE.Color('#cccdd0'); // very light grey accent
 // yellow/yellowB are repurposed to grey shades so all "accent" particles read as light grey
 const yellow  = greyC;
 const yellowB = greyB;
-const warmA = greyA, warmB = greyC, warmC = greyB;
-const coolA = greyB, coolB = greyC;
-const goldHi = greyC;
+const accentYellow = new THREE.Color('#FCE132');
 
 // ============================================================
 // OVERPASS QUERY — fetch buildings + Chao Phraya river
@@ -939,16 +1788,8 @@ async function fetchOverpass() {
 // ============================================================
 let riverPath = []; // array of THREE.Vector2 in scene coords
 let riverCurve = null;
-let projectedBuildings = null; // populated by projectBuildings, consumed by mesh/wireframe builders
+// projectedBuildings is populated by projectBuildings, consumed by mesh/wireframe builders.
 let roads = [];                // array of polylines [{x,z},...] from OSM highways
-let buildingHitMesh = null;
-let hoveredBuildingIndex = null;
-let pendingBuildingHoverEvent = null;
-let buildingHoverRaf = 0;
-const buildingHoverRecords = [];
-const buildingHighlights = new Map();
-const BUILDING_HOVER_FADE_SECONDS = 0.5;
-const BUILDING_HOVER_COLOR = new THREE.Color('#FCE132');
 
 function buildFromOSM(data) {
   // -------- separate buildings + rivers + roads --------
@@ -1002,43 +1843,13 @@ function buildFromOSM(data) {
 
   // -------- buildings → project geometry only (NO particles; wireframes carry the form) --------
   const osmProjected = projectBuildings(buildings);
-  // populate the rest of the sphere
-  const procCity   = buildProceduralCityData();
-  const dataCenters = buildDataCenterClusters();
-  const solarFarms  = buildSolarFarmGrids();
-  projectedBuildings = osmProjected
-    .concat(procCity)
-    .concat(dataCenters)
-    .concat(solarFarms);
+  projectedBuildings = osmProjected;
   console.log('[city] buildings →', {
     osm: osmProjected.length,
-    proceduralCity: procCity.length,
-    dataCenters: dataCenters.length,
-    solarFarms: solarFarms.length,
     total: projectedBuildings.length,
   });
-  lblText.textContent =
-    `${osmProjected.length.toLocaleString()} osm · ${procCity.length.toLocaleString()} city · ` +
-    `${dataCenters.length.toLocaleString()} datacenter · ${solarFarms.length.toLocaleString()} solar`;
+  lblText.textContent = `${osmProjected.length.toLocaleString()} map buildings`;
 }
-
-// helper: build a rectangle footprint at (cx, cz) of size (w, d) as closed pts[]
-function rectPts(cx, cz, w, d) {
-  const hw = w * 0.5, hd = d * 0.5;
-  return [
-    { x: cx - hw, z: cz - hd },
-    { x: cx + hw, z: cz - hd },
-    { x: cx + hw, z: cz + hd },
-    { x: cx - hw, z: cz + hd },
-    { x: cx - hw, z: cz - hd },
-  ];
-}
-
-const BUILDING_BOX_LINE_EDGES = [
-  [0,1], [1,3], [3,2], [2,0],
-  [4,5], [5,7], [7,6], [6,4],
-  [0,4], [1,5], [2,6], [3,7],
-];
 
 function wrapSpherePointCPU(x, y, z) {
   const R = GLOBE_R;
@@ -1056,202 +1867,207 @@ function wrapSpherePointCPU(x, y, z) {
   return [dirX * (R + y), -R + dirY * (R + y), dirZ * (R + y)];
 }
 
-function getBuildingBoxBounds(B, shrink = 0.05) {
+function footprintArea(pts) {
+  let area = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    area += a.x * b.z - b.x * a.z;
+  }
+  return area * 0.5;
+}
+
+function createBuildingRecord(B, shrink = 0.018) {
   if (!B || !B.pts || B.pts.length < 3) return null;
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+
+  const raw = [];
   for (const p of B.pts) {
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
+    const prev = raw[raw.length - 1];
+    if (prev && Math.hypot(prev.x - p.x, prev.z - p.z) < 0.001) continue;
+    raw.push({ x: p.x, z: p.z });
+  }
+  if (raw.length > 2) {
+    const first = raw[0];
+    const last = raw[raw.length - 1];
+    if (Math.hypot(first.x - last.x, first.z - last.z) < 0.001) raw.pop();
+  }
+  if (raw.length < 3 || Math.abs(footprintArea(raw)) < 0.01) return null;
+
+  if (footprintArea(raw) < 0) raw.reverse();
+
+  let cx = 0, cz = 0;
+  for (const p of raw) {
+    cx += p.x;
+    cz += p.z;
+  }
+  cx /= raw.length;
+  cz /= raw.length;
+
+  const pts = raw.map(p => ({
+    x: p.x + (cx - p.x) * shrink,
+    z: p.z + (cz - p.z) * shrink,
+  }));
+
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const p of pts) {
     if (p.x < minX) minX = p.x;
     if (p.x > maxX) maxX = p.x;
     if (p.z < minZ) minZ = p.z;
     if (p.z > maxZ) maxZ = p.z;
   }
-  minX += shrink; maxX -= shrink;
-  minZ += shrink; maxZ -= shrink;
   if (maxX <= minX || maxZ <= minZ) return null;
-  return { minX, maxX, minZ, maxZ, h: Math.max(0.4, B.heightU) };
+
+  return {
+    pts,
+    cx,
+    cz,
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    h: Math.max(0.4, B.heightU),
+    areaM2: B.areaM2 || 0,
+    tags: B.tags || {},
+  };
 }
 
-function getBuildingBoxCorners(bounds) {
-  const { minX, maxX, minZ, maxZ, h } = bounds;
-  return [
-    [minX, 0, minZ], [minX, 0, maxZ], [minX, h, minZ], [minX, h, maxZ],
-    [maxX, 0, minZ], [maxX, 0, maxZ], [maxX, h, minZ], [maxX, h, maxZ],
-  ];
+function pushVertex(positions, normals, x, y, z, nx, ny, nz) {
+  positions.push(x, y, z);
+  if (normals) normals.push(nx, ny, nz);
 }
 
-function getBuildingBoxFaces(bounds) {
-  const { minX, maxX, minZ, maxZ, h } = bounds;
-  return [
-    { n:[ 0,-1, 0], v:[[minX,0,minZ],[maxX,0,minZ],[maxX,0,maxZ],[minX,0,maxZ]] },
-    { n:[ 0, 1, 0], v:[[minX,h,minZ],[minX,h,maxZ],[maxX,h,maxZ],[maxX,h,minZ]] },
-    { n:[ 1, 0, 0], v:[[maxX,0,minZ],[maxX,h,minZ],[maxX,h,maxZ],[maxX,0,maxZ]] },
-    { n:[-1, 0, 0], v:[[minX,0,maxZ],[minX,h,maxZ],[minX,h,minZ],[minX,0,minZ]] },
-    { n:[ 0, 0, 1], v:[[maxX,0,maxZ],[maxX,h,maxZ],[minX,h,maxZ],[minX,0,maxZ]] },
-    { n:[ 0, 0,-1], v:[[minX,0,minZ],[minX,h,minZ],[maxX,h,minZ],[maxX,0,minZ]] },
-  ];
+function pushTriangle(indices, faceMap, a, b, c, recordIndex = null) {
+  indices.push(a, b, c);
+  if (faceMap) faceMap.push(recordIndex);
 }
 
-function appendBuildingBoxMesh(positions, normals, indices, hitPositions, bounds, vi, ii, vbase) {
-  const faces = getBuildingBoxFaces(bounds);
-  for (const face of faces) {
-    for (let k = 0; k < 4; k++) {
-      const p = face.v[k];
-      positions[vi*3+0] = p[0];
-      positions[vi*3+1] = p[1];
-      positions[vi*3+2] = p[2];
-      normals[vi*3+0] = face.n[0];
-      normals[vi*3+1] = face.n[1];
-      normals[vi*3+2] = face.n[2];
-      if (hitPositions) {
-        const wp = wrapSpherePointCPU(p[0], p[1], p[2]);
-        hitPositions[vi*3+0] = wp[0];
-        hitPositions[vi*3+1] = wp[1];
-        hitPositions[vi*3+2] = wp[2];
-      }
-      vi++;
-    }
-    indices[ii++] = vbase;
-    indices[ii++] = vbase + 1;
-    indices[ii++] = vbase + 2;
-    indices[ii++] = vbase;
-    indices[ii++] = vbase + 2;
-    indices[ii++] = vbase + 3;
-    vbase += 4;
+function appendBuildingPrismMesh(positions, normals, indices, record) {
+  const { pts, h } = record;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const len = Math.max(0.001, Math.hypot(dx, dz));
+    const nx = dz / len;
+    const nz = -dx / len;
+    const base = positions.length / 3;
+    pushVertex(positions, normals, a.x, 0, a.z, nx, 0, nz);
+    pushVertex(positions, normals, b.x, 0, b.z, nx, 0, nz);
+    pushVertex(positions, normals, b.x, h, b.z, nx, 0, nz);
+    pushVertex(positions, normals, a.x, h, a.z, nx, 0, nz);
+    pushTriangle(indices, null, base, base + 1, base + 2);
+    pushTriangle(indices, null, base, base + 2, base + 3);
   }
-  return { vi, ii, vbase };
+
+  const topBase = positions.length / 3;
+  for (const p of pts) pushVertex(positions, normals, p.x, h, p.z, 0, 1, 0);
+  const shapePts = pts.map(p => new THREE.Vector2(p.x, p.z));
+  let triangles = THREE.ShapeUtils.triangulateShape(shapePts, []);
+  if (!triangles.length && pts.length >= 3) {
+    triangles = [];
+    for (let i = 1; i < pts.length - 1; i++) triangles.push([0, i, i + 1]);
+  }
+  for (const tri of triangles) {
+    pushTriangle(indices, null, topBase + tri[0], topBase + tri[1], topBase + tri[2]);
+  }
 }
 
-function makeBuildingFillGeometry(bounds) {
-  const positions = new Float32Array(24 * 3);
-  const normals = new Float32Array(24 * 3);
-  const indices = new Uint32Array(36);
-  appendBuildingBoxMesh(positions, normals, indices, null, bounds, 0, 0, 0);
+function appendBuildingHitPrismMesh(positions, indices, faceMap, record, recordIndex) {
+  const { pts, h } = record;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const base = positions.length / 3;
+    for (const p of [[a.x, 0, a.z], [b.x, 0, b.z], [b.x, h, b.z], [a.x, h, a.z]]) {
+      const wp = wrapSpherePointCPU(p[0], p[1], p[2]);
+      positions.push(wp[0], wp[1], wp[2]);
+    }
+    pushTriangle(indices, faceMap, base, base + 1, base + 2, recordIndex);
+    pushTriangle(indices, faceMap, base, base + 2, base + 3, recordIndex);
+  }
+
+  const topBase = positions.length / 3;
+  for (const p of pts) {
+    const wp = wrapSpherePointCPU(p.x, h, p.z);
+    positions.push(wp[0], wp[1], wp[2]);
+  }
+  const shapePts = pts.map(p => new THREE.Vector2(p.x, p.z));
+  let triangles = THREE.ShapeUtils.triangulateShape(shapePts, []);
+  if (!triangles.length && pts.length >= 3) {
+    triangles = [];
+    for (let i = 1; i < pts.length - 1; i++) triangles.push([0, i, i + 1]);
+  }
+  for (const tri of triangles) {
+    pushTriangle(indices, faceMap, topBase + tri[0], topBase + tri[1], topBase + tri[2], recordIndex);
+  }
+}
+
+function appendBuildingLinePositions(positions, record) {
+  const { pts, h } = record;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    positions.push(a.x, 0, a.z, b.x, 0, b.z);
+    positions.push(a.x, h, a.z, b.x, h, b.z);
+    positions.push(a.x, 0, a.z, a.x, h, a.z);
+  }
+}
+
+function makeBuildingFillGeometry(record) {
+  const positions = [];
+  const normals = [];
+  const indices = [];
+  appendBuildingPrismMesh(positions, normals, indices, record);
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-  geo.setIndex(new THREE.BufferAttribute(indices, 1));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
   return geo;
 }
 
-function makeBuildingLineGeometry(bounds) {
-  const corners = getBuildingBoxCorners(bounds);
+function makeBuildingLineGeometry(record) {
   const positions = [];
-  for (const edge of BUILDING_BOX_LINE_EDGES) {
-    const a = corners[edge[0]];
-    const b = corners[edge[1]];
-    positions.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-  }
+  appendBuildingLinePositions(positions, record);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   return geo;
 }
 
-// helper: sample a position uniformly in an annulus [innerR, outerR]
-function sampleAnnulus(innerR, outerR) {
-  const u = Math.random();
-  const r = Math.sqrt(innerR * innerR + u * (outerR * outerR - innerR * innerR));
-  const a = Math.random() * Math.PI * 2;
-  return { cx: Math.cos(a) * r, cz: Math.sin(a) * r };
+function buildingHoverCellKey(x, z) {
+  return `${x},${z}`;
 }
 
-// Data centers: tight grids of identical small flat boxes (server warehouses).
-// Each cluster is a rectangular array of nearly-square footprints with uniform low height.
-function buildDataCenterClusters() {
-  const out = [];
-  const NUM_CLUSTERS = 200;          // dense coverage so the grid patterns read everywhere
-  const innerR = 760, outerR = 2950;
+function addBuildingHoverCell(cellX, cellZ, index) {
+  const key = buildingHoverCellKey(cellX, cellZ);
+  let bucket = buildingHoverSpatialIndex.get(key);
+  if (!bucket) {
+    bucket = [];
+    buildingHoverSpatialIndex.set(key, bucket);
+  }
+  bucket.push(index);
+}
 
-  for (let c = 0; c < NUM_CLUSTERS; c++) {
-    const { cx, cz } = sampleAnnulus(innerR, outerR);
-    const cols = 5 + Math.floor(Math.random() * 7);   // 5..11
-    const rows = 4 + Math.floor(Math.random() * 6);   // 4..9
-    const spacing = 3.6 + Math.random() * 1.4;
-    const w = 2.8 + Math.random() * 0.6;
-    const d = 2.8 + Math.random() * 0.6;
-    const h = 1.4 + Math.random() * 1.0; // uniform per cluster (warehouse-style)
-    const x0 = cx - ((cols - 1) * spacing) / 2;
-    const z0 = cz - ((rows - 1) * spacing) / 2;
+function buildBuildingHoverSpatialIndex() {
+  buildingHoverSpatialIndex.clear();
+  for (let index = 0; index < buildingHoverRecords.length; index++) {
+    const bounds = buildingHoverRecords[index];
+    const cx = (bounds.minX + bounds.maxX) * 0.5;
+    const cz = (bounds.minZ + bounds.maxZ) * 0.5;
+    bounds.hoverable = Math.hypot(cx, cz) <= BUILDING_HOVER_MAX_RADIUS;
+    if (!bounds.hoverable) continue;
 
-    for (let i = 0; i < cols; i++) {
-      for (let j = 0; j < rows; j++) {
-        const x = x0 + i * spacing;
-        const z = z0 + j * spacing;
-        out.push({
-          pts: rectPts(x, z, w, d),
-          heightU: h,
-          areaM2: (w * d) / (SCENE_SCALE * SCENE_SCALE),
-          tags: { kind: 'datacenter' },
-        });
+    const minCellX = Math.floor(bounds.minX / BUILDING_HOVER_CELL_SIZE);
+    const maxCellX = Math.floor(bounds.maxX / BUILDING_HOVER_CELL_SIZE);
+    const minCellZ = Math.floor(bounds.minZ / BUILDING_HOVER_CELL_SIZE);
+    const maxCellZ = Math.floor(bounds.maxZ / BUILDING_HOVER_CELL_SIZE);
+    for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
+        addBuildingHoverCell(cellX, cellZ, index);
       }
     }
   }
-  return out;
-}
-
-// Solar farms: rows of long thin near-ground rectangles (PV panel arrays).
-// Multiple parallel rows make the array read as a single farm from above.
-function buildSolarFarmGrids() {
-  const out = [];
-  const NUM_FARMS = 140;             // many farms so parallel-row patterns dot the dome
-  const innerR = 800, outerR = 2950;
-
-  for (let f = 0; f < NUM_FARMS; f++) {
-    const { cx, cz } = sampleAnnulus(innerR, outerR);
-    const cols = 6 + Math.floor(Math.random() * 8);   // 6..13 (panels per row)
-    const rows = 4 + Math.floor(Math.random() * 5);   // 4..8 (number of rows)
-    const colSpacing = 5.5 + Math.random() * 1.0;
-    const rowSpacing = 3.2 + Math.random() * 0.8;
-    const w = 4.8 + Math.random() * 0.5; // long axis
-    const d = 1.6 + Math.random() * 0.4; // narrow axis
-    const h = 0.22 + Math.random() * 0.18;
-    const x0 = cx - ((cols - 1) * colSpacing) / 2;
-    const z0 = cz - ((rows - 1) * rowSpacing) / 2;
-
-    for (let i = 0; i < cols; i++) {
-      for (let j = 0; j < rows; j++) {
-        const x = x0 + i * colSpacing;
-        const z = z0 + j * rowSpacing;
-        out.push({
-          pts: rectPts(x, z, w, d),
-          heightU: h,
-          areaM2: (w * d) / (SCENE_SCALE * SCENE_SCALE),
-          tags: { kind: 'solar' },
-        });
-      }
-    }
-  }
-  return out;
-}
-
-// Procedurally scatter axis-aligned rectangular buildings in an annulus around
-// the OSM area so the whole visible dome reads as a city, not just Bangkok.
-// Each entry matches the {pts, heightU, areaM2, tags} shape that the mesh and
-// wireframe builders consume, so they slot into the same merged draw calls.
-function buildProceduralCityData() {
-  const N = 22000;       // dense scatter so the dome reads as continuously built-up
-  const innerR = 720;    // start just outside the Bangkok bbox so we don't double up
-  const outerR = 2980;   // wraps onto ~π/2 of arc — covers the entire visible hemisphere
-  const out = [];
-
-  for (let i = 0; i < N; i++) {
-    const { cx, cz } = sampleAnnulus(innerR, outerR);
-
-    // bias footprint + height toward small (heavy tail of taller towers)
-    const w = 2.5 + Math.random() * Math.random() * 22;
-    const d = 2.5 + Math.random() * Math.random() * 22;
-    const tall = Math.random() < 0.06; // occasional tower
-    const h = tall
-      ? 6 + Math.random() * 30
-      : 1.2 + Math.random() * 5;
-
-    out.push({
-      pts: rectPts(cx, cz, w, d),
-      heightU: h,
-      areaM2: (w * d) / (SCENE_SCALE * SCENE_SCALE),
-      tags: {},
-    });
-  }
-  return out;
 }
 
 // projection-only pass: computes per-building {pts, heightU, areaM2, tags}
@@ -1505,7 +2321,8 @@ function buildBuildingPoints(buildings) {
         const y = heightU + 0.05 + Math.random() * 0.12;
 
         const r = Math.random();
-        if (r < 0.30) tmp.copy(yellow).lerp(yellowB, Math.random() * 0.4);
+        if (r < 0.018) tmp.copy(accentYellow).lerp(greyC, Math.random() * 0.18);
+        else if (r < 0.30) tmp.copy(yellow).lerp(yellowB, Math.random() * 0.4);
         else tmp.copy(greyA).lerp(greyB, Math.random() * 0.6);
         tmp.multiplyScalar(0.85 + Math.random() * 0.15);
 
@@ -1528,12 +2345,12 @@ function buildBuildingPoints(buildings) {
   geo.setAttribute('color',    new THREE.BufferAttribute(colors.subarray(0, k * 3), 3));
   geo.setAttribute('aSize',    new THREE.BufferAttribute(sizes.subarray(0, k), 1));
   geo.setAttribute('aPhase',   new THREE.BufferAttribute(phases.subarray(0, k), 1));
-  const mat = makePointsMaterial(1.0);
+  const mat = makePointsMaterial(1.0, particleDensityUniforms.buildings);
   scene.add(new THREE.Points(geo, mat));
 
   lblText.textContent = `${k.toLocaleString()} window lights · ${buildings.length.toLocaleString()} buildings`;
 
-  // expose for the box-mesh pass
+  // expose for the footprint extrusion pass
   projectedBuildings = projected;
 
   // thicken the field with ambient street/alley particles around every building
@@ -1550,7 +2367,7 @@ function buildRiverPoints(riverWays) {
       const b = project(way[i+1].lat, way[i+1].lon);
       const dx = b.x - a.x, dz = b.y - a.y;
       const len = Math.hypot(dx, dz);
-      const steps = Math.max(2, Math.floor(len / 1.5));
+      const steps = Math.max(2, Math.floor(len / (1.5 / RIVER_PARTICLE_POOL_MULTIPLIER)));
       const nx = -dz / (len || 1), nz = dx / (len || 1);
       for (let s = 0; s < steps; s++) {
         const t = s / steps;
@@ -1582,7 +2399,7 @@ function buildRiverPoints(riverWays) {
   geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
   geo.setAttribute('aSize',    new THREE.BufferAttribute(sizes, 1));
   geo.setAttribute('aPhase',   new THREE.BufferAttribute(phases, 1));
-  const mat = makePointsMaterial(0.8);
+  const mat = makePointsMaterial(0.8, particleDensityUniforms.river, RIVER_PARTICLE_POOL_MULTIPLIER);
   scene.add(new THREE.Points(geo, mat));
 }
 
@@ -1597,14 +2414,17 @@ const meshVert = /* glsl */`
   uniform float uFadeFar;
   varying vec3 vNormalW;
   varying vec3 vWorldPos;
+  varying vec3 vCullWorldPos;
   varying float vFade;
 
   void main() {
     vec3 wp;
     vec3 wn;
+    vec3 cullWp;
     if (uSphereR < 1.0) {
       wp = position;
       wn = normal;
+      cullWp = vec3(position.x, 0.0, position.z);
     } else {
       float R = uSphereR;
       float ax = position.z / R;
@@ -1624,10 +2444,12 @@ const meshVert = /* glsl */`
       mat3 Rot = Rz * Rx;
       vec3 local = vec3(0.0, R + position.y, 0.0);
       wp = Rot * local + vec3(0.0, -R, 0.0);
+      cullWp = Rot * vec3(0.0, R, 0.0) + vec3(0.0, -R, 0.0);
       wn = normalize(Rot * normal);
     }
     vNormalW = wn;
     vWorldPos = wp;
+    vCullWorldPos = cullWp;
     vec4 mv = modelViewMatrix * vec4(wp, 1.0);
     gl_Position = projectionMatrix * mv;
     float dist = -mv.z;
@@ -1645,6 +2467,7 @@ const meshFrag = /* glsl */`
   uniform float uSphereR;
   varying vec3 vNormalW;
   varying vec3 vWorldPos;
+  varying vec3 vCullWorldPos;
   varying float vFade;
 
   // cheap 3d hash → [0,1)
@@ -1655,10 +2478,11 @@ const meshFrag = /* glsl */`
   }
 
   void main() {
-    // back-face cull: hide anything on the far hemisphere of the globe
-    vec3 sphereOutN = normalize(vWorldPos - vec3(0.0, -uSphereR, 0.0));
-    vec3 sphereToCam = normalize(cameraPosition - vWorldPos);
-    if (dot(sphereOutN, sphereToCam) < 0.0) discard;
+    // Cull by footprint, not vertex height. Otherwise tall towers get sliced
+    // where their tops cross the curved-world horizon test before their bases.
+    vec3 sphereOutN = normalize(vCullWorldPos - vec3(0.0, -uSphereR, 0.0));
+    vec3 sphereToCam = normalize(cameraPosition - vCullWorldPos);
+    if (dot(sphereOutN, sphereToCam) < -0.04) discard;
 
     // -------- particle dither: discard a fraction of pixels so the box
     //          surface reads as a cloud of dots, not a wall --------
@@ -1692,12 +2516,13 @@ const buildingHoverFrag = /* glsl */`
   uniform float uSphereR;
   varying vec3 vNormalW;
   varying vec3 vWorldPos;
+  varying vec3 vCullWorldPos;
   varying float vFade;
 
   void main() {
-    vec3 sphereOutN = normalize(vWorldPos - vec3(0.0, -uSphereR, 0.0));
-    vec3 sphereToCam = normalize(cameraPosition - vWorldPos);
-    if (dot(sphereOutN, sphereToCam) < 0.0) discard;
+    vec3 sphereOutN = normalize(vCullWorldPos - vec3(0.0, -uSphereR, 0.0));
+    vec3 sphereToCam = normalize(cameraPosition - vCullWorldPos);
+    if (dot(sphereOutN, sphereToCam) < -0.04) discard;
 
     vec3 lightDir = normalize(vec3(0.36, 0.92, 0.28));
     float ndl = max(0.0, dot(normalize(vNormalW), lightDir));
@@ -1712,53 +2537,36 @@ const buildingHoverFrag = /* glsl */`
 
 function buildBuildingMeshes(projected) {
   if (!projected || !projected.length) return;
-  let validCount = 0;
-  for (const B of projected) if (B && B.pts && B.pts.length >= 3) validCount++;
-  if (!validCount) return;
-
-  lblText.textContent = `Extruding ${validCount.toLocaleString()} buildings…`;
-  if (buildingHitMesh) {
-    buildingHitMesh.geometry.dispose();
-    buildingHitMesh.material.dispose();
-    buildingHitMesh = null;
+  const records = [];
+  for (const B of projected) {
+    const record = createBuildingRecord(B);
+    if (record) records.push(record);
   }
+  if (!records.length) return;
+
+  lblText.textContent = `Extruding ${records.length.toLocaleString()} map footprints…`;
+  disposeBuildingHitMesh();
   buildingHoverRecords.length = 0;
 
-  const VERTS = validCount * 24;
-  const INDS  = validCount * 36;
-  const positions = new Float32Array(VERTS * 3);
-  const normals   = new Float32Array(VERTS * 3);
-  const hitPositions = new Float32Array(VERTS * 3);
-  const indices   = new Uint32Array(INDS);
+  const positions = [];
+  const normals = [];
+  const indices = [];
 
-  let vi = 0, ii = 0, vbase = 0;
-
-  for (const B of projected) {
-    const bounds = getBuildingBoxBounds(B, 0.05);
-    if (!bounds) continue;
-    buildingHoverRecords.push(bounds);
-    const written = appendBuildingBoxMesh(positions, normals, indices, hitPositions, bounds, vi, ii, vbase);
-    vi = written.vi;
-    ii = written.ii;
-    vbase = written.vbase;
+  for (const record of records) {
+    buildingHoverRecords.push(record);
+    appendBuildingPrismMesh(positions, normals, indices, record);
   }
+  buildBuildingHoverSpatialIndex();
+  updateBuildingHoverDebug();
 
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, vi * 3), 3));
-  geo.setAttribute('normal',   new THREE.BufferAttribute(normals.subarray(0, vi * 3), 3));
-  geo.setIndex(new THREE.BufferAttribute(indices.subarray(0, ii), 1));
-
-  const hitGeo = new THREE.BufferGeometry();
-  hitGeo.setAttribute('position', new THREE.BufferAttribute(hitPositions.subarray(0, vi * 3), 3));
-  hitGeo.setIndex(new THREE.BufferAttribute(indices.subarray(0, ii), 1));
-  hitGeo.computeBoundingSphere();
-  buildingHitMesh = new THREE.Mesh(hitGeo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
-  buildingHitMesh.frustumCulled = false;
-  buildingHitMesh.updateMatrixWorld(true);
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
 
   // Depth-only occluder pass: invisible, but writes depth so the wireframes
   // behind a building (including each building's own back edges) get hidden.
-  // DoubleSide rendering ensures every cube pixel has a depth value.
+  // DoubleSide rendering ensures every footprint prism pixel has a depth value.
   const occluderVert = `
     uniform float uSphereR;
     void main() {
@@ -1789,6 +2597,9 @@ function buildBuildingMeshes(projected) {
     colorWrite: false,
     depthWrite: true,
     depthTest: true,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
   });
 
   const mesh = new THREE.Mesh(geo, mat);
@@ -1796,18 +2607,21 @@ function buildBuildingMeshes(projected) {
   scene.add(mesh);
 }
 
-// ---------- BUILDING WIREFRAMES — thin grey line skeletons of every box ----------
+// ---------- BUILDING WIREFRAMES — thin grey outlines from actual OSM footprints ----------
 const wireVert = /* glsl */`
   uniform float uSphereR;
   uniform float uFadeNear;
   uniform float uFadeFar;
   varying float vFade;
   varying float vBackface;
+  varying float vDepthLayer;
 
   void main() {
     vec3 wp;
+    vec3 cullWp;
     if (uSphereR < 1.0) {
       wp = position;
+      cullWp = vec3(position.x, 0.0, position.z);
     } else {
       float R = uSphereR;
       float ax = position.z / R;
@@ -1819,15 +2633,17 @@ const wireVert = /* glsl */`
       mat3 Rot = Rz * Rx;
       vec3 local = vec3(0.0, R + position.y, 0.0);
       wp = Rot * local + vec3(0.0, -R, 0.0);
+      cullWp = Rot * vec3(0.0, R, 0.0) + vec3(0.0, -R, 0.0);
     }
-    vec3 outN = normalize(wp - vec3(0.0, -uSphereR, 0.0));
-    vec3 toCam = normalize(cameraPosition - wp);
+    vec3 outN = normalize(cullWp - vec3(0.0, -uSphereR, 0.0));
+    vec3 toCam = normalize(cameraPosition - cullWp);
     vBackface = dot(outN, toCam);
 
     vec4 mv = modelViewMatrix * vec4(wp, 1.0);
     gl_Position = projectionMatrix * mv;
     float dist = -mv.z;
     vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+    vDepthLayer = smoothstep(uFadeFar * 0.85, uFadeFar * 3.35, dist);
   }
 `;
 const wireFrag = /* glsl */`
@@ -1836,11 +2652,14 @@ const wireFrag = /* glsl */`
   uniform float uAlpha;
   varying float vFade;
   varying float vBackface;
+  varying float vDepthLayer;
 
   void main() {
-    if (vBackface < 0.0) discard;
-    vec3 col = mix(uColor, uBgColor, vFade * 0.85);
-    float alpha = uAlpha * (1.0 - vFade * 0.95);
+    if (vBackface < -0.04) discard;
+    vec3 col = mix(uColor, uBgColor, clamp(vFade * 0.70 + vDepthLayer * 0.70, 0.0, 1.0));
+    float closeAlpha = 1.0 - vFade * 0.95;
+    float depthAlpha = mix(1.08, 0.065, smoothstep(0.0, 1.0, vDepthLayer));
+    float alpha = uAlpha * closeAlpha * depthAlpha;
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(col, alpha);
   }
@@ -1848,56 +2667,18 @@ const wireFrag = /* glsl */`
 
 function buildBuildingWireframes(projected) {
   if (!projected || !projected.length) return;
-  let validCount = 0;
-  for (const B of projected) if (B && B.pts && B.pts.length >= 3) validCount++;
-  if (!validCount) return;
+  const records = buildingHoverRecords.length
+    ? buildingHoverRecords
+    : projected.map(B => createBuildingRecord(B)).filter(Boolean);
+  if (!records.length) return;
 
-  // 8 corners per box, 12 edges = 24 index entries
-  const positions = new Float32Array(validCount * 8 * 3);
-  const indices   = new Uint32Array(validCount * 24);
-  let vi = 0, ii = 0, vbase = 0;
-
-  // edge connectivity for a unit cube indexed (x*4 + y*2 + z)
-  const EDGES = [
-    0,1, 0,4, 1,5, 4,5,   // bottom rectangle
-    2,3, 2,6, 3,7, 6,7,   // top rectangle
-    0,2, 1,3, 4,6, 5,7,   // vertical pillars
-  ];
-
-  for (const B of projected) {
-    if (!B || !B.pts || B.pts.length < 3) continue;
-
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    for (const p of B.pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.z < minZ) minZ = p.z;
-      if (p.z > maxZ) maxZ = p.z;
-    }
-    const shrink = 0.04;
-    minX += shrink; maxX -= shrink;
-    minZ += shrink; maxZ -= shrink;
-    if (maxX <= minX || maxZ <= minZ) continue;
-    const h = Math.max(0.4, B.heightU);
-
-    // emit 8 corners
-    const c = [
-      [minX, 0, minZ], [minX, 0, maxZ], [minX, h, minZ], [minX, h, maxZ],
-      [maxX, 0, minZ], [maxX, 0, maxZ], [maxX, h, minZ], [maxX, h, maxZ],
-    ];
-    for (let k = 0; k < 8; k++) {
-      positions[vi*3 + 0] = c[k][0];
-      positions[vi*3 + 1] = c[k][1];
-      positions[vi*3 + 2] = c[k][2];
-      vi++;
-    }
-    for (let k = 0; k < 24; k++) indices[ii++] = vbase + EDGES[k];
-    vbase += 8;
+  const positions = [];
+  for (const record of records) {
+    appendBuildingLinePositions(positions, record);
   }
 
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, vi * 3), 3));
-  geo.setIndex(new THREE.BufferAttribute(indices.subarray(0, ii), 1));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
@@ -1924,7 +2705,7 @@ function buildBuildingWireframes(projected) {
 // the building wireframes.
 function buildBuildingAmbient(buildings, projected) {
   // budget proportional to building count, but capped
-  const N = Math.min(160000, Math.max(40000, buildings.length * 3));
+  const N = Math.min(520000, Math.max(90000, buildings.length * 3 * STREET_PARTICLE_POOL_MULTIPLIER));
   const pos = new Float32Array(N * 3);
   const col = new Float32Array(N * 3);
   const sz  = new Float32Array(N);
@@ -1951,7 +2732,8 @@ function buildBuildingAmbient(buildings, projected) {
 
     // grey ambience with frequent warm yellow lamp-spill
     const rr = Math.random();
-    if (rr < 0.28) tmp.copy(yellow).lerp(yellowB, Math.random() * 0.45);
+    if (rr < 0.015) tmp.copy(accentYellow).lerp(greyC, Math.random() * 0.25);
+    else if (rr < 0.28) tmp.copy(yellow).lerp(yellowB, Math.random() * 0.45);
     else if (rr < 0.66) tmp.copy(greyA).lerp(greyC, Math.random() * 0.6);
     else tmp.copy(greyA).lerp(greyB, Math.random() * 0.7);
 
@@ -1973,12 +2755,12 @@ function buildBuildingAmbient(buildings, projected) {
   geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
   geo.setAttribute('aSize',    new THREE.BufferAttribute(sz, 1));
   geo.setAttribute('aPhase',   new THREE.BufferAttribute(ph, 1));
-  scene.add(new THREE.Points(geo, makePointsMaterial(0.9)));
+  scene.add(new THREE.Points(geo, makePointsMaterial(0.9, particleDensityUniforms.streets, STREET_PARTICLE_POOL_MULTIPLIER)));
 }
 
 // ---------- TRAFFIC STREAMS along the river ----------
 let streamGeo, sT, sSpeed, sSide, sOff;
-const STREAM_COUNT = 2600;
+const STREAM_COUNT = 2600 * STREAM_PARTICLE_POOL_MULTIPLIER;
 
 function buildStreams() {
   if (!riverCurve) return;
@@ -2001,7 +2783,9 @@ function buildStreams() {
     size[i] = 1.4 + Math.random() * 1.8;
     // yellow flow one direction, grey flow the other
     const c = side > 0
-      ? yellow.clone().lerp(yellowB, Math.random() * 0.4)
+      ? (Math.random() < 0.11
+        ? accentYellow.clone().lerp(greyC, Math.random() * 0.18)
+        : yellow.clone().lerp(yellowB, Math.random() * 0.4))
       : greyB.clone().lerp(greyA, Math.random() * 0.5);
     col[i*3+0] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
     ph[i] = Math.random() * 6.28;
@@ -2010,7 +2794,7 @@ function buildStreams() {
   streamGeo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
   streamGeo.setAttribute('aSize',    new THREE.BufferAttribute(size, 1));
   streamGeo.setAttribute('aPhase',   new THREE.BufferAttribute(ph, 1));
-  const mat = makePointsMaterial(1.0);
+  const mat = makePointsMaterial(1.0, particleDensityUniforms.streams, STREAM_PARTICLE_POOL_MULTIPLIER);
   scene.add(new THREE.Points(streamGeo, mat));
 }
 
@@ -2018,7 +2802,7 @@ function buildStreams() {
 let trafficGeo = null;
 let trafficData = null;            // per-particle: {roadIdx, segIdx, t, dir, speed}
 let trafficRoadLens = null;        // per-road: cumulative segment lengths for fast advance
-const TRAFFIC_COUNT = 6000;
+const TRAFFIC_COUNT = 6000 * TRAFFIC_PARTICLE_POOL_MULTIPLIER;
 
 function buildTraffic() {
   if (!roads.length) return;
@@ -2075,9 +2859,11 @@ function buildTraffic() {
     pos[i*3+2] = a.z + (b.z - a.z) * t;
 
     // mostly mid grey, some light grey accents — distinguishes from buildings
-    const c = Math.random() < 0.55
-      ? greyA.clone().lerp(greyB, Math.random() * 0.5)
-      : greyA.clone().lerp(greyC, Math.random() * 0.5);
+    const c = Math.random() < 0.035
+      ? accentYellow.clone().lerp(greyC, Math.random() * 0.22)
+      : Math.random() < 0.55
+        ? greyA.clone().lerp(greyB, Math.random() * 0.5)
+        : greyA.clone().lerp(greyC, Math.random() * 0.5);
     col[i*3+0] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
     sz[i] = 1.2 + Math.random() * 0.9;
     ph[i] = Math.random() * 6.28;
@@ -2087,7 +2873,7 @@ function buildTraffic() {
   trafficGeo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
   trafficGeo.setAttribute('aSize',    new THREE.BufferAttribute(sz, 1));
   trafficGeo.setAttribute('aPhase',   new THREE.BufferAttribute(ph, 1));
-  scene.add(new THREE.Points(trafficGeo, makePointsMaterial(0.95)));
+  scene.add(new THREE.Points(trafficGeo, makePointsMaterial(0.95, particleDensityUniforms.traffic, TRAFFIC_PARTICLE_POOL_MULTIPLIER)));
 }
 
 function updateTraffic(dt) {
@@ -2101,7 +2887,7 @@ function updateTraffic(dt) {
 
     // advance along the current segment
     const segLen = meta.lens[d.segIdx] || 1;
-    d.t += (d.dir * d.speed * dt) / segLen;
+    d.t += (d.dir * d.speed * dt * particleSettings.trafficSpeed) / segLen;
 
     // hop across segments if we overflow; reverse at the road endpoints
     let safety = 8;
@@ -2138,7 +2924,7 @@ function updateTraffic(dt) {
 
 // ---------- FLOW FIELD — curl-noise-driven particle wind through the city ----------
 let eGeo;
-const EMBER_COUNT = 14000;
+const EMBER_COUNT = 14000 * WIND_PARTICLE_POOL_MULTIPLIER;
 const FLOW_BOUND = 2600;  // spread the curl-noise flow across the whole visible dome
 
 function buildEmbers() {
@@ -2156,9 +2942,11 @@ function buildEmbers() {
       : 30 + Math.random() * 220;
     pos[i*3+2] = (Math.random() * 2 - 1) * FLOW_BOUND;
     // grey with strong yellow accent streaks to read as warm flow
-    const c = Math.random() < 0.35
-      ? yellow.clone().lerp(yellowB, Math.random() * 0.45)
-      : greyA.clone().lerp(greyB, Math.random() * 0.55);
+    const c = Math.random() < 0.025
+      ? accentYellow.clone().lerp(greyC, Math.random() * 0.2)
+      : Math.random() < 0.35
+        ? yellow.clone().lerp(yellowB, Math.random() * 0.45)
+        : greyA.clone().lerp(greyB, Math.random() * 0.55);
     col[i*3+0] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
     sz[i] = 1.2 + Math.random() * 1.3;
     ph[i] = Math.random() * 6.28;
@@ -2167,7 +2955,7 @@ function buildEmbers() {
   eGeo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
   eGeo.setAttribute('aSize',    new THREE.BufferAttribute(sz, 1));
   eGeo.setAttribute('aPhase',   new THREE.BufferAttribute(ph, 1));
-  const mat = makePointsMaterial(0.95);
+  const mat = makePointsMaterial(0.95, particleDensityUniforms.wind, WIND_PARTICLE_POOL_MULTIPLIER);
   scene.add(new THREE.Points(eGeo, mat));
 }
 
@@ -2181,12 +2969,42 @@ const composer = {
 
 const buildingHoverRaycaster = new THREE.Raycaster();
 const buildingHoverPointer = new THREE.Vector2();
+const buildingHoverFlatPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const buildingHoverSphere = new THREE.Sphere(new THREE.Vector3(0, -GLOBE_R, 0), GLOBE_R);
+const buildingHoverHitPoint = new THREE.Vector3();
+
+function disposeBuildingHitMesh() {
+  buildingHitFaceMap = [];
+  if (!buildingHitMesh) return;
+  if (buildingHitMesh.geometry) buildingHitMesh.geometry.dispose();
+  if (buildingHitMesh.material) buildingHitMesh.material.dispose();
+  buildingHitMesh = null;
+}
 
 function disposeBuildingHighlight(highlight) {
   highlight.group.traverse(obj => {
     if (obj.geometry) obj.geometry.dispose();
     if (obj.material) obj.material.dispose();
   });
+}
+
+function clearBuildingHighlights() {
+  for (const highlight of buildingHighlights.values()) {
+    scene.remove(highlight.group);
+    disposeBuildingHighlight(highlight);
+  }
+  buildingHighlights.clear();
+}
+
+function setBuildingHoverEnabled(enabled, persist = true) {
+  buildingHoverEnabled = Boolean(enabled);
+  if (!buildingHoverEnabled) {
+    clearBuildingHover();
+    clearBuildingHighlights();
+    disposeBuildingHitMesh();
+  }
+  if (persist) saveBuildingHoverEnabled();
+  updateBuildingHoverDebug();
 }
 
 function createBuildingHighlight(index) {
@@ -2258,8 +3076,23 @@ function touchBuildingHighlight(index) {
   highlight.lastTouched = performance.now() / 1000;
 }
 
-function pickBuildingFromPointer(event) {
-  if (!buildingHitMesh) return null;
+function unwrapSpherePointCPU(point) {
+  const R = GLOBE_R;
+  if (R < 1) return { x: point.x, z: point.z };
+  const dx = point.x;
+  const dy = point.y + R;
+  const dz = point.z;
+  const len = Math.max(0.0001, Math.hypot(dx, dy, dz));
+  const dirX = dx / len;
+  const dirY = dy / len;
+  const dirZ = dz / len;
+  return {
+    x: -Math.atan2(-dirX, dirY) * R,
+    z: Math.asin(clamp(dirZ, -1, 1)) * R,
+  };
+}
+
+function flatPointFromPointer(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   const x = (event.clientX - rect.left) / rect.width;
   const y = (event.clientY - rect.top) / rect.height;
@@ -2267,30 +3100,156 @@ function pickBuildingFromPointer(event) {
 
   buildingHoverPointer.set(x * 2 - 1, -(y * 2 - 1));
   buildingHoverRaycaster.setFromCamera(buildingHoverPointer, camera);
-  const hits = buildingHoverRaycaster.intersectObject(buildingHitMesh, false);
+  if (GLOBE_R < 1) {
+    return buildingHoverRaycaster.ray.intersectPlane(buildingHoverFlatPlane, buildingHoverHitPoint)
+      ? { x: buildingHoverHitPoint.x, z: buildingHoverHitPoint.z }
+      : null;
+  }
+
+  return buildingHoverRaycaster.ray.intersectSphere(buildingHoverSphere, buildingHoverHitPoint)
+    ? unwrapSpherePointCPU(buildingHoverHitPoint)
+    : null;
+}
+
+function distanceToBuildingBoundsSq(point, bounds) {
+  const dx = point.x < bounds.minX
+    ? bounds.minX - point.x
+    : point.x > bounds.maxX
+      ? point.x - bounds.maxX
+      : 0;
+  const dz = point.z < bounds.minZ
+    ? bounds.minZ - point.z
+    : point.z > bounds.maxZ
+      ? point.z - bounds.maxZ
+      : 0;
+  return dx * dx + dz * dz;
+}
+
+function getBuildingHoverCandidates(point) {
+  if (!buildingHoverSpatialIndex.size) return [];
+
+  const cellX = Math.floor(point.x / BUILDING_HOVER_CELL_SIZE);
+  const cellZ = Math.floor(point.z / BUILDING_HOVER_CELL_SIZE);
+  const found = new Set();
+  const ranked = [];
+  const maxDistanceSq = BUILDING_HOVER_SEARCH_RADIUS * BUILDING_HOVER_SEARCH_RADIUS;
+
+  for (let dz = -BUILDING_HOVER_SEARCH_CELLS; dz <= BUILDING_HOVER_SEARCH_CELLS; dz++) {
+    for (let dx = -BUILDING_HOVER_SEARCH_CELLS; dx <= BUILDING_HOVER_SEARCH_CELLS; dx++) {
+      const bucket = buildingHoverSpatialIndex.get(buildingHoverCellKey(cellX + dx, cellZ + dz));
+      if (!bucket) continue;
+      for (const index of bucket) {
+        if (found.has(index)) continue;
+        found.add(index);
+        const bounds = buildingHoverRecords[index];
+        if (!bounds || !bounds.hoverable) continue;
+        const distanceSq = distanceToBuildingBoundsSq(point, bounds);
+        if (distanceSq > maxDistanceSq) continue;
+        ranked.push({ index, distanceSq });
+      }
+    }
+  }
+
+  ranked.sort((a, b) => a.distanceSq - b.distanceSq);
+  return ranked.slice(0, BUILDING_HOVER_MAX_CANDIDATES).map(item => item.index);
+}
+
+function buildBuildingHoverHitMesh(candidateIndices) {
+  disposeBuildingHitMesh();
+  if (!candidateIndices.length) return null;
+
+  const positions = [];
+  const indices = [];
+  const faceMap = [];
+
+  for (const index of candidateIndices) {
+    const record = buildingHoverRecords[index];
+    if (!record) continue;
+    appendBuildingHitPrismMesh(positions, indices, faceMap, record, index);
+  }
+
+  if (!positions.length || !indices.length) return null;
+  buildingHitFaceMap = faceMap;
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
+  geo.computeBoundingSphere();
+
+  const mat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  buildingHitMesh = new THREE.Mesh(geo, mat);
+  buildingHitMesh.frustumCulled = false;
+  buildingHitMesh.updateMatrixWorld(true);
+  return buildingHitMesh;
+}
+
+function pickBuildingFromPointer(event) {
+  if (!buildingHoverEnabled || controlsInteracting || cameraAnimation.active) return null;
+  const flatPoint = flatPointFromPointer(event);
+  if (!flatPoint) return null;
+
+  const candidates = getBuildingHoverCandidates(flatPoint);
+  if (!candidates.length) return null;
+
+  const hitMesh = buildBuildingHoverHitMesh(candidates);
+  if (!hitMesh) return null;
+
+  const hits = buildingHoverRaycaster.intersectObject(hitMesh, false);
   if (!hits.length || hits[0].faceIndex === undefined) return null;
-  const index = Math.floor(hits[0].faceIndex / 12);
+  const index = buildingHitFaceMap[hits[0].faceIndex];
   return buildingHoverRecords[index] ? index : null;
 }
 
 function updateBuildingHoverFromPointer() {
   buildingHoverRaf = 0;
+  buildingHoverLastPickAt = performance.now();
   if (!pendingBuildingHoverEvent) return;
+  if (!buildingHoverEnabled || controlsInteracting || cameraAnimation.active) {
+    clearBuildingHover();
+    return;
+  }
   const next = pickBuildingFromPointer(pendingBuildingHoverEvent);
   hoveredBuildingIndex = next;
   if (next !== null) touchBuildingHighlight(next);
 }
 
-function queueBuildingHover(event) {
-  pendingBuildingHoverEvent = { clientX: event.clientX, clientY: event.clientY };
-  if (!buildingHoverRaf) {
-    buildingHoverRaf = requestAnimationFrame(updateBuildingHoverFromPointer);
+function scheduleBuildingHoverPick() {
+  if (buildingHoverRaf || buildingHoverTimer) return;
+  const now = performance.now();
+  const wait = Math.max(0, BUILDING_HOVER_THROTTLE_MS - (now - buildingHoverLastPickAt));
+
+  if (wait > 0) {
+    buildingHoverTimer = window.setTimeout(() => {
+      buildingHoverTimer = 0;
+      buildingHoverRaf = requestAnimationFrame(updateBuildingHoverFromPointer);
+    }, wait);
+    return;
   }
+
+  buildingHoverRaf = requestAnimationFrame(updateBuildingHoverFromPointer);
+}
+
+function queueBuildingHover(event) {
+  if (!buildingHoverEnabled || controlsInteracting || cameraAnimation.active) {
+    clearBuildingHover();
+    return;
+  }
+  pendingBuildingHoverEvent = { clientX: event.clientX, clientY: event.clientY };
+  scheduleBuildingHoverPick();
 }
 
 function clearBuildingHover() {
+  if (buildingHoverRaf) {
+    cancelAnimationFrame(buildingHoverRaf);
+    buildingHoverRaf = 0;
+  }
+  if (buildingHoverTimer) {
+    clearTimeout(buildingHoverTimer);
+    buildingHoverTimer = 0;
+  }
   hoveredBuildingIndex = null;
   pendingBuildingHoverEvent = null;
+  disposeBuildingHitMesh();
 }
 
 function updateBuildingHighlights(now) {
@@ -2332,7 +3291,7 @@ function updateStreams(dt) {
   const tan = new THREE.Vector3();
   const p = new THREE.Vector3();
   for (let i = 0; i < STREAM_COUNT; i++) {
-    sT[i] += sSpeed[i] * dt * sSide[i] * 0.5;
+    sT[i] += sSpeed[i] * dt * sSide[i] * 0.5 * particleSettings.streamSpeed;
     if (sT[i] > 1) sT[i] -= 1;
     if (sT[i] < 0) sT[i] += 1;
     riverCurve.getPoint(sT[i], p);
@@ -2349,19 +3308,21 @@ function updateStreams(dt) {
 function updateEmbers(dt) {
   if (!eGeo) return;
   const arr = eGeo.attributes.position.array;
-  const t = clock.elapsedTime;
+  const speed = particleSettings.emberSpeed;
+  const t = clock.elapsedTime * speed;
   // pseudo-curl-noise velocity field (divergence-free-ish) for swirling, flowy motion
   // — each particle reads the field at its own position so neighbors stay coherent
   for (let i = 0; i < EMBER_COUNT; i++) {
     const ix = i * 3;
     const px = arr[ix + 0], py = arr[ix + 1], pz = arr[ix + 2];
     const f1 = 0.0035, f2 = 0.0055, f3 = 0.0042;
-    const vx = (Math.sin(pz * f1 + t * 0.32) + Math.cos(py * f2 + t * 0.41)) * 9;
+    const highAir = Math.min(1, Math.max(0, (py - 38) / 180));
+    const vx = (Math.sin(pz * f1 + t * 0.32) + Math.cos(py * f2 + t * 0.41)) * 9 + 2.2 + highAir * 5.4;
     const vy = (Math.sin(px * f3 + t * 0.27) - Math.cos(pz * f1 + t * 0.34)) * 2.2;
-    const vz = (Math.cos(px * f1 + t * 0.39) - Math.sin(py * f2 + t * 0.30)) * 9;
-    arr[ix + 0] = px + vx * dt;
-    arr[ix + 1] = py + vy * dt;
-    arr[ix + 2] = pz + vz * dt;
+    const vz = (Math.cos(px * f1 + t * 0.39) - Math.sin(py * f2 + t * 0.30)) * 9 + highAir * 2.1;
+    arr[ix + 0] = px + vx * dt * speed;
+    arr[ix + 1] = py + vy * dt * speed;
+    arr[ix + 2] = pz + vz * dt * speed;
     // wrap within flow bounds
     const B = FLOW_BOUND;
     if (arr[ix + 0] >  B) arr[ix + 0] = -B;
@@ -2381,6 +3342,7 @@ function tick() {
   updateTraffic(dt);
   updateEmbers(dt);
   updateBuildingHighlights(performance.now() / 1000);
+  updateCameraAnimation(performance.now());
   controls.update();
   composer.render();
   requestAnimationFrame(tick);
@@ -2400,76 +3362,12 @@ function tick() {
     buildEmbers();
   } catch (e) {
     console.error(e);
-    lblText.textContent = 'OSM unavailable — using procedural fallback';
-    proceduralFallback();
+    lblText.textContent = 'Map data unavailable';
   }
   loader.classList.add('gone');
   setTimeout(() => loader.remove(), 900);
   tick();
 })();
-
-// ============================================================
-// FALLBACK — if Overpass fails, build a stylised Bangkok-like grid
-// ============================================================
-function proceduralFallback() {
-  // S-curve river through frame
-  const curvePts = [
-    new THREE.Vector3(-900,  0,  600),
-    new THREE.Vector3(-300,  0,  340),
-    new THREE.Vector3(-80,   0,  120),
-    new THREE.Vector3( 60,   0, -40),
-    new THREE.Vector3( 220,  0, -180),
-    new THREE.Vector3( 540,  0, -560),
-  ];
-  riverCurve = new THREE.CatmullRomCurve3(curvePts, false, 'centripetal', 0.5);
-
-  const CITY_COUNT = 110000;
-  const pos = new Float32Array(CITY_COUNT * 3);
-  const col = new Float32Array(CITY_COUNT * 3);
-  const sz  = new Float32Array(CITY_COUNT);
-  const ph  = new Float32Array(CITY_COUNT);
-  const c = new THREE.Color();
-  let k = 0;
-  for (let i = 0; i < CITY_COUNT * 3 && k < CITY_COUNT; i++) {
-    const x = (Math.random() * 2 - 1) * 1100;
-    const z = (Math.random() * 2 - 1) * 1100;
-    const r = Math.hypot(x - 120, z + 40);
-    const dens = Math.exp(-r / 520);
-    if (Math.random() > dens * 1.1) continue;
-    // suppress near river
-    let minD = Infinity;
-    for (let s = 0; s < 60; s++) {
-      const p = riverCurve.getPoint(s / 59);
-      const d = Math.hypot(p.x - x, p.z - z);
-      if (d < minD) minD = d;
-    }
-    if (minD < 26) continue;
-    const tall = Math.random() < 0.014 && dens > 0.55;
-    const y = tall ? Math.random() * 80 + 20 : Math.random() * 2.5;
-    const rr = Math.random();
-    if (tall && rr < 0.45) c.copy(coolA).lerp(coolB, Math.random() * 0.7);
-    else if (rr < 0.62) c.copy(warmA).lerp(warmB, Math.random() * 0.9);
-    else if (rr < 0.88) c.copy(warmA).lerp(warmC, Math.random() * 0.55);
-    else c.copy(warmB);
-    const dim = Math.max(0.3, 1 - r / 1100);
-    c.multiplyScalar(dim * (0.55 + Math.random() * 0.7));
-    const ix = k * 3;
-    pos[ix+0] = x; pos[ix+1] = y; pos[ix+2] = z;
-    col[ix+0] = c.r; col[ix+1] = c.g; col[ix+2] = c.b;
-    sz[k] = (tall ? 2.4 : 1.4) * (0.7 + Math.random() * 0.8);
-    ph[k] = Math.random() * 6.28;
-    k++;
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0, k * 3), 3));
-  geo.setAttribute('color',    new THREE.BufferAttribute(col.subarray(0, k * 3), 3));
-  geo.setAttribute('aSize',    new THREE.BufferAttribute(sz.subarray(0, k), 1));
-  geo.setAttribute('aPhase',   new THREE.BufferAttribute(ph.subarray(0, k), 1));
-  scene.add(new THREE.Points(geo, makePointsMaterial(1.0)));
-
-  buildStreams();
-  buildEmbers();
-}
 </script>
 </body>
 </html>
