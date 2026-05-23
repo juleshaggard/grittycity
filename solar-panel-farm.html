@@ -159,6 +159,26 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   canvas { display: block; }
 
+  /* canvas fades in once scene is ready (same as city page) */
+  #app > canvas {
+    opacity: 0;
+    filter: contrast(1.18) brightness(1.05);
+    transition:
+      opacity 1.1s cubic-bezier(0.16, 1, 0.3, 1),
+      filter  1.1s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  body.scene-ready #app > canvas { opacity: 1; filter: none; }
+
+  /* solar sun glow — warm yellow wash bleeding in from the top */
+  .sun-glow {
+    position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    background: radial-gradient(ellipse 64% 52% at 50% 10%,
+      rgba(252,225,50,0.78) 0%,
+      rgba(252,225,50,0.24) 46%,
+      rgba(252,225,50,0) 88%);
+    mix-blend-mode: multiply;
+  }
+
   .page-nav {
     position: fixed;
     top: 18px;
@@ -227,6 +247,7 @@
   <a href="city-particles.html">City</a>
   <a class="active" href="solar-panel-farm.html">Solar farm</a>
 </nav>
+<div class="sun-glow"></div>
 <div id="loader">
   <div class="ring"></div>
   <div class="lbl" id="lblText">Assembling photovoltaic field...</div>
@@ -242,18 +263,11 @@
   <div class="robot-debug__head">
     <div class="robot-debug__title">
       <span>Debug</span>
-      <small>Skid + camera</small>
+      <small>Scene</small>
     </div>
     <button class="robot-debug__toggle" id="toggleDebugPanel" type="button">Hide</button>
   </div>
   <div class="robot-debug__body">
-    <div class="robot-debug__section">Skid Steer</div>
-    <div class="robot-debug__grid">
-      <label>X <input id="robotX" type="number" step="1" /></label>
-      <label>Z <input id="robotZ" type="number" step="1" /></label>
-      <label>Rot Deg <input id="robotRotation" type="number" step="1" /></label>
-      <label>Scale <input id="robotScale" type="number" min="0.2" max="1.4" step="0.01" /></label>
-    </div>
     <div class="robot-debug__section">Camera</div>
     <div class="robot-debug__grid">
       <label>Cam X <input id="cameraX" type="number" step="1" /></label>
@@ -294,16 +308,26 @@
     </div>
     <div class="robot-debug__section">Particles</div>
     <div class="robot-debug__grid">
-      <label>Panel Glints <input id="panelGlintDensity" type="number" min="0" max="4" step="0.05" /></label>
-      <label>Grid Particles <input id="gridParticleDensity" type="number" min="0" max="4" step="0.05" /></label>
-      <label>Atmosphere <input id="atmosphereDensity" type="number" min="0" max="4" step="0.05" /></label>
+      <label>Point Scale <input id="particleScale" type="number" min="0.1" max="5" step="0.05" /></label>
+      <label>Point Alpha <input id="particleAlpha" type="number" min="0" max="3" step="0.05" /></label>
+      <label>Point Density <input id="particleDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Panel Density <input id="panelGlintDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Grid Density <input id="gridParticleDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Atmo Density <input id="atmosphereDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Point Color <input id="particleColor" type="color" /></label>
+      <label>Color Mix <input id="particleColorMix" type="number" min="0" max="1" step="0.05" /></label>
+      <label>Point Blur <input id="particleBlur" type="number" min="0" max="1" step="0.05" /></label>
+      <label>Wobble <input id="particleWobble" type="number" min="0" max="4" step="0.05" /></label>
+      <label>Twinkle Speed <input id="twinkleSpeed" type="number" min="0" max="8" step="0.1" /></label>
+      <label>Twinkle Amt <input id="twinkleAmount" type="number" min="0" max="1" step="0.05" /></label>
+      <label>Grid Speed <input id="gridParticleSpeed" type="number" min="0" max="5" step="0.05" /></label>
+      <label>Atmo Speed <input id="atmosphereSpeed" type="number" min="0" max="5" step="0.05" /></label>
     </div>
     <textarea id="robotData" readonly spellcheck="false"></textarea>
     <div class="robot-debug__actions">
-      <button id="toggleRobotMove" type="button">Move Off</button>
       <button id="copyRobotData" type="button">Copy</button>
-      <button id="resetRobotData" type="button">Reset Bot</button>
       <button id="resetCameraData" type="button">Reset Cam</button>
+      <button id="resetParticleData" type="button">Reset Particles</button>
     </div>
   </div>
 </div>
@@ -326,10 +350,6 @@ const lblText = document.getElementById('lblText');
 const loader = document.getElementById('loader');
 const robotDebugEls = {
   panel: document.getElementById('robotDebug'),
-  x: document.getElementById('robotX'),
-  z: document.getElementById('robotZ'),
-  rotation: document.getElementById('robotRotation'),
-  scale: document.getElementById('robotScale'),
   cameraX: document.getElementById('cameraX'),
   cameraY: document.getElementById('cameraY'),
   cameraZ: document.getElementById('cameraZ'),
@@ -343,15 +363,25 @@ const robotDebugEls = {
   fadeNear: document.getElementById('fadeNear'),
   fadeFar: document.getElementById('fadeFar'),
   cameraAnimDuration: document.getElementById('cameraAnimDuration'),
+  particleScale: document.getElementById('particleScale'),
+  particleAlpha: document.getElementById('particleAlpha'),
+  particleDensity: document.getElementById('particleDensity'),
   panelGlintDensity: document.getElementById('panelGlintDensity'),
   gridParticleDensity: document.getElementById('gridParticleDensity'),
   atmosphereDensity: document.getElementById('atmosphereDensity'),
+  particleColor: document.getElementById('particleColor'),
+  particleColorMix: document.getElementById('particleColorMix'),
+  particleBlur: document.getElementById('particleBlur'),
+  particleWobble: document.getElementById('particleWobble'),
+  twinkleSpeed: document.getElementById('twinkleSpeed'),
+  twinkleAmount: document.getElementById('twinkleAmount'),
+  gridParticleSpeed: document.getElementById('gridParticleSpeed'),
+  atmosphereSpeed: document.getElementById('atmosphereSpeed'),
   data: document.getElementById('robotData'),
   togglePanel: document.getElementById('toggleDebugPanel'),
-  move: document.getElementById('toggleRobotMove'),
   copy: document.getElementById('copyRobotData'),
-  reset: document.getElementById('resetRobotData'),
   resetCamera: document.getElementById('resetCameraData'),
+  resetParticles: document.getElementById('resetParticleData'),
   setCameraKeyA: document.getElementById('setCameraKeyA'),
   setCameraKeyB: document.getElementById('setCameraKeyB'),
   returnCameraKeyA: document.getElementById('returnCameraKeyA'),
@@ -389,7 +419,24 @@ const DEFAULT_CAMERA_NEAR = 1;
 const DEFAULT_CAMERA_FAR = 8000;
 const DEFAULT_FADE_NEAR = 8;
 const DEFAULT_FADE_FAR = 70;
-const SOLAR_ARRAY_GRID_SPACING = 210;
+const DEFAULT_PARTICLE_SCALE = 1;
+const DEFAULT_PARTICLE_ALPHA = 1;
+const DEFAULT_PARTICLE_DENSITY = 1;
+const PARTICLE_DENSITY_MAX = 10;
+const DEFAULT_PARTICLE_COLOR = '#a4a4aa';
+const DEFAULT_PARTICLE_COLOR_MIX = 0;
+const DEFAULT_PARTICLE_BLUR = 0.72;
+const DEFAULT_PARTICLE_WOBBLE = 0.28;
+const DEFAULT_TWINKLE_SPEED = 1.6;
+const DEFAULT_TWINKLE_AMOUNT = 0.22;
+const DEFAULT_GRID_PARTICLE_SPEED = 1;
+const DEFAULT_ATMOSPHERE_SPEED = 1;
+const PANEL_GLINT_POOL_MULTIPLIER = 3;
+const GRID_PARTICLE_POOL_MULTIPLIER = 3;
+const ATMOSPHERE_PARTICLE_POOL_MULTIPLIER = 3;
+const SOLAR_ARRAY_GRID_SPACING = 170;
+const SOLAR_ARRAY_GRID_X_RADIUS = 7;
+const SOLAR_ARRAY_GRID_Z_RADIUS = 5;
 
 const camera = new THREE.PerspectiveCamera(
   DEFAULT_CAMERA_FOV,
@@ -448,7 +495,15 @@ const sharedUniforms = {
   uFadeNear: { value: DEFAULT_FADE_NEAR },
   uFadeFar:  { value: DEFAULT_FADE_FAR },
   uBgColor:  { value: new THREE.Color(0xffffff) },
-  uWobble:   { value: 0.28 },
+  uWobble:   { value: DEFAULT_PARTICLE_WOBBLE },
+  uPointScale: { value: DEFAULT_PARTICLE_SCALE },
+  uPointAlpha: { value: DEFAULT_PARTICLE_ALPHA },
+  uPointDensity: { value: DEFAULT_PARTICLE_DENSITY },
+  uPointColor: { value: new THREE.Color(DEFAULT_PARTICLE_COLOR) },
+  uPointColorMix: { value: DEFAULT_PARTICLE_COLOR_MIX },
+  uPointBlur: { value: DEFAULT_PARTICLE_BLUR },
+  uTwinkleSpeed: { value: DEFAULT_TWINKLE_SPEED },
+  uTwinkleAmount: { value: DEFAULT_TWINKLE_AMOUNT },
 };
 
 const SKID_STATE_KEY = 'solar-skidsteer-transform-v1';
@@ -461,8 +516,6 @@ const DEFAULT_SKID_Z = -238.74;
 const DEFAULT_SKID_ROTATION = -0.18;
 const DEFAULT_SKID_SCALE = 0.48;
 const DEFAULT_CAMERA_ANIMATION_DURATION = 4;
-const DEFAULT_PARTICLE_DENSITY = 1;
-const PARTICLE_DENSITY_MAX = 4;
 const skidState = {
   x: 0,
   z: 0,
@@ -486,6 +539,10 @@ let activeCameraShotName = 'Custom';
 let solarPanelCount = 0;
 let serviceParticleGeo = null;
 let serviceParticleData = [];
+const particleSettings = {
+  gridSpeed: DEFAULT_GRID_PARTICLE_SPEED,
+  atmosphereSpeed: DEFAULT_ATMOSPHERE_SPEED,
+};
 const particleDensityUniforms = {
   panelGlints: { value: DEFAULT_PARTICLE_DENSITY },
   gridParticles: { value: DEFAULT_PARTICLE_DENSITY },
@@ -508,6 +565,106 @@ function roundForDebug(value, digits = 2) {
   return Number(value.toFixed(digits));
 }
 
+function normalizeHexColor(value, fallback = DEFAULT_PARTICLE_COLOR) {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed;
+  if (/^[0-9a-f]{6}$/i.test(trimmed)) return `#${trimmed}`;
+  return fallback;
+}
+
+const cameraStateEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+const cameraStateQuaternion = new THREE.Quaternion();
+const cameraStateObject = new THREE.Object3D();
+const cameraSlerpFrom = new THREE.Quaternion();
+const cameraSlerpTo = new THREE.Quaternion();
+const cameraSlerpOut = new THREE.Quaternion();
+
+function cameraRotationFieldsFromQuaternion(quaternion) {
+  cameraStateEuler.setFromQuaternion(quaternion, 'XYZ');
+  return {
+    rotationX: cameraStateEuler.x,
+    rotationY: cameraStateEuler.y,
+    rotationZ: cameraStateEuler.z,
+    quaternionX: quaternion.x,
+    quaternionY: quaternion.y,
+    quaternionZ: quaternion.z,
+    quaternionW: quaternion.w,
+  };
+}
+
+function cameraRotationFieldsFromObject(object) {
+  return {
+    rotationX: object.rotation.x,
+    rotationY: object.rotation.y,
+    rotationZ: object.rotation.z,
+    quaternionX: object.quaternion.x,
+    quaternionY: object.quaternion.y,
+    quaternionZ: object.quaternion.z,
+    quaternionW: object.quaternion.w,
+  };
+}
+
+function cameraRotationFieldsFromState(state) {
+  const source = state && typeof state === 'object' ? state : {};
+  const rotation = source.rotation && typeof source.rotation === 'object' ? source.rotation : {};
+  const quaternion = source.quaternion && typeof source.quaternion === 'object' ? source.quaternion : {};
+  const qx = Number.isFinite(source.quaternionX) ? source.quaternionX : quaternion.x;
+  const qy = Number.isFinite(source.quaternionY) ? source.quaternionY : quaternion.y;
+  const qz = Number.isFinite(source.quaternionZ) ? source.quaternionZ : quaternion.z;
+  const qw = Number.isFinite(source.quaternionW) ? source.quaternionW : quaternion.w;
+  if ([qx, qy, qz, qw].every(Number.isFinite)) {
+    cameraStateQuaternion.set(qx, qy, qz, qw).normalize();
+    return cameraRotationFieldsFromQuaternion(cameraStateQuaternion);
+  }
+
+  const rx = Number.isFinite(source.rotationX) ? source.rotationX : rotation.x;
+  const ry = Number.isFinite(source.rotationY) ? source.rotationY : rotation.y;
+  const rz = Number.isFinite(source.rotationZ) ? source.rotationZ : rotation.z;
+  if ([rx, ry, rz].every(Number.isFinite)) {
+    cameraStateEuler.set(rx, ry, rz, 'XYZ');
+    cameraStateQuaternion.setFromEuler(cameraStateEuler);
+    return cameraRotationFieldsFromQuaternion(cameraStateQuaternion);
+  }
+
+  if (
+    Number.isFinite(source.x) &&
+    Number.isFinite(source.y) &&
+    Number.isFinite(source.z) &&
+    Number.isFinite(source.targetX) &&
+    Number.isFinite(source.targetY) &&
+    Number.isFinite(source.targetZ)
+  ) {
+    cameraStateObject.position.set(source.x, source.y, source.z);
+    cameraStateObject.lookAt(source.targetX, source.targetY, source.targetZ);
+    return cameraRotationFieldsFromObject(cameraStateObject);
+  }
+
+  return cameraRotationFieldsFromObject(camera);
+}
+
+function roundedRotationPayload(state) {
+  const rotation = cameraRotationFieldsFromState(state);
+  return {
+    rotation: {
+      x: roundForDebug(rotation.rotationX, 5),
+      y: roundForDebug(rotation.rotationY, 5),
+      z: roundForDebug(rotation.rotationZ, 5),
+    },
+    rotationDeg: {
+      x: roundForDebug(radToDeg(rotation.rotationX), 2),
+      y: roundForDebug(radToDeg(rotation.rotationY), 2),
+      z: roundForDebug(radToDeg(rotation.rotationZ), 2),
+    },
+    quaternion: {
+      x: roundForDebug(rotation.quaternionX, 5),
+      y: roundForDebug(rotation.quaternionY, 5),
+      z: roundForDebug(rotation.quaternionZ, 5),
+      w: roundForDebug(rotation.quaternionW, 5),
+    },
+  };
+}
+
 const pointVert = /* glsl */`
   attribute float aSize;
   attribute float aPhase;
@@ -523,6 +680,9 @@ const pointVert = /* glsl */`
   uniform float uFadeNear;
   uniform float uFadeFar;
   uniform float uWobble;
+  uniform float uPointScale;
+  uniform float uTwinkleSpeed;
+  uniform float uTwinkleAmount;
 
   vec3 wrapSphere(vec3 p) {
     float R = uSphereR;
@@ -541,7 +701,8 @@ const pointVert = /* glsl */`
   void main() {
     vColor = color;
     vDensitySeed = fract(sin(aPhase * 78.233 + aSize * 12.9898) * 43758.5453);
-    vTwinkle = 0.78 + 0.22 * sin(uTime * 1.6 + aPhase * 3.3);
+    float twinkleWave = 0.5 + 0.5 * sin(uTime * uTwinkleSpeed + aPhase * 3.3);
+    vTwinkle = 1.0 - uTwinkleAmount + uTwinkleAmount * twinkleWave;
     vec3 wob = vec3(
       sin(uTime * 0.7 + aPhase * 2.3),
       sin(uTime * 1.1 + aPhase * 1.7),
@@ -555,7 +716,7 @@ const pointVert = /* glsl */`
     gl_Position = projectionMatrix * mv;
     float dist = -mv.z;
     vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
-    float size = aSize * uSizeScale * 140.0 * uPixelRatio;
+    float size = aSize * uSizeScale * uPointScale * 140.0 * uPixelRatio;
     float hazePuff = 1.0 + vFade * 1.6;
     gl_PointSize = max(1.5, (size / max(0.001, dist)) * hazePuff);
   }
@@ -570,24 +731,34 @@ const pointFrag = /* glsl */`
   uniform sampler2D uMap;
   uniform vec3 uBgColor;
   uniform float uDensity;
+  uniform float uPoolMultiplier;
+  uniform float uPointAlpha;
+  uniform float uPointDensity;
+  uniform vec3 uPointColor;
+  uniform float uPointColorMix;
+  uniform float uPointBlur;
 
   void main() {
     float horizonFade = smoothstep(-0.28, 0.08, vBackface);
-    float density = max(0.0, uDensity);
-    if (vDensitySeed > min(density, 1.0)) discard;
+    float density = max(0.0, uDensity * uPointDensity);
+    float visibleDensity = clamp(density / max(1.0, uPoolMultiplier), 0.0, 1.0);
+    if (vDensitySeed > visibleDensity) discard;
     vec4 tex = texture2D(uMap, gl_PointCoord);
-    if (tex.a < 0.02) discard;
-    vec3 col = mix(vColor * vTwinkle, uBgColor, vFade * 0.95);
-    float densityBoost = 1.0 + max(0.0, density - 1.0) * 0.32;
-    float alpha = tex.a * (1.0 - vFade) * horizonFade * densityBoost;
+    float blurPower = mix(2.4, 0.45, clamp(uPointBlur, 0.0, 1.0));
+    float pointAlpha = pow(tex.a, blurPower);
+    if (pointAlpha < 0.01) discard;
+    vec3 sourceColor = mix(vColor, uPointColor, clamp(uPointColorMix, 0.0, 1.0));
+    vec3 col = mix(sourceColor * vTwinkle, uBgColor, vFade * 0.95);
+    float densityBoost = 1.0 + min(max(0.0, density - uPoolMultiplier), 12.0) * 0.05;
+    float alpha = pointAlpha * (1.0 - vFade) * horizonFade * uPointAlpha * densityBoost;
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(col, alpha);
   }
 `;
 
-function makePointsMaterial(sizeScale = 1.0, densityUniform = particleDensityUniforms.atmosphere) {
+function makePointsMaterial(sizeScale = 1.0, densityUniform = particleDensityUniforms.atmosphere, poolMultiplier = 1) {
   return new THREE.ShaderMaterial({
-    uniforms: { ...sharedUniforms, uSizeScale: { value: sizeScale }, uDensity: densityUniform },
+    uniforms: { ...sharedUniforms, uSizeScale: { value: sizeScale }, uDensity: densityUniform, uPoolMultiplier: { value: poolMultiplier } },
     vertexShader: pointVert,
     fragmentShader: pointFrag,
     vertexColors: true,
@@ -907,6 +1078,7 @@ function normalizeCameraState(state) {
   const fadeNear = clamp(Number.isFinite(state.fadeNear) ? state.fadeNear : defaults.fadeNear, 0, 10000);
   const fadeFar = Math.max(fadeNear + 0.1, Math.min(Number.isFinite(state.fadeFar) ? state.fadeFar : defaults.fadeFar, 20000));
   const zoom = clamp(Number.isFinite(state.zoom) ? state.zoom : defaults.zoom, 0.1, 10);
+  const rotation = cameraRotationFieldsFromState(state);
   return {
     x: Number.isFinite(state.x) ? state.x : defaults.x,
     y: Number.isFinite(state.y) ? state.y : defaults.y,
@@ -920,6 +1092,7 @@ function normalizeCameraState(state) {
     far,
     fadeNear,
     fadeFar,
+    ...rotation,
   };
 }
 
@@ -947,6 +1120,7 @@ function cameraDebugPayload() {
       y: roundForDebug(controls.target.y, 2),
       z: roundForDebug(controls.target.z, 2),
     },
+    ...roundedRotationPayload(cameraRotationFieldsFromObject(camera)),
     fov: roundForDebug(camera.fov, 2),
     zoom: roundForDebug(camera.zoom, 3),
     clipping: {
@@ -979,6 +1153,7 @@ function currentCameraState() {
     far: camera.far,
     fadeNear: sharedUniforms.uFadeNear.value,
     fadeFar: sharedUniforms.uFadeFar.value,
+    ...cameraRotationFieldsFromObject(camera),
   };
 }
 
@@ -995,6 +1170,7 @@ function cameraStatePayload(state) {
       y: roundForDebug(next.targetY, 2),
       z: roundForDebug(next.targetZ, 2),
     },
+    ...roundedRotationPayload(next),
     fov: roundForDebug(next.fov, 2),
     zoom: roundForDebug(next.zoom, 3),
     clipping: {
@@ -1077,6 +1253,7 @@ function saveCameraState() {
       far: camera.far,
       fadeNear: sharedUniforms.uFadeNear.value,
       fadeFar: sharedUniforms.uFadeFar.value,
+      ...cameraRotationFieldsFromObject(camera),
     }));
   } catch (e) {
     console.warn('Unable to save camera transform:', e);
@@ -1095,6 +1272,8 @@ function applyCameraState(state, persist = true) {
   sharedUniforms.uFadeFar.value = next.fadeFar;
   controls.target.set(next.targetX, next.targetY, next.targetZ);
   controls.update();
+  camera.quaternion.set(next.quaternionX, next.quaternionY, next.quaternionZ, next.quaternionW).normalize();
+  camera.updateMatrixWorld();
   if (persist) saveCameraState();
   updateCameraDebug();
 }
@@ -1123,6 +1302,10 @@ function lerp(a, b, t) {
 function lerpCameraStates(a, b, t) {
   const from = normalizeCameraState(a);
   const to = normalizeCameraState(b);
+  cameraSlerpFrom.set(from.quaternionX, from.quaternionY, from.quaternionZ, from.quaternionW).normalize();
+  cameraSlerpTo.set(to.quaternionX, to.quaternionY, to.quaternionZ, to.quaternionW).normalize();
+  cameraSlerpOut.copy(cameraSlerpFrom).slerp(cameraSlerpTo, t).normalize();
+  const rotation = cameraRotationFieldsFromQuaternion(cameraSlerpOut);
   return {
     x: lerp(from.x, to.x, t),
     y: lerp(from.y, to.y, t),
@@ -1136,6 +1319,7 @@ function lerpCameraStates(a, b, t) {
     far: lerp(from.far, to.far, t),
     fadeNear: lerp(from.fadeNear, to.fadeNear, t),
     fadeFar: lerp(from.fadeFar, to.fadeFar, t),
+    ...rotation,
   };
 }
 
@@ -1248,18 +1432,41 @@ function ensureSkidState(farmYaw) {
 
 function defaultParticleState() {
   return {
+    pointScale: DEFAULT_PARTICLE_SCALE,
+    pointAlpha: DEFAULT_PARTICLE_ALPHA,
+    pointDensity: DEFAULT_PARTICLE_DENSITY,
     panelGlints: DEFAULT_PARTICLE_DENSITY,
     gridParticles: DEFAULT_PARTICLE_DENSITY,
     atmosphere: DEFAULT_PARTICLE_DENSITY,
+    pointColor: DEFAULT_PARTICLE_COLOR,
+    pointColorMix: DEFAULT_PARTICLE_COLOR_MIX,
+    pointBlur: DEFAULT_PARTICLE_BLUR,
+    wobble: DEFAULT_PARTICLE_WOBBLE,
+    twinkleSpeed: DEFAULT_TWINKLE_SPEED,
+    twinkleAmount: DEFAULT_TWINKLE_AMOUNT,
+    gridSpeed: DEFAULT_GRID_PARTICLE_SPEED,
+    atmosphereSpeed: DEFAULT_ATMOSPHERE_SPEED,
   };
 }
 
 function normalizeParticleState(state = {}) {
   const defaults = defaultParticleState();
+  const densities = state && typeof state.densities === 'object' ? state.densities : {};
   return {
-    panelGlints: clamp(Number.isFinite(state.panelGlints) ? state.panelGlints : defaults.panelGlints, 0, PARTICLE_DENSITY_MAX),
-    gridParticles: clamp(Number.isFinite(state.gridParticles) ? state.gridParticles : defaults.gridParticles, 0, PARTICLE_DENSITY_MAX),
-    atmosphere: clamp(Number.isFinite(state.atmosphere) ? state.atmosphere : defaults.atmosphere, 0, PARTICLE_DENSITY_MAX),
+    pointScale: clamp(Number.isFinite(state.pointScale) ? state.pointScale : defaults.pointScale, 0.1, 5),
+    pointAlpha: clamp(Number.isFinite(state.pointAlpha) ? state.pointAlpha : defaults.pointAlpha, 0, 3),
+    pointDensity: clamp(Number.isFinite(state.pointDensity) ? state.pointDensity : defaults.pointDensity, 0, PARTICLE_DENSITY_MAX),
+    panelGlints: clamp(Number.isFinite(state.panelGlints) ? state.panelGlints : Number.isFinite(densities.panelGlints) ? densities.panelGlints : defaults.panelGlints, 0, PARTICLE_DENSITY_MAX),
+    gridParticles: clamp(Number.isFinite(state.gridParticles) ? state.gridParticles : Number.isFinite(densities.gridParticles) ? densities.gridParticles : defaults.gridParticles, 0, PARTICLE_DENSITY_MAX),
+    atmosphere: clamp(Number.isFinite(state.atmosphere) ? state.atmosphere : Number.isFinite(densities.atmosphere) ? densities.atmosphere : defaults.atmosphere, 0, PARTICLE_DENSITY_MAX),
+    pointColor: normalizeHexColor(state.pointColor, defaults.pointColor),
+    pointColorMix: clamp(Number.isFinite(state.pointColorMix) ? state.pointColorMix : defaults.pointColorMix, 0, 1),
+    pointBlur: clamp(Number.isFinite(state.pointBlur) ? state.pointBlur : defaults.pointBlur, 0, 1),
+    wobble: clamp(Number.isFinite(state.wobble) ? state.wobble : defaults.wobble, 0, 4),
+    twinkleSpeed: clamp(Number.isFinite(state.twinkleSpeed) ? state.twinkleSpeed : defaults.twinkleSpeed, 0, 8),
+    twinkleAmount: clamp(Number.isFinite(state.twinkleAmount) ? state.twinkleAmount : defaults.twinkleAmount, 0, 1),
+    gridSpeed: clamp(Number.isFinite(state.gridSpeed) ? state.gridSpeed : defaults.gridSpeed, 0, 5),
+    atmosphereSpeed: clamp(Number.isFinite(state.atmosphereSpeed) ? state.atmosphereSpeed : defaults.atmosphereSpeed, 0, 5),
   };
 }
 
@@ -1282,18 +1489,42 @@ function saveParticleState() {
 
 function applyParticleState(state, persist = true) {
   const next = normalizeParticleState(state);
+  sharedUniforms.uPointScale.value = next.pointScale;
+  sharedUniforms.uPointAlpha.value = next.pointAlpha;
+  sharedUniforms.uPointDensity.value = next.pointDensity;
+  sharedUniforms.uPointColor.value.set(next.pointColor);
+  sharedUniforms.uPointColorMix.value = next.pointColorMix;
+  sharedUniforms.uPointBlur.value = next.pointBlur;
+  sharedUniforms.uWobble.value = next.wobble;
+  sharedUniforms.uTwinkleSpeed.value = next.twinkleSpeed;
+  sharedUniforms.uTwinkleAmount.value = next.twinkleAmount;
   particleDensityUniforms.panelGlints.value = next.panelGlints;
   particleDensityUniforms.gridParticles.value = next.gridParticles;
   particleDensityUniforms.atmosphere.value = next.atmosphere;
+  particleSettings.gridSpeed = next.gridSpeed;
+  particleSettings.atmosphereSpeed = next.atmosphereSpeed;
   if (persist) saveParticleState();
   updateParticleDebug();
 }
 
 function particleDebugPayload() {
   return {
-    panelGlints: roundForDebug(particleDensityUniforms.panelGlints.value, 3),
-    gridParticles: roundForDebug(particleDensityUniforms.gridParticles.value, 3),
-    atmosphere: roundForDebug(particleDensityUniforms.atmosphere.value, 3),
+    pointScale: roundForDebug(sharedUniforms.uPointScale.value, 3),
+    pointAlpha: roundForDebug(sharedUniforms.uPointAlpha.value, 3),
+    pointDensity: roundForDebug(sharedUniforms.uPointDensity.value, 3),
+    densities: {
+      panelGlints: roundForDebug(particleDensityUniforms.panelGlints.value, 3),
+      gridParticles: roundForDebug(particleDensityUniforms.gridParticles.value, 3),
+      atmosphere: roundForDebug(particleDensityUniforms.atmosphere.value, 3),
+    },
+    pointColor: `#${sharedUniforms.uPointColor.value.getHexString()}`,
+    pointColorMix: roundForDebug(sharedUniforms.uPointColorMix.value, 3),
+    pointBlur: roundForDebug(sharedUniforms.uPointBlur.value, 3),
+    wobble: roundForDebug(sharedUniforms.uWobble.value, 3),
+    twinkleSpeed: roundForDebug(sharedUniforms.uTwinkleSpeed.value, 3),
+    twinkleAmount: roundForDebug(sharedUniforms.uTwinkleAmount.value, 3),
+    gridSpeed: roundForDebug(particleSettings.gridSpeed, 3),
+    atmosphereSpeed: roundForDebug(particleSettings.atmosphereSpeed, 3),
   };
 }
 
@@ -1309,7 +1540,6 @@ function robotDebugPayload() {
 
 function debugPayload() {
   return {
-    skidSteer: robotDebugPayload(),
     camera: cameraDebugPayload(),
     cameraAnimation: cameraAnimationPayload(),
     particles: particleDebugPayload(),
@@ -1362,9 +1592,20 @@ function cameraInputs() {
 
 function particleInputs() {
   return [
+    robotDebugEls.particleScale,
+    robotDebugEls.particleAlpha,
+    robotDebugEls.particleDensity,
     robotDebugEls.panelGlintDensity,
     robotDebugEls.gridParticleDensity,
     robotDebugEls.atmosphereDensity,
+    robotDebugEls.particleColor,
+    robotDebugEls.particleColorMix,
+    robotDebugEls.particleBlur,
+    robotDebugEls.particleWobble,
+    robotDebugEls.twinkleSpeed,
+    robotDebugEls.twinkleAmount,
+    robotDebugEls.gridParticleSpeed,
+    robotDebugEls.atmosphereSpeed,
   ].filter(Boolean);
 }
 
@@ -1398,21 +1639,36 @@ function updateParticleDebug() {
     return;
   }
   suppressParticleInput = true;
+  robotDebugEls.particleScale.value = sharedUniforms.uPointScale.value.toFixed(2);
+  robotDebugEls.particleAlpha.value = sharedUniforms.uPointAlpha.value.toFixed(2);
+  robotDebugEls.particleDensity.value = sharedUniforms.uPointDensity.value.toFixed(2);
   robotDebugEls.panelGlintDensity.value = particleDensityUniforms.panelGlints.value.toFixed(2);
   robotDebugEls.gridParticleDensity.value = particleDensityUniforms.gridParticles.value.toFixed(2);
   robotDebugEls.atmosphereDensity.value = particleDensityUniforms.atmosphere.value.toFixed(2);
+  robotDebugEls.particleColor.value = `#${sharedUniforms.uPointColor.value.getHexString()}`;
+  robotDebugEls.particleColorMix.value = sharedUniforms.uPointColorMix.value.toFixed(2);
+  robotDebugEls.particleBlur.value = sharedUniforms.uPointBlur.value.toFixed(2);
+  robotDebugEls.particleWobble.value = sharedUniforms.uWobble.value.toFixed(2);
+  robotDebugEls.twinkleSpeed.value = sharedUniforms.uTwinkleSpeed.value.toFixed(2);
+  robotDebugEls.twinkleAmount.value = sharedUniforms.uTwinkleAmount.value.toFixed(2);
+  robotDebugEls.gridParticleSpeed.value = particleSettings.gridSpeed.toFixed(2);
+  robotDebugEls.atmosphereSpeed.value = particleSettings.atmosphereSpeed.toFixed(2);
   suppressParticleInput = false;
   updateDebugData();
 }
 
 function updateRobotMoveModeUI() {
+  if (!robotDebugEls.move) {
+    renderer.domElement.style.cursor = '';
+    return;
+  }
   robotDebugEls.move.textContent = robotMoveMode ? 'Move On' : 'Move Off';
   robotDebugEls.move.classList.toggle('active', robotMoveMode);
   renderer.domElement.style.cursor = robotMoveMode ? 'move' : '';
 }
 
 function applyRobotDebugInputs() {
-  if (suppressRobotInput) return;
+  if (suppressRobotInput || !robotDebugEls.x) return;
   const x = parseFloat(robotDebugEls.x.value);
   const z = parseFloat(robotDebugEls.z.value);
   const rotationDeg = parseFloat(robotDebugEls.rotation.value);
@@ -1421,7 +1677,6 @@ function applyRobotDebugInputs() {
   if (Number.isFinite(z)) skidState.z = z;
   if (Number.isFinite(rotationDeg)) skidState.rotation = degToRad(rotationDeg);
   if (Number.isFinite(scale)) skidState.scale = clamp(scale, 0.2, 1.4);
-  buildSkidSteerRobot();
   saveSkidState();
 }
 
@@ -1459,13 +1714,34 @@ function applyCameraDebugInputs() {
 
 function applyParticleDebugInputs() {
   if (suppressParticleInput) return;
+  const pointScale = parseFloat(robotDebugEls.particleScale.value);
+  const pointAlpha = parseFloat(robotDebugEls.particleAlpha.value);
+  const pointDensity = parseFloat(robotDebugEls.particleDensity.value);
   const panelGlints = parseFloat(robotDebugEls.panelGlintDensity.value);
   const gridParticles = parseFloat(robotDebugEls.gridParticleDensity.value);
   const atmosphere = parseFloat(robotDebugEls.atmosphereDensity.value);
+  const pointColorMix = parseFloat(robotDebugEls.particleColorMix.value);
+  const pointBlur = parseFloat(robotDebugEls.particleBlur.value);
+  const wobble = parseFloat(robotDebugEls.particleWobble.value);
+  const twinkleSpeed = parseFloat(robotDebugEls.twinkleSpeed.value);
+  const twinkleAmount = parseFloat(robotDebugEls.twinkleAmount.value);
+  const gridSpeed = parseFloat(robotDebugEls.gridParticleSpeed.value);
+  const atmosphereSpeed = parseFloat(robotDebugEls.atmosphereSpeed.value);
   applyParticleState({
+    pointScale: Number.isFinite(pointScale) ? pointScale : sharedUniforms.uPointScale.value,
+    pointAlpha: Number.isFinite(pointAlpha) ? pointAlpha : sharedUniforms.uPointAlpha.value,
+    pointDensity: Number.isFinite(pointDensity) ? pointDensity : sharedUniforms.uPointDensity.value,
     panelGlints: Number.isFinite(panelGlints) ? panelGlints : particleDensityUniforms.panelGlints.value,
     gridParticles: Number.isFinite(gridParticles) ? gridParticles : particleDensityUniforms.gridParticles.value,
     atmosphere: Number.isFinite(atmosphere) ? atmosphere : particleDensityUniforms.atmosphere.value,
+    pointColor: normalizeHexColor(robotDebugEls.particleColor.value, `#${sharedUniforms.uPointColor.value.getHexString()}`),
+    pointColorMix: Number.isFinite(pointColorMix) ? pointColorMix : sharedUniforms.uPointColorMix.value,
+    pointBlur: Number.isFinite(pointBlur) ? pointBlur : sharedUniforms.uPointBlur.value,
+    wobble: Number.isFinite(wobble) ? wobble : sharedUniforms.uWobble.value,
+    twinkleSpeed: Number.isFinite(twinkleSpeed) ? twinkleSpeed : sharedUniforms.uTwinkleSpeed.value,
+    twinkleAmount: Number.isFinite(twinkleAmount) ? twinkleAmount : sharedUniforms.uTwinkleAmount.value,
+    gridSpeed: Number.isFinite(gridSpeed) ? gridSpeed : particleSettings.gridSpeed,
+    atmosphereSpeed: Number.isFinite(atmosphereSpeed) ? atmosphereSpeed : particleSettings.atmosphereSpeed,
   });
 }
 
@@ -1618,31 +1894,19 @@ function buildPanelFarm() {
   const pitch = -0.34;
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
   const gridSpacing = SOLAR_ARRAY_GRID_SPACING;
-  const arraySlots = [
-    { gx: -4, gz: -4, cols: 24, rows: 16 },
-    { gx: -2, gz: -4, cols: 28, rows: 16 },
-    { gx:  0, gz: -4, cols: 28, rows: 16 },
-    { gx:  2, gz: -4, cols: 28, rows: 16 },
-    { gx:  4, gz: -4, cols: 24, rows: 16 },
-
-    { gx: -4, gz: -2, cols: 24, rows: 18 },
-    { gx: -2, gz: -2, cols: 30, rows: 18 },
-    { gx:  0, gz: -2, cols: 30, rows: 18 },
-    { gx:  2, gz: -2, cols: 30, rows: 18 },
-    { gx:  4, gz: -2, cols: 24, rows: 18 },
-
-    { gx: -4, gz:  0, cols: 24, rows: 18 },
-    { gx: -2, gz:  0, cols: 30, rows: 18 },
-    { gx:  0, gz:  0, cols: 30, rows: 18 },
-    { gx:  2, gz:  0, cols: 30, rows: 18 },
-    { gx:  4, gz:  0, cols: 24, rows: 18 },
-
-    { gx: -4, gz:  2, cols: 24, rows: 16 },
-    { gx: -2, gz:  2, cols: 28, rows: 16 },
-    { gx:  0, gz:  2, cols: 28, rows: 16 },
-    { gx:  2, gz:  2, cols: 28, rows: 16 },
-    { gx:  4, gz:  2, cols: 24, rows: 16 },
-  ];
+  const arraySlots = [];
+  for (let gz = -SOLAR_ARRAY_GRID_Z_RADIUS; gz <= SOLAR_ARRAY_GRID_Z_RADIUS; gz++) {
+    for (let gx = -SOLAR_ARRAY_GRID_X_RADIUS; gx <= SOLAR_ARRAY_GRID_X_RADIUS; gx++) {
+      const edgeX = Math.abs(gx) === SOLAR_ARRAY_GRID_X_RADIUS;
+      const edgeZ = Math.abs(gz) === SOLAR_ARRAY_GRID_Z_RADIUS;
+      arraySlots.push({
+        gx,
+        gz,
+        cols: edgeX ? 10 : 12,
+        rows: edgeZ ? 18 : 21,
+      });
+    }
+  }
   const blocks = arraySlots.map(slot => {
     const localX = slot.gx * gridSpacing;
     const localZ = slot.gz * gridSpacing;
@@ -1658,8 +1922,8 @@ function buildPanelFarm() {
   const panelW = 10.5;
   const panelD = 4.25;
   const panelT = 0.42;
-  const colGap = 2.2;
-  const rowGap = 4.8;
+  const colGap = 1.45;
+  const rowGap = 2.15;
   const tmp = new THREE.Vector3();
 
   for (const block of blocks) {
@@ -1687,7 +1951,6 @@ function buildPanelFarm() {
 
   const wirePositions = [];
   const railPositions = [];
-  const supportPositions = [];
   const cellPositions = [];
   const leadingEdgePositions = [];
   const glintPositions = [];
@@ -1700,8 +1963,7 @@ function buildPanelFarm() {
     const p = panels[i];
     const { corners } = addBox(null, p.cx, p.cz, p.w, p.t, p.d, p.yaw, p.pitch);
     const edges = [
-      [0,1], [1,2], [2,3], [3,0], [4,5], [5,6],
-      [6,7], [7,4], [0,4], [1,5], [2,6], [3,7],
+      [4,5], [5,6], [6,7], [7,4],
     ];
     for (const e of edges) addLine(wirePositions, corners[e[0]], corners[e[1]]);
 
@@ -1722,15 +1984,7 @@ function buildPanelFarm() {
     }
     addLine(railPositions, transform(0, p.t * 0.8, -p.d * 0.48), transform(0, p.t * 0.8, p.d * 0.48));
 
-    if (i % 2 === 0) {
-      const feet = [
-        transform(-p.w * 0.36, -p.t * 0.58, p.d * 0.28),
-        transform( p.w * 0.36, -p.t * 0.58, p.d * 0.28),
-      ];
-      for (const foot of feet) addLine(supportPositions, [foot[0], 0.08, foot[2]], foot);
-    }
-
-    for (let s = 0; s < 4; s++) {
+    for (let s = 0; s < 2 * PANEL_GLINT_POOL_MULTIPLIER; s++) {
       const gx = -p.w * 0.42 + Math.random() * p.w * 0.84;
       const gz = -p.d * 0.40 + Math.random() * p.d * 0.80;
       const g = transform(gx, p.t * 0.86, gz);
@@ -1802,7 +2056,7 @@ function buildPanelFarm() {
   scene.add(new THREE.LineSegments(edgeGeo, edgeMat));
 
   const detailGeo = new THREE.BufferGeometry();
-  detailGeo.setAttribute('position', new THREE.Float32BufferAttribute(railPositions.concat(supportPositions), 3));
+  detailGeo.setAttribute('position', new THREE.Float32BufferAttribute(railPositions, 3));
   const detailMat = new THREE.ShaderMaterial({
     uniforms: {
       uSphereR: sharedUniforms.uSphereR,
@@ -1825,12 +2079,10 @@ function buildPanelFarm() {
   glintGeo.setAttribute('color', new THREE.Float32BufferAttribute(glintColors, 3));
   glintGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(glintSizes, 1));
   glintGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(glintPhases, 1));
-  scene.add(new THREE.Points(glintGeo, makePointsMaterial(1.08, particleDensityUniforms.panelGlints)));
+  scene.add(new THREE.Points(glintGeo, makePointsMaterial(1.08, particleDensityUniforms.panelGlints, PANEL_GLINT_POOL_MULTIPLIER)));
 
   buildServiceGrid(blocks, yaw);
-  buildInverterBoxes(yaw);
   buildServiceMachines(yaw);
-  buildSkidSteerRobot(yaw);
   return panels.length;
 }
 
@@ -1869,11 +2121,12 @@ function buildServiceGrid(blocks, yaw) {
   const domeExtent = 3250;
   const minorExtent = 2700;
   const gridSpacing = SOLAR_ARRAY_GRID_SPACING;
-  const gridHalf = gridSpacing * 7;
-  for (let z = -gridHalf; z <= gridHalf; z += gridSpacing) {
+  const gridHalfX = gridSpacing * SOLAR_ARRAY_GRID_X_RADIUS;
+  const gridHalfZ = gridSpacing * SOLAR_ARRAY_GRID_Z_RADIUS;
+  for (let z = -gridHalfZ; z <= gridHalfZ; z += gridSpacing) {
     serviceRuns.push([-domeExtent, z, domeExtent, z]);
   }
-  for (let x = -gridHalf; x <= gridHalf; x += gridSpacing) {
+  for (let x = -gridHalfX; x <= gridHalfX; x += gridSpacing) {
     serviceRuns.push([x, -minorExtent, x, minorExtent]);
   }
 
@@ -1882,7 +2135,7 @@ function buildServiceGrid(blocks, yaw) {
     const b = local(run[2], run[3]);
     addWrappedRun(run);
     const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
-    const steps = Math.floor(len / 8.5);
+    const steps = Math.floor((len / 8.5) * GRID_PARTICLE_POOL_MULTIPLIER);
     for (let i = 0; i < steps; i++) {
       const t = i / Math.max(1, steps - 1);
       const y = 0.22 + Math.random() * 0.2;
@@ -1933,15 +2186,17 @@ function buildServiceGrid(blocks, yaw) {
   pointGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(particleSize, 1));
   pointGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(particlePhase, 1));
   serviceParticleGeo = pointGeo;
-  scene.add(new THREE.Points(pointGeo, makePointsMaterial(0.9, particleDensityUniforms.gridParticles)));
+  scene.add(new THREE.Points(pointGeo, makePointsMaterial(0.9, particleDensityUniforms.gridParticles, GRID_PARTICLE_POOL_MULTIPLIER)));
 }
 
 function updateServiceGridParticles(dt, elapsed) {
   if (!serviceParticleGeo || !serviceParticleData.length) return;
   const arr = serviceParticleGeo.attributes.position.array;
+  const speed = particleSettings.gridSpeed;
+  const flowElapsed = elapsed * speed;
   for (let i = 0; i < serviceParticleData.length; i++) {
     const d = serviceParticleData[i];
-    d.t += d.speed * dt;
+    d.t += d.speed * dt * speed;
     if (d.t > 1) d.t -= 1;
     if (d.t < 0) d.t += 1;
     const dx = d.bx - d.ax;
@@ -1949,83 +2204,41 @@ function updateServiceGridParticles(dt, elapsed) {
     const len = Math.max(0.001, Math.hypot(dx, dz));
     const nx = -dz / len;
     const nz = dx / len;
-    const sway = Math.sin(elapsed * 1.7 + d.phase) * d.jitter;
+    const sway = Math.sin(flowElapsed * 1.7 + d.phase) * d.jitter;
     const ix = i * 3;
     arr[ix + 0] = d.ax + dx * d.t + nx * sway;
-    arr[ix + 1] = d.y + Math.sin(elapsed * 2.1 + d.phase) * 0.05;
+    arr[ix + 1] = d.y + Math.sin(flowElapsed * 2.1 + d.phase) * 0.05;
     arr[ix + 2] = d.az + dz * d.t + nz * sway;
   }
   serviceParticleGeo.attributes.position.needsUpdate = true;
 }
 
-function buildInverterBoxes(yaw) {
-  const boxes = [
-    [-44, -18, 22, 10, 13],
-    [48, -18, 22, 10, 13],
-    [-48, 282, 20, 9, 12],
-    [48, 282, 20, 9, 12],
-    [-214, 506, 18, 8, 11],
-    [232, 506, 18, 8, 11],
-  ];
-  const wires = [];
-  const nodePositions = [];
-  const nodeColors = [];
-  const nodeSizes = [];
-  const nodePhases = [];
-  const cy = Math.cos(yaw), sy = Math.sin(yaw);
-  for (const box of boxes) {
-    const x = box[0] * cy - box[1] * sy;
-    const z = box[0] * sy + box[1] * cy;
-    const { corners } = addBox(null, x, z, box[2], box[3], box[4], yaw, 0);
-    const edges = [
-      [0,1], [1,2], [2,3], [3,0], [4,5], [5,6],
-      [6,7], [7,4], [0,4], [1,5], [2,6], [3,7],
-    ];
-    for (const e of edges) addLine(wires, corners[e[0]], corners[e[1]]);
-    nodePositions.push(x, 1.55 + box[3] * 0.64, z);
-    nodeColors.push(accentYellow.r, accentYellow.g, accentYellow.b);
-    nodeSizes.push(2.2 + Math.random() * 0.7);
-    nodePhases.push(Math.random() * Math.PI * 2);
-  }
-
-  const wireGeo = new THREE.BufferGeometry();
-  wireGeo.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
-  const wireMat = new THREE.ShaderMaterial({
-    uniforms: {
-      uSphereR: sharedUniforms.uSphereR,
-      uFadeNear: sharedUniforms.uFadeNear,
-      uFadeFar: sharedUniforms.uFadeFar,
-      uBgColor: sharedUniforms.uBgColor,
-      uColor: { value: new THREE.Color('#7e7f86') },
-      uAlpha: { value: 0.62 },
-    },
-    vertexShader: wireVert,
-    fragmentShader: wireFrag,
-    transparent: true,
-    depthWrite: false,
-  });
-  scene.add(new THREE.LineSegments(wireGeo, wireMat));
-
-  const nodeGeo = new THREE.BufferGeometry();
-  nodeGeo.setAttribute('position', new THREE.Float32BufferAttribute(nodePositions, 3));
-  nodeGeo.setAttribute('color', new THREE.Float32BufferAttribute(nodeColors, 3));
-  nodeGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(nodeSizes, 1));
-  nodeGeo.setAttribute('aPhase', new THREE.Float32BufferAttribute(nodePhases, 1));
-  scene.add(new THREE.Points(nodeGeo, makePointsMaterial(1.2, particleDensityUniforms.gridParticles)));
-}
-
 function buildServiceMachines(farmYaw) {
   const machines = [
-    { lx: -640, lz: -640, rot:  0.18, scale: 0.34, variant: 'arm' },
-    { lx:  -60, lz: -650, rot: -0.38, scale: 0.30, variant: 'mast' },
-    { lx:  570, lz: -620, rot:  0.54, scale: 0.32, variant: 'cart' },
-    { lx: -850, lz: -225, rot: -0.15, scale: 0.31, variant: 'cart' },
-    { lx: -250, lz: -205, rot:  0.68, scale: 0.36, variant: 'arm' },
-    { lx:  360, lz: -225, rot: -0.74, scale: 0.29, variant: 'mast' },
-    { lx:  900, lz: -185, rot:  0.24, scale: 0.33, variant: 'arm' },
-    { lx: -620, lz:  210, rot:  0.88, scale: 0.30, variant: 'mast' },
-    { lx:   20, lz:  215, rot: -0.56, scale: 0.35, variant: 'arm' },
-    { lx:  650, lz:  245, rot:  0.36, scale: 0.31, variant: 'cart' },
+    { lx: -765, lz: -595, rot:  0.22, scale: 0.28, variant: 'arm' },
+    { lx: -425, lz: -595, rot: -0.36, scale: 0.26, variant: 'mast' },
+    { lx:  -85, lz: -595, rot:  0.58, scale: 0.27, variant: 'cart' },
+    { lx:  255, lz: -595, rot: -0.50, scale: 0.28, variant: 'arm' },
+    { lx:  595, lz: -595, rot:  0.31, scale: 0.26, variant: 'mast' },
+    { lx: -595, lz: -425, rot: -0.14, scale: 0.27, variant: 'cart' },
+    { lx: -255, lz: -425, rot:  0.74, scale: 0.30, variant: 'arm' },
+    { lx:   85, lz: -425, rot: -0.68, scale: 0.26, variant: 'mast' },
+    { lx:  425, lz: -425, rot:  0.42, scale: 0.28, variant: 'cart' },
+    { lx:  765, lz: -425, rot: -0.22, scale: 0.27, variant: 'arm' },
+    { lx: -765, lz: -255, rot:  0.66, scale: 0.26, variant: 'mast' },
+    { lx: -425, lz: -255, rot: -0.52, scale: 0.29, variant: 'arm' },
+    { lx:  -85, lz: -255, rot:  0.18, scale: 0.25, variant: 'cart' },
+    { lx:  255, lz: -255, rot: -0.76, scale: 0.29, variant: 'arm' },
+    { lx:  595, lz: -255, rot:  0.56, scale: 0.26, variant: 'mast' },
+    { lx: -595, lz:  -85, rot: -0.46, scale: 0.28, variant: 'arm' },
+    { lx: -255, lz:  -85, rot:  0.92, scale: 0.25, variant: 'mast' },
+    { lx:   85, lz:  -85, rot: -0.36, scale: 0.30, variant: 'arm' },
+    { lx:  425, lz:  -85, rot:  0.24, scale: 0.27, variant: 'cart' },
+    { lx: -765, lz:  255, rot:  0.38, scale: 0.26, variant: 'cart' },
+    { lx: -425, lz:  255, rot: -0.70, scale: 0.28, variant: 'arm' },
+    { lx:  -85, lz:  255, rot:  0.44, scale: 0.26, variant: 'mast' },
+    { lx:  255, lz:  255, rot: -0.28, scale: 0.29, variant: 'arm' },
+    { lx:  595, lz:  255, rot:  0.76, scale: 0.27, variant: 'cart' },
   ];
   const bodyPositions = [];
   const accentPositions = [];
@@ -2156,7 +2369,8 @@ function buildServiceMachines(farmYaw) {
 }
 
 let eGeo;
-const EMBER_COUNT = 15500;
+const BASE_EMBER_COUNT = 15500;
+const EMBER_COUNT = BASE_EMBER_COUNT * ATMOSPHERE_PARTICLE_POOL_MULTIPLIER;
 const FLOW_BOUND = 1240;
 
 function buildEmbers() {
@@ -2188,12 +2402,13 @@ function buildEmbers() {
   eGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   eGeo.setAttribute('aSize', new THREE.BufferAttribute(sz, 1));
   eGeo.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
-  scene.add(new THREE.Points(eGeo, makePointsMaterial(0.95, particleDensityUniforms.atmosphere)));
+  scene.add(new THREE.Points(eGeo, makePointsMaterial(0.95, particleDensityUniforms.atmosphere, ATMOSPHERE_PARTICLE_POOL_MULTIPLIER)));
 }
 
 function updateEmbers(dt, elapsed) {
   if (!eGeo) return;
   const arr = eGeo.attributes.position.array;
+  const speed = particleSettings.atmosphereSpeed;
   for (let i = 0; i < EMBER_COUNT; i++) {
     const ix = i * 3;
     const px = arr[ix + 0], py = arr[ix + 1], pz = arr[ix + 2];
@@ -2201,9 +2416,9 @@ function updateEmbers(dt, elapsed) {
     const vx = (Math.sin(pz * f1 + elapsed * 0.32) + Math.cos(py * f2 + elapsed * 0.41)) * 8.4;
     const vy = (Math.sin(px * f3 + elapsed * 0.27) - Math.cos(pz * f1 + elapsed * 0.34)) * 1.8;
     const vz = (Math.cos(px * f1 + elapsed * 0.39) - Math.sin(py * f2 + elapsed * 0.30)) * 8.4;
-    arr[ix + 0] = px + vx * dt;
-    arr[ix + 1] = py + vy * dt;
-    arr[ix + 2] = pz + vz * dt;
+    arr[ix + 0] = px + vx * dt * speed;
+    arr[ix + 1] = py + vy * dt * speed;
+    arr[ix + 2] = pz + vz * dt * speed;
     const B = FLOW_BOUND;
     if (arr[ix + 0] >  B) arr[ix + 0] = -B;
     if (arr[ix + 0] < -B) arr[ix + 0] =  B;
@@ -2220,92 +2435,7 @@ const composer = {
   setSize: (w, h) => renderer.setSize(w, h),
 };
 
-const groundRaycaster = new THREE.Raycaster();
-const groundPointer = new THREE.Vector2();
-const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const robotDragPoint = new THREE.Vector3();
-const robotDrag = {
-  active: false,
-  pointerId: null,
-  offsetX: 0,
-  offsetZ: 0,
-};
-
-function getGroundPointFromEvent(event, target) {
-  const rect = renderer.domElement.getBoundingClientRect();
-  const x = (event.clientX - rect.left) / rect.width;
-  const y = (event.clientY - rect.top) / rect.height;
-  if (x < 0 || x > 1 || y < 0 || y > 1) return false;
-
-  groundPointer.set(x * 2 - 1, -(y * 2 - 1));
-  groundRaycaster.setFromCamera(groundPointer, camera);
-  return !!groundRaycaster.ray.intersectPlane(groundPlane, target);
-}
-
-function robotHitRadius() {
-  return Math.max(14, 44 * skidState.scale);
-}
-
-function isPointerOnRobot(event) {
-  if (!skidState.initialized) return false;
-  if (!getGroundPointFromEvent(event, robotDragPoint)) return false;
-  return Math.hypot(robotDragPoint.x - skidState.x, robotDragPoint.z - skidState.z) <= robotHitRadius();
-}
-
-function startRobotDrag(event) {
-  if (event.button !== 0) return;
-  const canDrag = robotMoveMode
-    ? getGroundPointFromEvent(event, robotDragPoint)
-    : isPointerOnRobot(event);
-  if (!canDrag) return;
-  robotDrag.active = true;
-  robotDrag.pointerId = event.pointerId;
-  robotDrag.offsetX = skidState.x - robotDragPoint.x;
-  robotDrag.offsetZ = skidState.z - robotDragPoint.z;
-  controls.enabled = false;
-  renderer.domElement.setPointerCapture(event.pointerId);
-  event.preventDefault();
-}
-
-function moveRobotDrag(event) {
-  if (!robotDrag.active) return false;
-  if (getGroundPointFromEvent(event, robotDragPoint)) {
-    skidState.x = robotDragPoint.x + robotDrag.offsetX;
-    skidState.z = robotDragPoint.z + robotDrag.offsetZ;
-    buildSkidSteerRobot();
-    saveSkidState();
-  }
-  event.preventDefault();
-  return true;
-}
-
-function endRobotDrag(event) {
-  if (!robotDrag.active) return;
-  if (event.pointerId === robotDrag.pointerId && renderer.domElement.hasPointerCapture(event.pointerId)) {
-    renderer.domElement.releasePointerCapture(event.pointerId);
-  }
-  robotDrag.active = false;
-  robotDrag.pointerId = null;
-  controls.enabled = true;
-  saveSkidState();
-}
-
-function handlePointerMove(event) {
-  moveRobotDrag(event);
-}
-
-renderer.domElement.addEventListener('pointerdown', startRobotDrag);
-window.addEventListener('pointermove', handlePointerMove, { passive: false });
-window.addEventListener('pointerup', endRobotDrag);
-window.addEventListener('pointercancel', endRobotDrag);
-window.addEventListener('blur', () => {
-  if (robotDrag.active) {
-    robotDrag.active = false;
-    controls.enabled = true;
-  }
-});
-
-for (const input of [robotDebugEls.x, robotDebugEls.z, robotDebugEls.rotation, robotDebugEls.scale]) {
+for (const input of [robotDebugEls.x, robotDebugEls.z, robotDebugEls.rotation, robotDebugEls.scale].filter(Boolean)) {
   input.addEventListener('input', applyRobotDebugInputs);
 }
 
@@ -2328,10 +2458,12 @@ robotDebugEls.togglePanel.addEventListener('click', () => {
   setDebugPanelCollapsed(!robotDebugEls.panel.classList.contains('is-collapsed'));
 });
 
-robotDebugEls.move.addEventListener('click', () => {
-  robotMoveMode = !robotMoveMode;
-  updateRobotMoveModeUI();
-});
+if (robotDebugEls.move) {
+  robotDebugEls.move.addEventListener('click', () => {
+    robotMoveMode = !robotMoveMode;
+    updateRobotMoveModeUI();
+  });
+}
 
 robotDebugEls.copy.addEventListener('click', async () => {
   const value = robotDebugEls.data.value;
@@ -2343,17 +2475,22 @@ robotDebugEls.copy.addEventListener('click', async () => {
   }
 });
 
-robotDebugEls.reset.addEventListener('click', () => {
-  Object.assign(skidState, defaultSkidState(), { initialized: true });
-  buildSkidSteerRobot();
-  saveSkidState();
-});
+if (robotDebugEls.reset) {
+  robotDebugEls.reset.addEventListener('click', () => {
+    Object.assign(skidState, defaultSkidState(), { initialized: true });
+    saveSkidState();
+  });
+}
 
 robotDebugEls.resetCamera.addEventListener('click', () => {
   stopCameraAnimation(false);
   activeCameraShotName = 'Custom';
   applyCameraState(defaultCameraState());
   updateCameraAnimationDebug();
+});
+
+robotDebugEls.resetParticles.addEventListener('click', () => {
+  applyParticleState(defaultParticleState());
 });
 
 robotDebugEls.setCameraKeyA.addEventListener('click', () => setCameraKeyframe('keyA'));
@@ -2409,7 +2546,7 @@ function tick() {
   updateServiceGridParticles(dt, elapsed);
   updateEmbers(dt, elapsed);
   updateCameraAnimation(performance.now());
-  controls.update();
+  if (!cameraAnimation.active) controls.update();
   composer.render();
   requestAnimationFrame(tick);
 }
@@ -2422,6 +2559,10 @@ function tick() {
   updateSceneHud();
   loader.classList.add('gone');
   setTimeout(() => loader.remove(), 900);
+  // fade canvas in (matches city page behaviour)
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.body.classList.add('scene-ready');
+  }));
   tick();
 })();
 </script>

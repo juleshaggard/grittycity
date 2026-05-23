@@ -11,6 +11,17 @@
     overflow: hidden; height: 100%;
   }
   #app { position: fixed; inset: 0; }
+  #app > canvas {
+    opacity: 0;
+    filter: contrast(1.18) brightness(1.05);
+    transition:
+      opacity 1.1s cubic-bezier(0.16, 1, 0.3, 1),
+      filter 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  body.scene-ready #app > canvas {
+    opacity: 1;
+    filter: none;
+  }
   .hud {
     position: fixed; left: 20px; bottom: 18px; font-size: 11px;
     letter-spacing: 0.18em; text-transform: uppercase;
@@ -27,21 +38,37 @@
   #loader {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     flex-direction: column; gap: 14px; background: #ffffff; z-index: 50;
-    transition: opacity 0.8s ease; pointer-events: none;
+    overflow: hidden;
+    transition:
+      background 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
   }
+  #loader.resolving { background: rgba(255, 255, 255, 0); }
   #loader.gone { opacity: 0; }
-  .ring {
-    width: 38px; height: 38px; border-radius: 50%;
-    border: 1px solid rgba(40,40,48,0.15);
-    border-top-color: rgba(20,20,24,0.75);
-    animation: spin 1.1s linear infinite;
+  #bootVision {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.92;
+    transition:
+      opacity 0.72s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.72s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .lbl {
-    font-size: 10.5px; letter-spacing: 0.3em; text-transform: uppercase;
-    color: rgba(40,40,48,0.6);
+  #loader.resolving #bootVision {
+    opacity: 0.38;
+    transform: scale(1.015);
   }
-  #lblText { min-width: 280px; text-align: center; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    pointer-events: none;
+  }
   canvas { display: block; }
 
   /* top-left page nav — switches between scenes */
@@ -240,15 +267,15 @@
 
 </style>
 </head>
-<body>
+<body class="scene-booting">
 <div id="app"></div>
 <nav class="page-nav" aria-label="Scene pages">
   <a class="active" href="city-particles.html">City</a>
   <a href="solar-panel-farm.html">Solar farm</a>
 </nav>
 <div id="loader">
-  <div class="ring"></div>
-  <div class="lbl" id="lblText">Loading Bangkok map data…</div>
+  <canvas id="bootVision" aria-hidden="true"></canvas>
+  <div class="loader-status" id="lblText" aria-live="polite">Loading Bangkok map data…</div>
 </div>
 <div class="corner">
   BANGKOK · 13°45′N 100°30′E
@@ -442,24 +469,24 @@ container.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xffffff); // pure white, no gradient/vignette
 
-const CITY_CAMERA_STATE_KEY = 'city-camera-transform-v1';
-const CITY_CAMERA_ANIMATION_STATE_KEY = 'city-camera-animation-v2';
+const CITY_CAMERA_STATE_KEY = 'city-camera-transform-v2';
+const CITY_CAMERA_ANIMATION_STATE_KEY = 'city-camera-animation-v3';
 const CITY_PARTICLE_STATE_KEY = 'city-particle-system-v2';
 const CITY_DEBUG_PANEL_STATE_KEY = 'city-debug-panel-v1';
 const CITY_BUILDING_HOVER_STATE_KEY = 'city-building-hover-v1';
 const CITY_FADE_FAR_MIGRATION_KEY = 'city-fade-far-360-v1';
-const DEFAULT_CAMERA_X = 360;
-const DEFAULT_CAMERA_Y = 270;
-const DEFAULT_CAMERA_Z = 480;
+const DEFAULT_CAMERA_X = 44.3;
+const DEFAULT_CAMERA_Y = 1735.9;
+const DEFAULT_CAMERA_Z = 0.1;
 const DEFAULT_TARGET_X = 0;
 const DEFAULT_TARGET_Y = 0;
 const DEFAULT_TARGET_Z = 0;
-const DEFAULT_CAMERA_FOV = 72;
+const DEFAULT_CAMERA_FOV = 31;
 const DEFAULT_CAMERA_ZOOM = 1;
 const DEFAULT_CAMERA_NEAR = 1;
 const DEFAULT_CAMERA_FAR = 8000;
 const DEFAULT_FADE_NEAR = 8;
-const DEFAULT_FADE_FAR = 360;
+const DEFAULT_FADE_FAR = 4000;
 const DEFAULT_MAX_POLAR_DEG = 99;
 const DEFAULT_PARTICLE_SCALE = 1;
 const DEFAULT_PARTICLE_ALPHA = 1;
@@ -512,6 +539,98 @@ function radToDeg(rad) {
 
 function roundForDebug(value, digits = 2) {
   return Number(value.toFixed(digits));
+}
+
+const cameraStateEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+const cameraStateQuaternion = new THREE.Quaternion();
+const cameraStateObject = new THREE.Object3D();
+const cameraSlerpFrom = new THREE.Quaternion();
+const cameraSlerpTo = new THREE.Quaternion();
+const cameraSlerpOut = new THREE.Quaternion();
+
+function cameraRotationFieldsFromQuaternion(quaternion) {
+  cameraStateEuler.setFromQuaternion(quaternion, 'XYZ');
+  return {
+    rotationX: cameraStateEuler.x,
+    rotationY: cameraStateEuler.y,
+    rotationZ: cameraStateEuler.z,
+    quaternionX: quaternion.x,
+    quaternionY: quaternion.y,
+    quaternionZ: quaternion.z,
+    quaternionW: quaternion.w,
+  };
+}
+
+function cameraRotationFieldsFromObject(object) {
+  return {
+    rotationX: object.rotation.x,
+    rotationY: object.rotation.y,
+    rotationZ: object.rotation.z,
+    quaternionX: object.quaternion.x,
+    quaternionY: object.quaternion.y,
+    quaternionZ: object.quaternion.z,
+    quaternionW: object.quaternion.w,
+  };
+}
+
+function cameraRotationFieldsFromState(state) {
+  const source = state && typeof state === 'object' ? state : {};
+  const rotation = source.rotation && typeof source.rotation === 'object' ? source.rotation : {};
+  const quaternion = source.quaternion && typeof source.quaternion === 'object' ? source.quaternion : {};
+  const qx = Number.isFinite(source.quaternionX) ? source.quaternionX : quaternion.x;
+  const qy = Number.isFinite(source.quaternionY) ? source.quaternionY : quaternion.y;
+  const qz = Number.isFinite(source.quaternionZ) ? source.quaternionZ : quaternion.z;
+  const qw = Number.isFinite(source.quaternionW) ? source.quaternionW : quaternion.w;
+  if ([qx, qy, qz, qw].every(Number.isFinite)) {
+    cameraStateQuaternion.set(qx, qy, qz, qw).normalize();
+    return cameraRotationFieldsFromQuaternion(cameraStateQuaternion);
+  }
+
+  const rx = Number.isFinite(source.rotationX) ? source.rotationX : rotation.x;
+  const ry = Number.isFinite(source.rotationY) ? source.rotationY : rotation.y;
+  const rz = Number.isFinite(source.rotationZ) ? source.rotationZ : rotation.z;
+  if ([rx, ry, rz].every(Number.isFinite)) {
+    cameraStateEuler.set(rx, ry, rz, 'XYZ');
+    cameraStateQuaternion.setFromEuler(cameraStateEuler);
+    return cameraRotationFieldsFromQuaternion(cameraStateQuaternion);
+  }
+
+  if (
+    Number.isFinite(source.x) &&
+    Number.isFinite(source.y) &&
+    Number.isFinite(source.z) &&
+    Number.isFinite(source.targetX) &&
+    Number.isFinite(source.targetY) &&
+    Number.isFinite(source.targetZ)
+  ) {
+    cameraStateObject.position.set(source.x, source.y, source.z);
+    cameraStateObject.lookAt(source.targetX, source.targetY, source.targetZ);
+    return cameraRotationFieldsFromObject(cameraStateObject);
+  }
+
+  return cameraRotationFieldsFromObject(camera);
+}
+
+function roundedRotationPayload(state) {
+  const rotation = cameraRotationFieldsFromState(state);
+  return {
+    rotation: {
+      x: roundForDebug(rotation.rotationX, 5),
+      y: roundForDebug(rotation.rotationY, 5),
+      z: roundForDebug(rotation.rotationZ, 5),
+    },
+    rotationDeg: {
+      x: roundForDebug(radToDeg(rotation.rotationX), 2),
+      y: roundForDebug(radToDeg(rotation.rotationY), 2),
+      z: roundForDebug(radToDeg(rotation.rotationZ), 2),
+    },
+    quaternion: {
+      x: roundForDebug(rotation.quaternionX, 5),
+      y: roundForDebug(rotation.quaternionY, 5),
+      z: roundForDebug(rotation.quaternionZ, 5),
+      w: roundForDebug(rotation.quaternionW, 5),
+    },
+  };
 }
 
 function normalizeHexColor(value, fallback = DEFAULT_PARTICLE_COLOR) {
@@ -655,31 +774,63 @@ function defaultCameraState() {
     fadeNear: DEFAULT_FADE_NEAR,
     fadeFar: DEFAULT_FADE_FAR,
     maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+    rotationX: 1.57085,
+    rotationY: -0.02551,
+    rotationZ: 1.57305,
+    quaternionX: 0.49302,
+    quaternionY: -0.50691,
+    quaternionZ: 0.49414,
+    quaternionW: 0.50577,
   };
 }
 
 function defaultCameraKeyAState() {
   return {
-    x: 0,
-    y: 2706.87,
-    z: 0,
+    x: 65.77,
+    y: 2576.52,
+    z: 0.22,
     targetX: 0,
     targetY: 0,
     targetZ: 0,
-    fov: 21,
+    fov: 31,
     zoom: DEFAULT_CAMERA_ZOOM,
     near: DEFAULT_CAMERA_NEAR,
     far: DEFAULT_CAMERA_FAR,
     fadeNear: DEFAULT_FADE_NEAR,
-    fadeFar: 2000,
+    fadeFar: 360,
     maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+    rotationX: -1.57071,
+    rotationY: 0.02552,
+    rotationZ: 1.56745,
+    quaternionX: -0.4944,
+    quaternionY: 0.50549,
+    quaternionZ: 0.49275,
+    quaternionW: 0.50719,
   };
 }
 
 function defaultCameraKeyBState() {
   return {
-    ...defaultCameraState(),
+    x: 590.41,
+    y: -25.55,
+    z: -289.24,
+    targetX: 0,
+    targetY: 0,
+    targetZ: 0,
+    fov: 72,
+    zoom: DEFAULT_CAMERA_ZOOM,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
     fadeFar: 360,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+    rotationX: 3.05347,
+    rotationY: 1.11372,
+    rotationZ: -3.06248,
+    quaternionX: 0.01028,
+    quaternionY: 0.84835,
+    quaternionZ: -0.01648,
+    quaternionW: 0.52908,
   };
 }
 
@@ -749,6 +900,7 @@ function normalizeCameraState(state) {
   const fadeNear = clamp(Number.isFinite(state.fadeNear) ? state.fadeNear : defaults.fadeNear, 0, 10000);
   const fadeFar = Math.max(fadeNear + 0.1, Math.min(Number.isFinite(state.fadeFar) ? state.fadeFar : defaults.fadeFar, 20000));
   const zoom = clamp(Number.isFinite(state.zoom) ? state.zoom : defaults.zoom, 0.1, 10);
+  const rotation = cameraRotationFieldsFromState(state);
   return {
     x: Number.isFinite(state.x) ? state.x : defaults.x,
     y: Number.isFinite(state.y) ? state.y : defaults.y,
@@ -763,6 +915,7 @@ function normalizeCameraState(state) {
     fadeNear,
     fadeFar,
     maxPolarDeg: clamp(Number.isFinite(state.maxPolarDeg) ? state.maxPolarDeg : defaults.maxPolarDeg, 1, 179),
+    ...rotation,
   };
 }
 
@@ -794,6 +947,7 @@ function cameraDebugPayload() {
       y: roundForDebug(controls.target.y, 2),
       z: roundForDebug(controls.target.z, 2),
     },
+    ...roundedRotationPayload(cameraRotationFieldsFromObject(camera)),
     fov: roundForDebug(camera.fov, 2),
     zoom: roundForDebug(camera.zoom, 3),
     clipping: {
@@ -828,6 +982,7 @@ function currentCameraState() {
     fadeNear: sharedUniforms.uFadeNear.value,
     fadeFar: sharedUniforms.uFadeFar.value,
     maxPolarDeg: radToDeg(controls.maxPolarAngle),
+    ...cameraRotationFieldsFromObject(camera),
   };
 }
 
@@ -844,6 +999,7 @@ function cameraStatePayload(state) {
       y: roundForDebug(next.targetY, 2),
       z: roundForDebug(next.targetZ, 2),
     },
+    ...roundedRotationPayload(next),
     fov: roundForDebug(next.fov, 2),
     zoom: roundForDebug(next.zoom, 3),
     clipping: {
@@ -1046,6 +1202,7 @@ function saveCameraState() {
       fadeNear: sharedUniforms.uFadeNear.value,
       fadeFar: sharedUniforms.uFadeFar.value,
       maxPolarDeg: radToDeg(controls.maxPolarAngle),
+      ...cameraRotationFieldsFromObject(camera),
     }));
   } catch (e) {
     console.warn('Unable to save city camera transform:', e);
@@ -1174,6 +1331,8 @@ function applyCameraState(state, persist = true) {
   controls.target.set(next.targetX, next.targetY, next.targetZ);
   controls.maxPolarAngle = degToRad(next.maxPolarDeg);
   controls.update();
+  camera.quaternion.set(next.quaternionX, next.quaternionY, next.quaternionZ, next.quaternionW).normalize();
+  camera.updateMatrixWorld();
   if (persist) saveCameraState();
   updateCameraDebug();
 }
@@ -1202,6 +1361,10 @@ function lerp(a, b, t) {
 function lerpCameraStates(a, b, t) {
   const from = normalizeCameraState(a);
   const to = normalizeCameraState(b);
+  cameraSlerpFrom.set(from.quaternionX, from.quaternionY, from.quaternionZ, from.quaternionW).normalize();
+  cameraSlerpTo.set(to.quaternionX, to.quaternionY, to.quaternionZ, to.quaternionW).normalize();
+  cameraSlerpOut.copy(cameraSlerpFrom).slerp(cameraSlerpTo, t).normalize();
+  const rotation = cameraRotationFieldsFromQuaternion(cameraSlerpOut);
   return {
     x: lerp(from.x, to.x, t),
     y: lerp(from.y, to.y, t),
@@ -1216,6 +1379,7 @@ function lerpCameraStates(a, b, t) {
     fadeNear: lerp(from.fadeNear, to.fadeNear, t),
     fadeFar: lerp(from.fadeFar, to.fadeFar, t),
     maxPolarDeg: lerp(from.maxPolarDeg, to.maxPolarDeg, t),
+    ...rotation,
   };
 }
 
@@ -1618,6 +1782,161 @@ const accentYellow = new THREE.Color('#FCE132');
 // ============================================================
 const lblText = document.getElementById('lblText');
 const loader  = document.getElementById('loader');
+const bootCanvas = document.getElementById('bootVision');
+const bootCtx = bootCanvas ? bootCanvas.getContext('2d') : null;
+const bootProjectionPoint = new THREE.Vector3();
+const bootVision = {
+  active: Boolean(bootCtx),
+  startAt: performance.now(),
+  readyAt: 0,
+  width: 0,
+  height: 0,
+  dpr: 1,
+  records: [],
+  status: 'bbox pending',
+};
+
+function bootNoise(seed) {
+  return Math.abs(Math.sin(seed * 12.9898 + 78.233) * 43758.5453) % 1;
+}
+
+function resizeBootVision() {
+  if (!bootCanvas || !bootCtx) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  if (bootVision.width === width && bootVision.height === height && bootVision.dpr === dpr) return;
+  bootVision.width = width;
+  bootVision.height = height;
+  bootVision.dpr = dpr;
+  bootCanvas.width = Math.max(1, Math.floor(width * dpr));
+  bootCanvas.height = Math.max(1, Math.floor(height * dpr));
+  bootCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function setBootVisionStatus(status) {
+  bootVision.status = status;
+}
+
+function seedBootVisionScene(records) {
+  if (!bootVision.active || !records || !records.length) return;
+  const maxRecords = 720;
+  const step = Math.max(1, Math.floor(records.length / maxRecords));
+  const picked = [];
+  for (let i = 0; i < records.length && picked.length < maxRecords; i += step) {
+    const record = records[i];
+    if (!record || Math.hypot(record.cx, record.cz) > 2650) continue;
+    picked.push(record);
+  }
+  bootVision.records = picked;
+  setBootVisionStatus(`locking ${picked.length.toLocaleString()} object boxes`);
+}
+
+function projectBootPoint(x, y, z) {
+  const wrapped = wrapSpherePointCPU(x, y, z);
+  bootProjectionPoint.set(wrapped[0], wrapped[1], wrapped[2]).project(camera);
+  return {
+    x: (bootProjectionPoint.x * 0.5 + 0.5) * bootVision.width,
+    y: (-bootProjectionPoint.y * 0.5 + 0.5) * bootVision.height,
+    z: bootProjectionPoint.z,
+  };
+}
+
+function screenBoxFromRecord(record) {
+  const corners = [
+    [record.minX, 0, record.minZ],
+    [record.maxX, 0, record.minZ],
+    [record.maxX, 0, record.maxZ],
+    [record.minX, 0, record.maxZ],
+    [record.minX, record.h, record.minZ],
+    [record.maxX, record.h, record.minZ],
+    [record.maxX, record.h, record.maxZ],
+    [record.minX, record.h, record.maxZ],
+  ];
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let visible = 0;
+  for (const p of corners) {
+    const projected = projectBootPoint(p[0], p[1], p[2]);
+    if (projected.z > -1.2 && projected.z < 1.2) visible++;
+    minX = Math.min(minX, projected.x);
+    minY = Math.min(minY, projected.y);
+    maxX = Math.max(maxX, projected.x);
+    maxY = Math.max(maxY, projected.y);
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  if (!visible || width < 2 || height < 2 || width > bootVision.width * 0.46 || height > bootVision.height * 0.46) return null;
+  if (maxX < -40 || minX > bootVision.width + 40 || maxY < -40 || minY > bootVision.height + 40) return null;
+  return { x: minX, y: minY, width, height };
+}
+
+function drawBootSceneBoxes(ctx, now, resolveT) {
+  const records = bootVision.records;
+  if (!records.length) return;
+  const reveal = bootVision.readyAt
+    ? 1
+    : clamp((now - bootVision.startAt) / 2200, 0.05, 0.62);
+  const count = Math.min(records.length, Math.floor(records.length * reveal));
+  ctx.lineWidth = 1;
+  for (let i = 0; i < count; i++) {
+    const record = records[i];
+    const box = screenBoxFromRecord(record);
+    if (!box) continue;
+    const flicker = bootNoise(i * 2.71 + Math.floor(now / 120));
+    const accent = i % 41 === 0;
+    ctx.strokeStyle = accent
+      ? `rgba(252, 225, 50, ${0.34 + flicker * 0.18})`
+      : `rgba(34, 34, 40, ${0.12 + flicker * 0.16 - resolveT * 0.05})`;
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+  }
+}
+
+function drawBootScanLines(ctx, now, resolveT) {
+  const scanY = (now * 0.035) % (bootVision.height + 180) - 90;
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = `rgba(252, 225, 50, ${0.18 - resolveT * 0.09})`;
+  ctx.beginPath();
+  ctx.moveTo(0, scanY);
+  ctx.lineTo(bootVision.width, scanY + 32);
+  ctx.stroke();
+}
+
+function drawBootVision(now) {
+  if (!bootVision.active || !bootCtx) return;
+  resizeBootVision();
+  const ctx = bootCtx;
+  const resolveT = bootVision.readyAt ? clamp((now - bootVision.readyAt) / 1500, 0, 1) : 0;
+  ctx.clearRect(0, 0, bootVision.width, bootVision.height);
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.94 - resolveT * 0.34})`;
+  ctx.fillRect(0, 0, bootVision.width, bootVision.height);
+  drawBootSceneBoxes(ctx, now, resolveT);
+  drawBootScanLines(ctx, now, resolveT);
+
+  requestAnimationFrame(drawBootVision);
+}
+
+function finishBootVision() {
+  if (bootVision.readyAt) return;
+  seedBootVisionScene(buildingHoverRecords);
+  bootVision.readyAt = performance.now();
+  document.body.classList.remove('scene-booting');
+  document.body.classList.add('scene-ready');
+  if (loader) loader.classList.add('resolving');
+  setBootVisionStatus('scene resolved');
+  window.setTimeout(() => {
+    if (loader) loader.classList.add('gone');
+  }, 1180);
+  window.setTimeout(() => {
+    bootVision.active = false;
+    if (loader) loader.remove();
+  }, 2150);
+}
+
+resizeBootVision();
+requestAnimationFrame(drawBootVision);
 
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
@@ -1737,7 +2056,10 @@ async function markOSMCacheChecked(record) {
 async function queryOverpass({ quiet = false } = {}) {
   for (let i = 0; i < OVERPASS_ENDPOINTS.length; i++) {
     const ep = OVERPASS_ENDPOINTS[i];
-    if (!quiet) lblText.textContent = `Querying OSM (${i + 1}/${OVERPASS_ENDPOINTS.length})…`;
+    if (!quiet) {
+      lblText.textContent = `Querying OSM (${i + 1}/${OVERPASS_ENDPOINTS.length})…`;
+      setBootVisionStatus(`query endpoint ${i + 1}/${OVERPASS_ENDPOINTS.length}`);
+    }
     try {
       const res = await fetch(ep, {
         method: 'POST',
@@ -1745,7 +2067,10 @@ async function queryOverpass({ quiet = false } = {}) {
         body: 'data=' + encodeURIComponent(query),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      if (!quiet) lblText.textContent = 'Parsing response…';
+      if (!quiet) {
+        lblText.textContent = 'Parsing response…';
+        setBootVisionStatus('parsing osm response');
+      }
       const data = await res.json();
       await writeOSMCache(data);
       return data;
@@ -1773,6 +2098,7 @@ async function fetchOverpass() {
     const ageMs = Math.max(0, now - (cached.savedAt || now));
     const checkedAgeMs = Math.max(0, now - (cached.checkedAt || 0));
     lblText.textContent = `Loading cached OSM (${formatCacheAge(ageMs)})…`;
+    setBootVisionStatus(`loading cached osm ${formatCacheAge(ageMs)}`);
 
     if (ageMs > OSM_CACHE_REFRESH_MS && checkedAgeMs > OSM_CACHE_RETRY_MS) {
       refreshOSMCache(cached);
@@ -1816,6 +2142,7 @@ function buildFromOSM(data) {
   }));
 
   lblText.textContent = `Placing ${buildings.length.toLocaleString()} buildings…`;
+  setBootVisionStatus(`placing ${buildings.length.toLocaleString()} footprints`);
 
   // -------- river curve from longest contiguous river way --------
   // pick the longest river way as the spine (likely the Chao Phraya main channel)
@@ -1849,6 +2176,7 @@ function buildFromOSM(data) {
     total: projectedBuildings.length,
   });
   lblText.textContent = `${osmProjected.length.toLocaleString()} map buildings`;
+  setBootVisionStatus(`${osmProjected.length.toLocaleString()} map objects indexed`);
 }
 
 function wrapSpherePointCPU(x, y, z) {
@@ -2193,6 +2521,7 @@ function buildBuildingPoints(buildings) {
   }
 
   lblText.textContent = `Generating ${total.toLocaleString()} window lights…`;
+  setBootVisionStatus(`generating ${total.toLocaleString()} light points`);
 
   // -------- allocate one big buffer for ALL buildings --------
   const positions = new Float32Array(total * 3);
@@ -2349,6 +2678,7 @@ function buildBuildingPoints(buildings) {
   scene.add(new THREE.Points(geo, mat));
 
   lblText.textContent = `${k.toLocaleString()} window lights · ${buildings.length.toLocaleString()} buildings`;
+  setBootVisionStatus(`${k.toLocaleString()} lights locked`);
 
   // expose for the footprint extrusion pass
   projectedBuildings = projected;
@@ -2545,6 +2875,7 @@ function buildBuildingMeshes(projected) {
   if (!records.length) return;
 
   lblText.textContent = `Extruding ${records.length.toLocaleString()} map footprints…`;
+  setBootVisionStatus(`extruding ${records.length.toLocaleString()} boxes`);
   disposeBuildingHitMesh();
   buildingHoverRecords.length = 0;
 
@@ -3280,6 +3611,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(w, h);
   composer.setSize(w, h);
   sharedUniforms.uPixelRatio.value = renderer.getPixelRatio();
+  resizeBootVision();
 });
 
 // ---------- animate ----------
@@ -3343,7 +3675,7 @@ function tick() {
   updateEmbers(dt);
   updateBuildingHighlights(performance.now() / 1000);
   updateCameraAnimation(performance.now());
-  controls.update();
+  if (!cameraAnimation.active) controls.update();
   composer.render();
   requestAnimationFrame(tick);
 }
@@ -3356,6 +3688,7 @@ function tick() {
     const data = await fetchOverpass();
     buildFromOSM(data);
     buildBuildingMeshes(projectedBuildings);   // depth-only invisible occluders
+    seedBootVisionScene(buildingHoverRecords);
     buildBuildingWireframes(projectedBuildings);
     buildTraffic();
     buildStreams();
@@ -3363,10 +3696,10 @@ function tick() {
   } catch (e) {
     console.error(e);
     lblText.textContent = 'Map data unavailable';
+    setBootVisionStatus('map data unavailable');
   }
-  loader.classList.add('gone');
-  setTimeout(() => loader.remove(), 900);
   tick();
+  finishBootVision();
 })();
 </script>
 </body>
