@@ -35,6 +35,65 @@
     pointer-events: none; user-select: none;
   }
   .corner small { display: block; color: rgba(40, 40, 48, 0.35); font-size: 9px; margin-top: 4px; }
+  .building-tracker-hud {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 64;
+    display: grid;
+    gap: 3px;
+    min-width: 118px;
+    padding: 7px 9px 6px 11px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(252, 225, 50, 0.48);
+    color: rgba(24, 24, 28, 0.76);
+    font: 9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.18em;
+    line-height: 1.25;
+    text-transform: uppercase;
+    pointer-events: none;
+    user-select: none;
+    opacity: 0;
+    transform: translate3d(-999px, -999px, 0);
+    will-change: transform, opacity;
+    isolation: isolate;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.68);
+  }
+  .building-tracker-hud__connector {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    z-index: 0;
+    width: 0;
+    height: 1px;
+    background: rgba(252, 225, 50, 0.82);
+    transform-origin: 0 50%;
+    pointer-events: none;
+  }
+  .building-tracker-hud::before,
+  .building-tracker-hud::after {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    width: 12px;
+    height: 12px;
+    border-color: rgba(252, 225, 50, 0.9);
+    border-style: solid;
+    pointer-events: none;
+  }
+  .building-tracker-hud::before {
+    left: 0;
+    top: 0;
+    border-width: 1px 0 0 1px;
+  }
+  .building-tracker-hud::after {
+    right: 0;
+    bottom: 0;
+    border-width: 0 1px 1px 0;
+  }
+  .building-tracker-hud span { position: relative; z-index: 1; }
+  .building-tracker-hud span:first-child { color: rgba(20, 20, 24, 0.88); }
+  .building-tracker-hud span:last-child { color: rgba(40, 40, 48, 0.46); }
   #loader {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     flex-direction: column; gap: 14px; background: #ffffff; z-index: 50;
@@ -751,6 +810,23 @@ const BUILDING_HOVER_SEARCH_RADIUS = 260;
 const BUILDING_HOVER_MAX_CANDIDATES = 140;
 const BUILDING_HOVER_MAX_RADIUS = 2200;
 const BUILDING_HOVER_THROTTLE_MS = 80;
+const BUILDING_TRACKER_FADE_SPEED = 13;
+const BUILDING_TRACKER_SCAN_SPEED = 0.92;
+const BUILDING_TRACKER_MAX_ALPHA = 1;
+let buildingHoverTrackerGroup = null;
+let buildingHoverTrackerFrame = null;
+let buildingHoverTrackerDetail = null;
+let buildingHoverTrackerScan = null;
+let buildingHoverTrackerHud = null;
+const buildingHoverTrackerAnchor = new THREE.Vector3();
+const buildingHoverTrackerScreen = new THREE.Vector3();
+const buildingHoverTrackerState = {
+  active: false,
+  opacity: 0,
+  targetOpacity: 0,
+  currentIndex: null,
+  scanT: 0,
+};
 const cameraAnimation = {
   active: false,
   startedAt: 0,
@@ -2995,6 +3071,23 @@ const wireFrag = /* glsl */`
     gl_FragColor = vec4(col, alpha);
   }
 `;
+const buildingTrackerFrag = /* glsl */`
+  uniform vec3 uColor;
+  uniform vec3 uBgColor;
+  uniform float uAlpha;
+  varying float vFade;
+  varying float vBackface;
+  varying float vDepthLayer;
+
+  void main() {
+    if (vBackface < -0.04) discard;
+    float haze = clamp((1.0 - vFade) * 0.20 + vDepthLayer * 0.54, 0.0, 0.78);
+    vec3 col = mix(uColor, uBgColor, haze);
+    float alpha = uAlpha * (0.34 + 0.66 * vFade) * (1.0 - vDepthLayer * 0.58);
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
 
 function buildBuildingWireframes(projected) {
   if (!projected || !projected.length) return;
@@ -3327,10 +3420,311 @@ function clearBuildingHighlights() {
   buildingHighlights.clear();
 }
 
+function makeTrackerLineGeometry(positions) {
+  const geo = new THREE.BufferGeometry();
+  const safePositions = positions.length ? positions : [0, 0, 0, 0, 0, 0];
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(safePositions, 3));
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function setTrackerLinePositions(line, positions) {
+  const safePositions = positions.length ? positions : [0, 0, 0, 0, 0, 0];
+  const next = new Float32Array(safePositions);
+  const attr = line.geometry && line.geometry.getAttribute('position');
+  if (!attr || attr.array.length !== next.length) {
+    if (line.geometry) line.geometry.dispose();
+    line.geometry = makeTrackerLineGeometry(safePositions);
+    return;
+  }
+  attr.array.set(next);
+  attr.needsUpdate = true;
+  line.geometry.computeBoundingSphere();
+}
+
+function makeBuildingTrackerMaterial(color, alpha) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: color.clone() },
+      uAlpha: { value: alpha },
+    },
+    vertexShader: wireVert,
+    fragmentShader: buildingTrackerFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+  });
+}
+
+function ensureBuildingHoverTrackerHud() {
+  if (buildingHoverTrackerHud) return buildingHoverTrackerHud;
+  buildingHoverTrackerHud = document.createElement('div');
+  buildingHoverTrackerHud.className = 'building-tracker-hud';
+  buildingHoverTrackerHud.setAttribute('aria-hidden', 'true');
+  buildingHoverTrackerHud.innerHTML = '<i class="building-tracker-hud__connector" data-tracker-line></i><span data-tracker-id></span><span data-tracker-meta></span>';
+  document.body.appendChild(buildingHoverTrackerHud);
+  return buildingHoverTrackerHud;
+}
+
+function ensureBuildingHoverTracker() {
+  if (buildingHoverTrackerGroup) return buildingHoverTrackerGroup;
+
+  buildingHoverTrackerGroup = new THREE.Group();
+  buildingHoverTrackerGroup.name = 'building-hover-tracker';
+  buildingHoverTrackerGroup.visible = false;
+
+  buildingHoverTrackerFrame = new THREE.LineSegments(
+    makeTrackerLineGeometry([]),
+    makeBuildingTrackerMaterial(BUILDING_HOVER_COLOR, 0)
+  );
+  buildingHoverTrackerFrame.renderOrder = 10;
+  buildingHoverTrackerFrame.frustumCulled = false;
+  buildingHoverTrackerGroup.add(buildingHoverTrackerFrame);
+
+  buildingHoverTrackerDetail = new THREE.LineSegments(
+    makeTrackerLineGeometry([]),
+    makeBuildingTrackerMaterial(new THREE.Color('#24262c'), 0)
+  );
+  buildingHoverTrackerDetail.renderOrder = 11;
+  buildingHoverTrackerDetail.frustumCulled = false;
+  buildingHoverTrackerGroup.add(buildingHoverTrackerDetail);
+
+  buildingHoverTrackerScan = new THREE.LineSegments(
+    makeTrackerLineGeometry([]),
+    makeBuildingTrackerMaterial(BUILDING_HOVER_COLOR, 0)
+  );
+  buildingHoverTrackerScan.renderOrder = 12;
+  buildingHoverTrackerScan.frustumCulled = false;
+  buildingHoverTrackerGroup.add(buildingHoverTrackerScan);
+
+  scene.add(buildingHoverTrackerGroup);
+  ensureBuildingHoverTrackerHud();
+  return buildingHoverTrackerGroup;
+}
+
+function pushTrackerLine(positions, ax, ay, az, bx, by, bz) {
+  positions.push(ax, ay, az, bx, by, bz);
+}
+
+function pushTrackerRect(positions, minX, maxX, minZ, maxZ, y) {
+  pushTrackerLine(positions, minX, y, minZ, maxX, y, minZ);
+  pushTrackerLine(positions, maxX, y, minZ, maxX, y, maxZ);
+  pushTrackerLine(positions, maxX, y, maxZ, minX, y, maxZ);
+  pushTrackerLine(positions, minX, y, maxZ, minX, y, minZ);
+}
+
+function pushTrackerFootprint(positions, pts, y) {
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    pushTrackerLine(positions, a.x, y, a.z, b.x, y, b.z);
+  }
+}
+
+function makeBuildingTrackerFramePositions(bounds) {
+  const positions = [];
+  const width = bounds.maxX - bounds.minX;
+  const depth = bounds.maxZ - bounds.minZ;
+  const maxDim = Math.max(width, depth, 1);
+  const pad = clamp(maxDim * 0.09, 2, 18);
+  const minX = bounds.minX - pad;
+  const maxX = bounds.maxX + pad;
+  const minZ = bounds.minZ - pad;
+  const maxZ = bounds.maxZ + pad;
+  const topY = bounds.h + clamp(bounds.h * 0.035, 1.2, 5);
+  const baseY = 0.8;
+  const lenX = clamp(width * 0.35, 4, Math.max(5, maxDim * 0.42));
+  const lenZ = clamp(depth * 0.35, 4, Math.max(5, maxDim * 0.42));
+  const vLen = clamp(bounds.h * 0.22, 5, 36);
+
+  for (const xSide of [-1, 1]) {
+    for (const zSide of [-1, 1]) {
+      const x = xSide < 0 ? minX : maxX;
+      const z = zSide < 0 ? minZ : maxZ;
+      const sx = xSide < 0 ? 1 : -1;
+      const sz = zSide < 0 ? 1 : -1;
+      pushTrackerLine(positions, x, topY, z, x + sx * lenX, topY, z);
+      pushTrackerLine(positions, x, topY, z, x, topY, z + sz * lenZ);
+      pushTrackerLine(positions, x, baseY, z, x + sx * lenX * 0.62, baseY, z);
+      pushTrackerLine(positions, x, baseY, z, x, baseY, z + sz * lenZ * 0.62);
+      pushTrackerLine(positions, x, topY, z, x, Math.max(baseY, topY - vLen), z);
+      pushTrackerLine(positions, x, baseY, z, x, Math.min(topY, baseY + vLen), z);
+    }
+  }
+
+  pushTrackerFootprint(positions, bounds.pts, topY);
+  return positions;
+}
+
+function makeBuildingTrackerDetailPositions(bounds) {
+  const positions = [];
+  const width = bounds.maxX - bounds.minX;
+  const depth = bounds.maxZ - bounds.minZ;
+  const maxDim = Math.max(width, depth, 1);
+  const topY = bounds.h + clamp(bounds.h * 0.07, 2, 8);
+  const cx = bounds.cx;
+  const cz = bounds.cz;
+  const cross = clamp(maxDim * 0.16, 4, 18);
+  const tick = clamp(maxDim * 0.055, 2.5, 8);
+
+  pushTrackerLine(positions, cx - cross, topY, cz, cx + cross, topY, cz);
+  pushTrackerLine(positions, cx, topY, cz - cross, cx, topY, cz + cross);
+
+  for (let i = 1; i <= 3; i++) {
+    const t = i / 4;
+    const x = bounds.minX + (bounds.maxX - bounds.minX) * t;
+    pushTrackerLine(positions, x, topY, bounds.minZ, x, topY, bounds.minZ + tick);
+    pushTrackerLine(positions, x, topY, bounds.maxZ, x, topY, bounds.maxZ - tick);
+  }
+
+  return positions;
+}
+
+function makeBuildingTrackerScanPositions(bounds, scanT) {
+  const positions = [];
+  const width = bounds.maxX - bounds.minX;
+  const depth = bounds.maxZ - bounds.minZ;
+  const maxDim = Math.max(width, depth, 1);
+  const pad = clamp(maxDim * 0.065, 1.4, 13);
+  const minX = bounds.minX - pad;
+  const maxX = bounds.maxX + pad;
+  const minZ = bounds.minZ - pad;
+  const maxZ = bounds.maxZ + pad;
+  const y = Math.max(0.9, bounds.h * (0.12 + 0.78 * scanT));
+
+  pushTrackerRect(positions, minX, maxX, minZ, maxZ, y);
+  for (let i = 1; i <= 3; i++) {
+    const t = i / 4;
+    const x = minX + (maxX - minX) * t;
+    pushTrackerLine(positions, x, y, minZ, x, y, maxZ);
+  }
+  return positions;
+}
+
+function updateBuildingTrackerHudContent(index, bounds) {
+  const hud = ensureBuildingHoverTrackerHud();
+  const id = (index % 65536).toString(16).toUpperCase().padStart(4, '0');
+  const width = Math.max(1, bounds.maxX - bounds.minX);
+  const depth = Math.max(1, bounds.maxZ - bounds.minZ);
+  const area = Math.round(bounds.areaM2 || width * depth);
+  const idEl = hud.querySelector('[data-tracker-id]');
+  const metaEl = hud.querySelector('[data-tracker-meta]');
+  if (idEl) idEl.textContent = `BLOB ${id}`;
+  if (metaEl) metaEl.textContent = `BOX ${Math.round(width)}x${Math.round(depth)} / H ${Math.round(bounds.h)} / A ${area}`;
+}
+
+function updateBuildingTrackerHudPosition() {
+  if (!buildingHoverTrackerHud) return;
+  const opacity = clamp(buildingHoverTrackerState.opacity / BUILDING_TRACKER_MAX_ALPHA, 0, 1);
+  if (buildingHoverTrackerState.currentIndex === null || opacity <= 0.002) {
+    buildingHoverTrackerHud.style.opacity = '0';
+    return;
+  }
+
+  buildingHoverTrackerScreen.copy(buildingHoverTrackerAnchor).project(camera);
+  const visible = buildingHoverTrackerScreen.z > -1 && buildingHoverTrackerScreen.z < 1;
+  if (!visible) {
+    buildingHoverTrackerHud.style.opacity = '0';
+    return;
+  }
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = rect.left + (buildingHoverTrackerScreen.x * 0.5 + 0.5) * rect.width;
+  const y = rect.top + (-buildingHoverTrackerScreen.y * 0.5 + 0.5) * rect.height;
+  const hudW = buildingHoverTrackerHud.offsetWidth || 118;
+  const hudH = buildingHoverTrackerHud.offsetHeight || 31;
+  const labelX = clamp(x - 18, 8, window.innerWidth - hudW - 8);
+  const labelY = clamp(y - hudH - 26, 8, window.innerHeight - hudH - 8);
+  const connector = buildingHoverTrackerHud.querySelector('[data-tracker-line]');
+  if (connector) {
+    const startX = clamp(x - labelX, 12, hudW - 12);
+    const startY = hudH;
+    const dx = x - labelX - startX;
+    const dy = y - labelY - startY;
+    const length = Math.max(0, Math.hypot(dx, dy));
+    const angle = Math.atan2(dy, dx);
+    connector.style.left = `${startX.toFixed(1)}px`;
+    connector.style.top = `${startY.toFixed(1)}px`;
+    connector.style.width = `${length.toFixed(1)}px`;
+    connector.style.transform = `rotate(${angle.toFixed(4)}rad)`;
+    connector.style.opacity = `${Math.min(1, opacity * 1.15)}`;
+  }
+  buildingHoverTrackerHud.style.opacity = `${Math.min(0.9, opacity)}`;
+  buildingHoverTrackerHud.style.transform = `translate3d(${labelX.toFixed(1)}px, ${labelY.toFixed(1)}px, 0)`;
+}
+
+function setBuildingHoverTrackerTarget(index) {
+  const bounds = buildingHoverRecords[index];
+  if (!bounds) {
+    clearBuildingHoverTracker();
+    return;
+  }
+
+  ensureBuildingHoverTracker();
+  if (buildingHoverTrackerState.currentIndex !== index) {
+    buildingHoverTrackerState.currentIndex = index;
+    buildingHoverTrackerState.scanT = 0;
+    setTrackerLinePositions(buildingHoverTrackerFrame, makeBuildingTrackerFramePositions(bounds));
+    setTrackerLinePositions(buildingHoverTrackerDetail, makeBuildingTrackerDetailPositions(bounds));
+    setTrackerLinePositions(buildingHoverTrackerScan, makeBuildingTrackerScanPositions(bounds, buildingHoverTrackerState.scanT));
+    updateBuildingTrackerHudContent(index, bounds);
+  }
+
+  const anchorY = bounds.h + clamp(bounds.h * 0.38, 10, 52);
+  const anchor = wrapSpherePointCPU(bounds.cx, anchorY, bounds.cz);
+  buildingHoverTrackerAnchor.set(anchor[0], anchor[1], anchor[2]);
+  buildingHoverTrackerState.active = true;
+  buildingHoverTrackerState.targetOpacity = BUILDING_TRACKER_MAX_ALPHA;
+  buildingHoverTrackerGroup.visible = true;
+}
+
+function clearBuildingHoverTracker(immediate = false) {
+  buildingHoverTrackerState.active = false;
+  buildingHoverTrackerState.targetOpacity = 0;
+  if (immediate) {
+    buildingHoverTrackerState.opacity = 0;
+    buildingHoverTrackerState.currentIndex = null;
+    if (buildingHoverTrackerGroup) buildingHoverTrackerGroup.visible = false;
+    if (buildingHoverTrackerHud) buildingHoverTrackerHud.style.opacity = '0';
+  }
+}
+
+function updateBuildingHoverTracker(dt) {
+  if (!buildingHoverTrackerGroup) return;
+  const fadeEase = 1 - Math.exp(-BUILDING_TRACKER_FADE_SPEED * dt);
+  buildingHoverTrackerState.opacity += (buildingHoverTrackerState.targetOpacity - buildingHoverTrackerState.opacity) * fadeEase;
+
+  const opacity = clamp(buildingHoverTrackerState.opacity / BUILDING_TRACKER_MAX_ALPHA, 0, 1);
+  buildingHoverTrackerFrame.material.uniforms.uAlpha.value = opacity * 0.92;
+  buildingHoverTrackerDetail.material.uniforms.uAlpha.value = opacity * 0.42;
+  buildingHoverTrackerScan.material.uniforms.uAlpha.value = opacity * (0.38 + 0.22 * Math.sin(sharedUniforms.uTime.value * 7.5));
+
+  if (buildingHoverTrackerState.currentIndex !== null) {
+    const bounds = buildingHoverRecords[buildingHoverTrackerState.currentIndex];
+    if (bounds) {
+      buildingHoverTrackerState.scanT = (buildingHoverTrackerState.scanT + dt * BUILDING_TRACKER_SCAN_SPEED) % 1;
+      setTrackerLinePositions(buildingHoverTrackerScan, makeBuildingTrackerScanPositions(bounds, buildingHoverTrackerState.scanT));
+    }
+  }
+
+  updateBuildingTrackerHudPosition();
+
+  if (!buildingHoverTrackerState.active && buildingHoverTrackerState.opacity <= 0.002) {
+    buildingHoverTrackerGroup.visible = false;
+    buildingHoverTrackerState.currentIndex = null;
+    if (buildingHoverTrackerHud) buildingHoverTrackerHud.style.opacity = '0';
+  }
+}
+
 function setBuildingHoverEnabled(enabled, persist = true) {
   buildingHoverEnabled = Boolean(enabled);
   if (!buildingHoverEnabled) {
     clearBuildingHover();
+    clearBuildingHoverTracker(true);
     clearBuildingHighlights();
     disposeBuildingHitMesh();
   }
@@ -3528,7 +3922,9 @@ function pickBuildingFromPointer(event) {
   const hits = buildingHoverRaycaster.intersectObject(hitMesh, false);
   if (!hits.length || hits[0].faceIndex === undefined) return null;
   const index = buildingHitFaceMap[hits[0].faceIndex];
-  return buildingHoverRecords[index] ? index : null;
+  return buildingHoverRecords[index]
+    ? { index, point: hits[0].point.clone() }
+    : null;
 }
 
 function updateBuildingHoverFromPointer() {
@@ -3539,9 +3935,14 @@ function updateBuildingHoverFromPointer() {
     clearBuildingHover();
     return;
   }
-  const next = pickBuildingFromPointer(pendingBuildingHoverEvent);
-  hoveredBuildingIndex = next;
-  if (next !== null) touchBuildingHighlight(next);
+  const picked = pickBuildingFromPointer(pendingBuildingHoverEvent);
+  hoveredBuildingIndex = picked ? picked.index : null;
+  if (picked) {
+    touchBuildingHighlight(picked.index);
+    setBuildingHoverTrackerTarget(picked.index);
+  } else {
+    clearBuildingHoverTracker();
+  }
 }
 
 function scheduleBuildingHoverPick() {
@@ -3580,6 +3981,7 @@ function clearBuildingHover() {
   }
   hoveredBuildingIndex = null;
   pendingBuildingHoverEvent = null;
+  clearBuildingHoverTracker();
   disposeBuildingHitMesh();
 }
 
@@ -3676,6 +4078,7 @@ function tick() {
   updateBuildingHighlights(performance.now() / 1000);
   updateCameraAnimation(performance.now());
   if (!cameraAnimation.active) controls.update();
+  updateBuildingHoverTracker(dt);
   composer.render();
   requestAnimationFrame(tick);
 }
