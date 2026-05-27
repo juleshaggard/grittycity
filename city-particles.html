@@ -368,6 +368,10 @@
       <label>Fade Far <input id="fadeFar" type="number" min="1" step="1" /></label>
       <label>Max Polar Deg <input id="maxPolar" type="number" min="1" max="179" step="1" /></label>
     </div>
+    <div class="debug-menu__section">Scene</div>
+    <div class="debug-menu__grid">
+      <label>Orb Y Deg <input id="orbRotationDeg" type="number" min="-3600" max="3600" step="1" /></label>
+    </div>
     <div class="debug-menu__section">Camera Shots</div>
     <div class="debug-menu__actions debug-menu__actions--wrap">
       <button id="shotLowOrbit" type="button">Low Orbit</button>
@@ -479,6 +483,7 @@ const debugEls = {
   fadeNear: document.getElementById('fadeNear'),
   fadeFar: document.getElementById('fadeFar'),
   maxPolar: document.getElementById('maxPolar'),
+  orbRotationDeg: document.getElementById('orbRotationDeg'),
   cameraAnimDuration: document.getElementById('cameraAnimDuration'),
   particleScale: document.getElementById('particleScale'),
   particleAlpha: document.getElementById('particleAlpha'),
@@ -531,9 +536,10 @@ scene.background = new THREE.Color(0xffffff); // pure white, no gradient/vignett
 const CITY_CAMERA_STATE_KEY = 'city-camera-transform-v2';
 const CITY_CAMERA_ANIMATION_STATE_KEY = 'city-camera-animation-v3';
 const CITY_PARTICLE_STATE_KEY = 'city-particle-system-v2';
+const CITY_ORB_STATE_KEY = 'city-orb-settings-v1';
 const CITY_DEBUG_PANEL_STATE_KEY = 'city-debug-panel-v1';
 const CITY_BUILDING_HOVER_STATE_KEY = 'city-building-hover-v1';
-const CITY_FADE_FAR_MIGRATION_KEY = 'city-fade-far-360-v1';
+const CITY_FADE_FAR_MIGRATION_KEY = 'city-fade-far-2000-v1';
 const DEFAULT_CAMERA_X = 44.3;
 const DEFAULT_CAMERA_Y = 1735.9;
 const DEFAULT_CAMERA_Z = 0.1;
@@ -545,7 +551,7 @@ const DEFAULT_CAMERA_ZOOM = 1;
 const DEFAULT_CAMERA_NEAR = 1;
 const DEFAULT_CAMERA_FAR = 8000;
 const DEFAULT_FADE_NEAR = 8;
-const DEFAULT_FADE_FAR = 4000;
+const DEFAULT_FADE_FAR = 2000;
 const DEFAULT_MAX_POLAR_DEG = 99;
 const DEFAULT_PARTICLE_SCALE = 1;
 const DEFAULT_PARTICLE_ALPHA = 1;
@@ -566,6 +572,7 @@ const DEFAULT_TWINKLE_AMOUNT = 0.22;
 const DEFAULT_STREAM_SPEED = 1;
 const DEFAULT_TRAFFIC_SPEED = 1;
 const DEFAULT_EMBER_SPEED = 1;
+const DEFAULT_ORB_ROTATION_DEG = 0;
 const DEFAULT_CAMERA_ANIMATION_DURATION = 4;
 
 const camera = new THREE.PerspectiveCamera(
@@ -753,6 +760,7 @@ const sharedUniforms = {
   uMap: { value: sprite },
   uPixelRatio: { value: renderer.getPixelRatio() },
   uSphereR: { value: GLOBE_R },
+  uOrbRotation: { value: degToRad(DEFAULT_ORB_ROTATION_DEG) },
   // INVERTED fade — only the very-close band fades; everything else stays sharp at any orbit distance
   uFadeNear: { value: DEFAULT_FADE_NEAR }, // closer than this = fully faded (basically inside a building)
   uFadeFar:  { value: DEFAULT_FADE_FAR },  // past this = fully saturated; well below the orbit minDistance
@@ -771,6 +779,9 @@ const sharedUniforms = {
 let suppressCameraInput = false;
 let suppressParticleInput = false;
 let activeCameraShotName = 'Custom';
+const sceneSettings = {
+  orbRotationDeg: DEFAULT_ORB_ROTATION_DEG,
+};
 const particleSettings = {
   streamSpeed: DEFAULT_STREAM_SPEED,
   trafficSpeed: DEFAULT_TRAFFIC_SPEED,
@@ -1143,6 +1154,47 @@ function saveCameraAnimationState() {
   }
 }
 
+function defaultSceneState() {
+  return {
+    orbRotationDeg: DEFAULT_ORB_ROTATION_DEG,
+  };
+}
+
+function normalizeSceneState(state = {}) {
+  const defaults = defaultSceneState();
+  return {
+    orbRotationDeg: clamp(
+      Number.isFinite(state.orbRotationDeg) ? state.orbRotationDeg : defaults.orbRotationDeg,
+      -3600,
+      3600
+    ),
+  };
+}
+
+function readSavedSceneState() {
+  try {
+    const raw = localStorage.getItem(CITY_ORB_STATE_KEY);
+    return raw ? normalizeSceneState(JSON.parse(raw)) : defaultSceneState();
+  } catch (e) {
+    return defaultSceneState();
+  }
+}
+
+function sceneDebugPayload() {
+  return {
+    orbRotationDeg: roundForDebug(sceneSettings.orbRotationDeg, 3),
+    orbRotationRad: roundForDebug(sharedUniforms.uOrbRotation.value, 5),
+  };
+}
+
+function saveSceneState() {
+  try {
+    localStorage.setItem(CITY_ORB_STATE_KEY, JSON.stringify(sceneDebugPayload()));
+  } catch (e) {
+    console.warn('Unable to save city scene settings:', e);
+  }
+}
+
 function defaultParticleState() {
   return {
     pointScale: DEFAULT_PARTICLE_SCALE,
@@ -1255,6 +1307,7 @@ function updateDebugData() {
     debugEls.data.value = JSON.stringify({
       camera: cameraDebugPayload(),
       cameraAnimation: cameraAnimationPayload(),
+      scene: sceneDebugPayload(),
       particles: particleDebugPayload(),
       interaction: buildingHoverDebugPayload(),
     }, null, 2);
@@ -1311,6 +1364,12 @@ function cameraInputs() {
   ].filter(Boolean);
 }
 
+function sceneInputs() {
+  return [
+    debugEls.orbRotationDeg,
+  ].filter(Boolean);
+}
+
 function particleInputs() {
   return [
     debugEls.particleScale,
@@ -1355,6 +1414,16 @@ function updateCameraDebug() {
   debugEls.fadeFar.value = sharedUniforms.uFadeFar.value.toFixed(1);
   debugEls.maxPolar.value = radToDeg(controls.maxPolarAngle).toFixed(1);
   suppressCameraInput = false;
+  updateDebugData();
+}
+
+function updateSceneDebug() {
+  if (!debugEls.orbRotationDeg) return;
+  if (sceneInputs().includes(document.activeElement)) {
+    updateDebugData();
+    return;
+  }
+  debugEls.orbRotationDeg.value = sceneSettings.orbRotationDeg.toFixed(1);
   updateDebugData();
 }
 
@@ -1531,6 +1600,23 @@ function updateCameraAnimation(now) {
   }
 }
 
+function applySceneState(state, persist = true) {
+  const next = normalizeSceneState(state);
+  sceneSettings.orbRotationDeg = next.orbRotationDeg;
+  sharedUniforms.uOrbRotation.value = degToRad(next.orbRotationDeg);
+  disposeBuildingHitMesh();
+  clearBuildingHover();
+  if (persist) saveSceneState();
+  updateSceneDebug();
+}
+
+function applySceneDebugInputs() {
+  const orbRotationDeg = parseFloat(debugEls.orbRotationDeg.value);
+  applySceneState({
+    orbRotationDeg: Number.isFinite(orbRotationDeg) ? orbRotationDeg : sceneSettings.orbRotationDeg,
+  });
+}
+
 function applyParticleState(state, persist = true) {
   const next = normalizeParticleState(state);
   sharedUniforms.uPointScale.value = next.pointScale;
@@ -1640,6 +1726,10 @@ for (const input of cameraInputs()) {
   input.addEventListener('input', applyCameraDebugInputs);
 }
 
+for (const input of sceneInputs()) {
+  input.addEventListener('input', applySceneDebugInputs);
+}
+
 for (const input of particleInputs()) {
   input.addEventListener('input', applyParticleDebugInputs);
 }
@@ -1714,11 +1804,13 @@ window.addEventListener('keydown', (event) => {
 
 applyCameraState(readSavedCameraState(), false);
 Object.assign(cameraAnimation, readSavedCameraAnimationState(), { active: false, startedAt: 0 });
+applySceneState(readSavedSceneState(), false);
 applyParticleState(readSavedParticleState(), false);
 setBuildingHoverEnabled(readBuildingHoverEnabled(), false);
 setDebugPanelCollapsed(readDebugPanelCollapsed(), false);
 updateCameraDebug();
 updateCameraAnimationDebug();
+updateSceneDebug();
 updateParticleDebug();
 updateBuildingHoverDebug();
 
@@ -1734,6 +1826,7 @@ const vert = /* glsl */`
   uniform float uPixelRatio;
   uniform float uSizeScale;
   uniform float uSphereR;
+  uniform float uOrbRotation;
   uniform float uFadeNear;
   uniform float uFadeFar;
   uniform float uWobble;
@@ -1741,13 +1834,19 @@ const vert = /* glsl */`
   uniform float uTwinkleSpeed;
   uniform float uTwinkleAmount;
 
+  vec3 rotateOrbY(vec3 p) {
+    float c = cos(uOrbRotation);
+    float s = sin(uOrbRotation);
+    return vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
+  }
+
   // Wrap a flat (x, y, z) plane point onto a sphere of radius R.
   // The plane's origin sits on top of the sphere (north pole),
   // (x, z) become arc-lengths in two perpendicular directions,
   // y becomes radial elevation above the surface.
   vec3 wrapSphere(vec3 p) {
     float R = uSphereR;
-    if (R < 1.0) return p;
+    if (R < 1.0) return rotateOrbY(p);
     float ax = p.z / R;
     float az = -p.x / R;
     float cx = cos(ax), sx = sin(ax);
@@ -1756,7 +1855,7 @@ const vert = /* glsl */`
     vec3 dir = vec3(d.x * cz - d.y * sz,
                     d.x * sz + d.y * cz,
                     d.z);
-    return vec3(0.0, -R, 0.0) + dir * (R + p.y);
+    return rotateOrbY(vec3(0.0, -R, 0.0) + dir * (R + p.y));
   }
 
   void main() {
@@ -2255,9 +2354,25 @@ function buildFromOSM(data) {
   setBootVisionStatus(`${osmProjected.length.toLocaleString()} map objects indexed`);
 }
 
+function rotateOrbPointCPU(x, y, z, angle = sharedUniforms.uOrbRotation.value) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [x * c + z * s, y, -x * s + z * c];
+}
+
+function inverseRotateOrbPointCPU(point, angle = sharedUniforms.uOrbRotation.value) {
+  const c = Math.cos(-angle);
+  const s = Math.sin(-angle);
+  return {
+    x: point.x * c + point.z * s,
+    y: point.y,
+    z: -point.x * s + point.z * c,
+  };
+}
+
 function wrapSpherePointCPU(x, y, z) {
   const R = GLOBE_R;
-  if (R < 1) return [x, y, z];
+  if (R < 1) return rotateOrbPointCPU(x, y, z);
   const ax = z / R;
   const az = -x / R;
   const cx = Math.cos(ax), sx = Math.sin(ax);
@@ -2268,7 +2383,7 @@ function wrapSpherePointCPU(x, y, z) {
   const dirX = dx * cz - dy * sz;
   const dirY = dx * sz + dy * cz;
   const dirZ = dz;
-  return [dirX * (R + y), -R + dirY * (R + y), dirZ * (R + y)];
+  return rotateOrbPointCPU(dirX * (R + y), -R + dirY * (R + y), dirZ * (R + y));
 }
 
 function footprintArea(pts) {
@@ -2816,12 +2931,19 @@ function buildRiverPoints(riverWays) {
 // the vertex shader so the boxes curve onto the globe just like the points.
 const meshVert = /* glsl */`
   uniform float uSphereR;
+  uniform float uOrbRotation;
   uniform float uFadeNear;
   uniform float uFadeFar;
   varying vec3 vNormalW;
   varying vec3 vWorldPos;
   varying vec3 vCullWorldPos;
   varying float vFade;
+
+  vec3 rotateOrbY(vec3 p) {
+    float c = cos(uOrbRotation);
+    float s = sin(uOrbRotation);
+    return vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
+  }
 
   void main() {
     vec3 wp;
@@ -2853,6 +2975,9 @@ const meshVert = /* glsl */`
       cullWp = Rot * vec3(0.0, R, 0.0) + vec3(0.0, -R, 0.0);
       wn = normalize(Rot * normal);
     }
+    wp = rotateOrbY(wp);
+    cullWp = rotateOrbY(cullWp);
+    wn = normalize(rotateOrbY(wn));
     vNormalW = wn;
     vWorldPos = wp;
     vCullWorldPos = cullWp;
@@ -2976,6 +3101,14 @@ function buildBuildingMeshes(projected) {
   // DoubleSide rendering ensures every footprint prism pixel has a depth value.
   const occluderVert = `
     uniform float uSphereR;
+    uniform float uOrbRotation;
+
+    vec3 rotateOrbY(vec3 p) {
+      float c = cos(uOrbRotation);
+      float s = sin(uOrbRotation);
+      return vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
+    }
+
     void main() {
       vec3 wp;
       if (uSphereR < 1.0) {
@@ -2991,13 +3124,14 @@ function buildBuildingMeshes(projected) {
         mat3 Rot = Rz * Rx;
         wp = Rot * vec3(0.0, R + position.y, 0.0) + vec3(0.0, -R, 0.0);
       }
+      wp = rotateOrbY(wp);
       gl_Position = projectionMatrix * modelViewMatrix * vec4(wp, 1.0);
     }
   `;
   const occluderFrag = `void main() { gl_FragColor = vec4(0.0); }`;
 
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uSphereR: sharedUniforms.uSphereR },
+    uniforms: { uSphereR: sharedUniforms.uSphereR, uOrbRotation: sharedUniforms.uOrbRotation },
     vertexShader: occluderVert,
     fragmentShader: occluderFrag,
     side: THREE.DoubleSide,
@@ -3017,11 +3151,18 @@ function buildBuildingMeshes(projected) {
 // ---------- BUILDING WIREFRAMES — thin grey outlines from actual OSM footprints ----------
 const wireVert = /* glsl */`
   uniform float uSphereR;
+  uniform float uOrbRotation;
   uniform float uFadeNear;
   uniform float uFadeFar;
   varying float vFade;
   varying float vBackface;
   varying float vDepthLayer;
+
+  vec3 rotateOrbY(vec3 p) {
+    float c = cos(uOrbRotation);
+    float s = sin(uOrbRotation);
+    return vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
+  }
 
   void main() {
     vec3 wp;
@@ -3042,6 +3183,8 @@ const wireVert = /* glsl */`
       wp = Rot * local + vec3(0.0, -R, 0.0);
       cullWp = Rot * vec3(0.0, R, 0.0) + vec3(0.0, -R, 0.0);
     }
+    wp = rotateOrbY(wp);
+    cullWp = rotateOrbY(cullWp);
     vec3 outN = normalize(cullWp - vec3(0.0, -uSphereR, 0.0));
     vec3 toCam = normalize(cameraPosition - cullWp);
     vBackface = dot(outN, toCam);
@@ -3107,6 +3250,7 @@ function buildBuildingWireframes(projected) {
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uSphereR:  sharedUniforms.uSphereR,
+      uOrbRotation: sharedUniforms.uOrbRotation,
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar:  sharedUniforms.uFadeFar,
       uBgColor:  sharedUniforms.uBgColor,
@@ -3446,6 +3590,7 @@ function makeBuildingTrackerMaterial(color, alpha) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uSphereR: sharedUniforms.uSphereR,
+      uOrbRotation: sharedUniforms.uOrbRotation,
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar: sharedUniforms.uFadeFar,
       uBgColor: sharedUniforms.uBgColor,
@@ -3742,6 +3887,7 @@ function createBuildingHighlight(index) {
   const fillMat = new THREE.ShaderMaterial({
     uniforms: {
       uSphereR: sharedUniforms.uSphereR,
+      uOrbRotation: sharedUniforms.uOrbRotation,
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar: sharedUniforms.uFadeFar,
       uBgColor: sharedUniforms.uBgColor,
@@ -3765,6 +3911,7 @@ function createBuildingHighlight(index) {
   const lineMat = new THREE.ShaderMaterial({
     uniforms: {
       uSphereR: sharedUniforms.uSphereR,
+      uOrbRotation: sharedUniforms.uOrbRotation,
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar: sharedUniforms.uFadeFar,
       uBgColor: sharedUniforms.uBgColor,
@@ -3803,10 +3950,11 @@ function touchBuildingHighlight(index) {
 
 function unwrapSpherePointCPU(point) {
   const R = GLOBE_R;
-  if (R < 1) return { x: point.x, z: point.z };
-  const dx = point.x;
-  const dy = point.y + R;
-  const dz = point.z;
+  const unrotated = inverseRotateOrbPointCPU(point);
+  if (R < 1) return { x: unrotated.x, z: unrotated.z };
+  const dx = unrotated.x;
+  const dy = unrotated.y + R;
+  const dz = unrotated.z;
   const len = Math.max(0.0001, Math.hypot(dx, dy, dz));
   const dirX = dx / len;
   const dirY = dy / len;
@@ -3826,9 +3974,9 @@ function flatPointFromPointer(event) {
   buildingHoverPointer.set(x * 2 - 1, -(y * 2 - 1));
   buildingHoverRaycaster.setFromCamera(buildingHoverPointer, camera);
   if (GLOBE_R < 1) {
-    return buildingHoverRaycaster.ray.intersectPlane(buildingHoverFlatPlane, buildingHoverHitPoint)
-      ? { x: buildingHoverHitPoint.x, z: buildingHoverHitPoint.z }
-      : null;
+    if (!buildingHoverRaycaster.ray.intersectPlane(buildingHoverFlatPlane, buildingHoverHitPoint)) return null;
+    const unrotated = inverseRotateOrbPointCPU(buildingHoverHitPoint);
+    return { x: unrotated.x, z: unrotated.z };
   }
 
   return buildingHoverRaycaster.ray.intersectSphere(buildingHoverSphere, buildingHoverHitPoint)
