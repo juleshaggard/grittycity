@@ -1,0 +1,2404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Energy Generation Plant - Wireframe Particle Simulation</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #ffffff;
+    color: #2a2a2e;
+    font-family: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+  }
+  #app {
+    position: fixed;
+    inset: 0;
+  }
+  canvas {
+    display: block;
+  }
+  #app > canvas {
+    opacity: 0;
+    filter: contrast(1.18) brightness(1.06);
+    transition:
+      opacity 1.1s cubic-bezier(0.16, 1, 0.3, 1),
+      filter 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  body.scene-ready #app > canvas {
+    opacity: 1;
+    filter: none;
+  }
+  .page-nav {
+    position: fixed;
+    top: 18px;
+    left: 22px;
+    z-index: 60;
+    display: flex;
+    gap: 20px;
+    font-size: 10.5px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+  }
+  .page-nav a {
+    color: rgba(40, 40, 48, 0.45);
+    text-decoration: none;
+    padding-bottom: 4px;
+    border-bottom: 1px solid transparent;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .page-nav a:hover {
+    color: rgba(20, 20, 24, 0.85);
+  }
+  .page-nav a.active {
+    color: rgba(20, 20, 24, 0.95);
+    border-bottom-color: rgba(20, 20, 24, 0.35);
+  }
+  .corner {
+    position: fixed;
+    right: 22px;
+    top: 18px;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    line-height: 1.35;
+    text-align: right;
+    text-transform: uppercase;
+    color: rgba(40, 40, 48, 0.5);
+    pointer-events: none;
+    user-select: none;
+  }
+  .corner small {
+    display: block;
+    margin-top: 4px;
+    color: rgba(40, 40, 48, 0.35);
+    font-size: 9px;
+  }
+  .hud {
+    position: fixed;
+    left: 20px;
+    bottom: 18px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(40, 40, 48, 0.55);
+    pointer-events: none;
+    user-select: none;
+  }
+  .hud b {
+    color: rgba(20, 20, 24, 0.85);
+    font-weight: 500;
+  }
+  .plant-readout {
+    position: fixed;
+    left: 20px;
+    bottom: 46px;
+    z-index: 45;
+    min-width: 238px;
+    padding: 12px 13px;
+    border: 1px solid rgba(40, 40, 48, 0.12);
+    background: rgba(255, 255, 255, 0.82);
+    color: rgba(32, 32, 36, 0.7);
+    font: 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  .plant-readout strong {
+    display: block;
+    margin-bottom: 7px;
+    color: rgba(20, 20, 24, 0.86);
+    font-weight: 500;
+    letter-spacing: 0.22em;
+  }
+  .plant-readout span {
+    display: block;
+    margin-top: 4px;
+  }
+  body.hide-telemetry .plant-readout {
+    display: none;
+  }
+  .debug-menu {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 70;
+    width: 306px;
+    max-height: calc(100vh - 36px);
+    overflow: auto;
+    padding: 12px;
+    background: rgba(250, 250, 252, 0.94);
+    border: 1px solid rgba(40, 40, 48, 0.14);
+    color: rgba(28, 28, 32, 0.78);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: 0 12px 34px rgba(40, 40, 48, 0.08);
+  }
+  .debug-menu__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    color: rgba(20, 20, 24, 0.9);
+    letter-spacing: 0.18em;
+  }
+  .debug-menu__title {
+    display: grid;
+    gap: 3px;
+  }
+  .debug-menu__title small {
+    color: rgba(40, 40, 48, 0.42);
+    font-size: 8px;
+    letter-spacing: 0.14em;
+  }
+  .debug-menu__section {
+    margin: 11px 0 7px;
+    color: rgba(20, 20, 24, 0.78);
+    letter-spacing: 0.18em;
+  }
+  .debug-menu__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .debug-menu label {
+    display: grid;
+    gap: 4px;
+  }
+  .debug-menu__check {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+  .debug-menu input,
+  .debug-menu textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(40, 40, 48, 0.16);
+    background: rgba(255, 255, 255, 0.82);
+    color: rgba(20, 20, 24, 0.82);
+    font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0;
+    padding: 6px;
+    outline: none;
+  }
+  .debug-menu input:focus,
+  .debug-menu textarea:focus {
+    border-color: rgba(20, 20, 24, 0.38);
+  }
+  .debug-menu input[type="color"] {
+    min-height: 28px;
+    padding: 2px;
+  }
+  .debug-menu input[type="checkbox"] {
+    width: auto;
+  }
+  .debug-menu textarea {
+    height: 116px;
+    margin-top: 8px;
+    resize: none;
+    text-transform: none;
+  }
+  .debug-menu__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .debug-menu__actions--wrap button {
+    min-width: 120px;
+  }
+  .debug-menu button {
+    flex: 1;
+    min-width: 74px;
+    border: 1px solid rgba(40, 40, 48, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 7px 8px;
+    color: rgba(20, 20, 24, 0.76);
+    font: inherit;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .debug-menu button:hover {
+    background: rgba(252, 225, 50, 0.24);
+    border-color: rgba(40, 40, 48, 0.28);
+  }
+  .debug-menu button.active {
+    background: rgba(252, 225, 50, 0.42);
+    border-color: rgba(40, 40, 48, 0.34);
+    color: rgba(20, 20, 24, 0.9);
+  }
+  .debug-menu__toggle {
+    flex: 0 0 auto !important;
+    min-width: 58px !important;
+    padding: 6px 8px !important;
+  }
+  .debug-menu.is-collapsed {
+    width: 150px;
+    overflow: visible;
+  }
+  .debug-menu.is-collapsed .debug-menu__head {
+    margin-bottom: 0;
+  }
+  .debug-menu.is-collapsed .debug-menu__body {
+    display: none;
+  }
+  #loader {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 14px;
+    background: #ffffff;
+    pointer-events: none;
+    transition: opacity 0.8s ease;
+  }
+  #loader.gone {
+    opacity: 0;
+  }
+  .ring {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid rgba(40, 40, 48, 0.15);
+    border-top-color: rgba(20, 20, 24, 0.75);
+    animation: spin 1.1s linear infinite;
+  }
+  .lbl {
+    min-width: 300px;
+    text-align: center;
+    font-size: 10.5px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(40, 40, 48, 0.6);
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  @media (max-width: 760px) {
+    .page-nav {
+      top: 16px;
+      left: 18px;
+      gap: 15px;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+    }
+    .corner {
+      top: 50px;
+      left: 18px;
+      right: 18px;
+      max-width: calc(100vw - 36px);
+      text-align: left;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+    }
+    .corner small {
+      font-size: 8px;
+    }
+    .hud {
+      left: 16px;
+      right: 16px;
+      bottom: 94px;
+      font-size: 10px;
+      line-height: 1.6;
+    }
+    .plant-readout {
+      display: none;
+    }
+    .debug-menu {
+      left: 16px;
+      right: 16px;
+      bottom: 14px;
+      width: auto;
+    }
+    .debug-menu.is-collapsed {
+      left: auto;
+      width: 150px;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="page-nav" aria-label="Scene pages">
+  <a href="city-particles.html">City</a>
+  <a href="solar-panel-farm.html">Solar farm</a>
+  <a class="active" href="energy-generation-plant.html">Generation</a>
+</nav>
+<div id="loader">
+  <div class="ring"></div>
+  <div class="lbl" id="lblText">Tracing generation plant systems...</div>
+</div>
+<div class="corner">
+  ENERGY GENERATION PLANT - WIRE TURBINE FIELD
+  <small id="plantHudStatus">TURBINES -- · GRID FLOW 1.00 · CITY HAZE 0.72</small>
+</div>
+<div class="hud">
+  <b>drag</b> to orbit &nbsp;-&nbsp; <b>scroll</b> to zoom &nbsp;-&nbsp; <b>middle/right-drag</b> to pan
+</div>
+<div class="plant-readout">
+  <strong>Plant telemetry</strong>
+  <span id="readoutOutput">Output stabilizing</span>
+  <span id="readoutSteam">Haze vectors indexing</span>
+  <span id="readoutGrid">Substation bus lines online</span>
+</div>
+<div class="debug-menu" id="plantDebug">
+  <div class="debug-menu__head">
+    <div class="debug-menu__title">
+      <span>Debug</span>
+      <small>Generation camera</small>
+    </div>
+    <button class="debug-menu__toggle" id="toggleDebugPanel" type="button">Hide</button>
+  </div>
+  <div class="debug-menu__body">
+    <div class="debug-menu__section">Camera</div>
+    <div class="debug-menu__grid">
+      <label>Cam X <input id="cameraX" type="number" step="1" /></label>
+      <label>Cam Y <input id="cameraY" type="number" step="1" /></label>
+      <label>Cam Z <input id="cameraZ" type="number" step="1" /></label>
+      <label>FOV <input id="cameraFov" type="number" min="20" max="100" step="1" /></label>
+      <label>Zoom <input id="cameraZoom" type="number" min="0.1" max="10" step="0.01" /></label>
+      <label>Clip Near <input id="cameraNear" type="number" min="0.01" step="0.1" /></label>
+      <label>Clip Far <input id="cameraFar" type="number" min="1" step="100" /></label>
+      <label>Target X <input id="targetX" type="number" step="1" /></label>
+      <label>Target Y <input id="targetY" type="number" step="1" /></label>
+      <label>Target Z <input id="targetZ" type="number" step="1" /></label>
+      <label>Fade Near <input id="fadeNear" type="number" min="0" step="1" /></label>
+      <label>Fade Far <input id="fadeFar" type="number" min="1" step="1" /></label>
+      <label>Max Polar Deg <input id="maxPolar" type="number" min="1" max="179" step="1" /></label>
+    </div>
+    <div class="debug-menu__section">Scene</div>
+    <div class="debug-menu__grid">
+      <label>Orb Y Deg <input id="orbRotationDeg" type="number" min="-3600" max="3600" step="1" /></label>
+    </div>
+    <div class="debug-menu__section">Camera Shots</div>
+    <div class="debug-menu__actions debug-menu__actions--wrap">
+      <button id="shotLowOrbit" type="button">Low Orbit</button>
+      <button id="shotTopographic" type="button">Topographic</button>
+      <button id="shotMacro" type="button">Macro</button>
+      <button id="shotHorizonSweep" type="button">Horizon Sweep</button>
+    </div>
+    <div class="debug-menu__section">Camera Move</div>
+    <div class="debug-menu__grid">
+      <label>Time S <input id="cameraAnimDuration" type="number" min="0.1" max="120" step="0.1" /></label>
+    </div>
+    <div class="debug-menu__actions">
+      <button id="setCameraKeyA" type="button">Set A</button>
+      <button id="setCameraKeyB" type="button">Set B</button>
+      <button id="setCameraKeyC" type="button">Set C</button>
+    </div>
+    <div class="debug-menu__actions">
+      <button id="returnCameraKeyA" type="button">Return to A</button>
+      <button id="returnCameraKeyB" type="button">Return to B</button>
+      <button id="returnCameraKeyC" type="button">Return to C</button>
+    </div>
+    <div class="debug-menu__actions">
+      <button id="playCameraMove" type="button">Play</button>
+      <button id="resetCameraMove" type="button">Reset</button>
+    </div>
+    <div class="debug-menu__section">Particles</div>
+    <div class="debug-menu__grid">
+      <label>Point Scale <input id="particleScale" type="number" min="0.1" max="5" step="0.05" /></label>
+      <label>Point Alpha <input id="particleAlpha" type="number" min="0" max="3" step="0.05" /></label>
+      <label>Point Density <input id="particleDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Atmo Density <input id="particleAtmosphereDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Haze Density <input id="particleSteamDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Flow Density <input id="particleFlowDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Point Color <input id="particleColor" type="color" /></label>
+      <label>Color Mix <input id="particleColorMix" type="number" min="0" max="1" step="0.05" /></label>
+      <label>Point Blur <input id="particleBlur" type="number" min="0" max="1" step="0.05" /></label>
+      <label>Wobble <input id="particleWobble" type="number" min="0" max="4" step="0.05" /></label>
+      <label>Twinkle Speed <input id="twinkleSpeed" type="number" min="0" max="8" step="0.1" /></label>
+      <label>Twinkle Amt <input id="twinkleAmount" type="number" min="0" max="1" step="0.05" /></label>
+      <label>Haze Speed <input id="steamSpeed" type="number" min="0" max="5" step="0.05" /></label>
+      <label>Flow Speed <input id="flowSpeed" type="number" min="0" max="5" step="0.05" /></label>
+    </div>
+    <div class="debug-menu__section">Interaction</div>
+    <div class="debug-menu__grid">
+      <label class="debug-menu__check">Telemetry HUD <input id="telemetryHudEnabled" type="checkbox" /></label>
+    </div>
+    <textarea id="debugData" readonly spellcheck="false"></textarea>
+    <div class="debug-menu__actions">
+      <button id="copyDebugData" type="button">Copy</button>
+      <button id="resetCameraData" type="button">Reset Cam</button>
+      <button id="resetParticleData" type="button">Reset Particles</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const container = document.getElementById('app');
+const loader = document.getElementById('loader');
+const lblText = document.getElementById('lblText');
+const hudStatus = document.getElementById('plantHudStatus');
+const readoutOutput = document.getElementById('readoutOutput');
+const readoutSteam = document.getElementById('readoutSteam');
+const readoutGrid = document.getElementById('readoutGrid');
+const debugEls = {
+  panel: document.getElementById('plantDebug'),
+  cameraX: document.getElementById('cameraX'),
+  cameraY: document.getElementById('cameraY'),
+  cameraZ: document.getElementById('cameraZ'),
+  cameraFov: document.getElementById('cameraFov'),
+  cameraZoom: document.getElementById('cameraZoom'),
+  cameraNear: document.getElementById('cameraNear'),
+  cameraFar: document.getElementById('cameraFar'),
+  targetX: document.getElementById('targetX'),
+  targetY: document.getElementById('targetY'),
+  targetZ: document.getElementById('targetZ'),
+  fadeNear: document.getElementById('fadeNear'),
+  fadeFar: document.getElementById('fadeFar'),
+  maxPolar: document.getElementById('maxPolar'),
+  orbRotationDeg: document.getElementById('orbRotationDeg'),
+  cameraAnimDuration: document.getElementById('cameraAnimDuration'),
+  particleScale: document.getElementById('particleScale'),
+  particleAlpha: document.getElementById('particleAlpha'),
+  particleDensity: document.getElementById('particleDensity'),
+  particleAtmosphereDensity: document.getElementById('particleAtmosphereDensity'),
+  particleSteamDensity: document.getElementById('particleSteamDensity'),
+  particleFlowDensity: document.getElementById('particleFlowDensity'),
+  particleColor: document.getElementById('particleColor'),
+  particleColorMix: document.getElementById('particleColorMix'),
+  particleBlur: document.getElementById('particleBlur'),
+  particleWobble: document.getElementById('particleWobble'),
+  twinkleSpeed: document.getElementById('twinkleSpeed'),
+  twinkleAmount: document.getElementById('twinkleAmount'),
+  steamSpeed: document.getElementById('steamSpeed'),
+  flowSpeed: document.getElementById('flowSpeed'),
+  telemetryHudEnabled: document.getElementById('telemetryHudEnabled'),
+  data: document.getElementById('debugData'),
+  togglePanel: document.getElementById('toggleDebugPanel'),
+  copy: document.getElementById('copyDebugData'),
+  resetCamera: document.getElementById('resetCameraData'),
+  resetParticles: document.getElementById('resetParticleData'),
+  setCameraKeyA: document.getElementById('setCameraKeyA'),
+  setCameraKeyB: document.getElementById('setCameraKeyB'),
+  setCameraKeyC: document.getElementById('setCameraKeyC'),
+  returnCameraKeyA: document.getElementById('returnCameraKeyA'),
+  returnCameraKeyB: document.getElementById('returnCameraKeyB'),
+  returnCameraKeyC: document.getElementById('returnCameraKeyC'),
+  playCameraMove: document.getElementById('playCameraMove'),
+  resetCameraMove: document.getElementById('resetCameraMove'),
+  shotLowOrbit: document.getElementById('shotLowOrbit'),
+  shotTopographic: document.getElementById('shotTopographic'),
+  shotMacro: document.getElementById('shotMacro'),
+  shotHorizonSweep: document.getElementById('shotHorizonSweep'),
+};
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0xffffff, 1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+const DEFAULT_CAMERA_X = 520;
+const DEFAULT_CAMERA_Y = 260;
+const DEFAULT_CAMERA_Z = 650;
+const DEFAULT_TARGET_X = 12;
+const DEFAULT_TARGET_Y = 44;
+const DEFAULT_TARGET_Z = 8;
+const DEFAULT_CAMERA_FOV = 58;
+const DEFAULT_CAMERA_ZOOM = 1;
+const DEFAULT_CAMERA_NEAR = 0.5;
+const DEFAULT_CAMERA_FAR = 7000;
+const DEFAULT_FADE_NEAR = 12;
+const DEFAULT_FADE_FAR = 780;
+const DEFAULT_MAX_POLAR_DEG = 108;
+const DEFAULT_ORB_ROTATION_DEG = 0;
+const DEFAULT_CAMERA_ANIMATION_DURATION = 5.5;
+const DEFAULT_PARTICLE_SCALE = 1;
+const DEFAULT_PARTICLE_ALPHA = 0.92;
+const DEFAULT_PARTICLE_DENSITY = 1;
+const DEFAULT_ATMOSPHERE_DENSITY = 3;
+const DEFAULT_STEAM_DENSITY = 3;
+const DEFAULT_FLOW_DENSITY = 3;
+const PARTICLE_DENSITY_MAX = 10;
+const DEFAULT_PARTICLE_COLOR = '#a4a4aa';
+const DEFAULT_PARTICLE_COLOR_MIX = 0.12;
+const DEFAULT_PARTICLE_BLUR = 0.74;
+const DEFAULT_PARTICLE_WOBBLE = 0.34;
+const DEFAULT_TWINKLE_SPEED = 1.45;
+const DEFAULT_TWINKLE_AMOUNT = 0.2;
+const DEFAULT_STEAM_SPEED = 0.72;
+const DEFAULT_FLOW_SPEED = 1;
+const ATMOSPHERE_POOL_MULTIPLIER = 3;
+const STEAM_POOL_MULTIPLIER = 3;
+const FLOW_POOL_MULTIPLIER = 3;
+const CAMERA_STATE_KEY = 'generation-camera-transform-v1';
+const CAMERA_ANIMATION_STATE_KEY = 'generation-camera-animation-v1';
+const SCENE_STATE_KEY = 'generation-scene-settings-v2';
+const PARTICLE_STATE_KEY = 'generation-particle-settings-v1';
+const DEBUG_PANEL_STATE_KEY = 'generation-debug-panel-v1';
+const TELEMETRY_STATE_KEY = 'generation-telemetry-hud-v1';
+
+const camera = new THREE.PerspectiveCamera(
+  DEFAULT_CAMERA_FOV,
+  window.innerWidth / window.innerHeight,
+  DEFAULT_CAMERA_NEAR,
+  DEFAULT_CAMERA_FAR
+);
+camera.position.set(DEFAULT_CAMERA_X, DEFAULT_CAMERA_Y, DEFAULT_CAMERA_Z);
+camera.zoom = DEFAULT_CAMERA_ZOOM;
+camera.updateProjectionMatrix();
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.065;
+controls.minDistance = 90;
+controls.maxDistance = 2500;
+controls.maxPolarAngle = THREE.MathUtils.degToRad(DEFAULT_MAX_POLAR_DEG);
+controls.target.set(DEFAULT_TARGET_X, DEFAULT_TARGET_Y, DEFAULT_TARGET_Z);
+controls.mouseButtons = {
+  LEFT: THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.PAN,
+  RIGHT: THREE.MOUSE.PAN,
+};
+
+const GLOBE_R = 4200;
+const greyDark = new THREE.Color('#595b62');
+const greyMid = new THREE.Color('#898a91');
+const greyLight = new THREE.Color('#bfc0c7');
+const greyMist = new THREE.Color('#d9dadd');
+const accentYellow = new THREE.Color('#FCE132');
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function degToRad(deg) {
+  return deg * Math.PI / 180;
+}
+
+function radToDeg(rad) {
+  return rad * 180 / Math.PI;
+}
+
+function rand(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function smoothstep(edge0, edge1, x) {
+  const t = clamp((x - edge0) / Math.max(0.0001, edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function makeSpriteTexture() {
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0.00, 'rgba(255,255,255,1.00)');
+  g.addColorStop(0.10, 'rgba(255,255,255,0.86)');
+  g.addColorStop(0.30, 'rgba(255,255,255,0.42)');
+  g.addColorStop(0.58, 'rgba(255,255,255,0.14)');
+  g.addColorStop(0.82, 'rgba(255,255,255,0.04)');
+  g.addColorStop(1.00, 'rgba(255,255,255,0.00)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const sprite = makeSpriteTexture();
+const sharedUniforms = {
+  uTime: { value: 0 },
+  uMap: { value: sprite },
+  uPixelRatio: { value: renderer.getPixelRatio() },
+  uSphereR: { value: GLOBE_R },
+  uOrbRotation: { value: degToRad(DEFAULT_ORB_ROTATION_DEG) },
+  uFadeNear: { value: DEFAULT_FADE_NEAR },
+  uFadeFar: { value: DEFAULT_FADE_FAR },
+  uBgColor: { value: new THREE.Color(0xffffff) },
+  uWobble: { value: DEFAULT_PARTICLE_WOBBLE },
+  uPointScale: { value: DEFAULT_PARTICLE_SCALE },
+  uPointAlpha: { value: DEFAULT_PARTICLE_ALPHA },
+  uPointDensity: { value: DEFAULT_PARTICLE_DENSITY },
+  uPointColor: { value: new THREE.Color(DEFAULT_PARTICLE_COLOR) },
+  uPointColorMix: { value: DEFAULT_PARTICLE_COLOR_MIX },
+  uPointBlur: { value: DEFAULT_PARTICLE_BLUR },
+  uTwinkleSpeed: { value: DEFAULT_TWINKLE_SPEED },
+  uTwinkleAmount: { value: DEFAULT_TWINKLE_AMOUNT },
+};
+const particleDensityUniforms = {
+  atmosphere: { value: DEFAULT_ATMOSPHERE_DENSITY },
+  steam: { value: DEFAULT_STEAM_DENSITY },
+  flow: { value: DEFAULT_FLOW_DENSITY },
+};
+const sceneSettings = {
+  orbRotationDeg: DEFAULT_ORB_ROTATION_DEG,
+};
+const particleSettings = {
+  steamSpeed: DEFAULT_STEAM_SPEED,
+  flowSpeed: DEFAULT_FLOW_SPEED,
+};
+const cameraAnimation = {
+  active: false,
+  startedAt: 0,
+  duration: DEFAULT_CAMERA_ANIMATION_DURATION,
+  keyA: null,
+  keyB: null,
+  keyC: null,
+};
+let suppressCameraInput = false;
+let suppressSceneInput = false;
+let suppressParticleInput = false;
+let activeCameraShotName = 'Custom';
+let applyingProgrammaticCameraState = false;
+
+const pointVert = /* glsl */`
+  attribute float aSize;
+  attribute float aPhase;
+  varying vec3 vColor;
+  varying float vTwinkle;
+  varying float vFade;
+  varying float vBackface;
+  varying float vDensitySeed;
+  uniform float uTime;
+  uniform float uPixelRatio;
+  uniform float uSizeScale;
+  uniform float uSphereR;
+  uniform float uOrbRotation;
+  uniform float uFadeNear;
+  uniform float uFadeFar;
+  uniform float uWobble;
+  uniform float uPointScale;
+  uniform float uTwinkleSpeed;
+  uniform float uTwinkleAmount;
+
+  vec3 rotateOrbY(vec3 p) {
+    float c = cos(uOrbRotation);
+    float s = sin(uOrbRotation);
+    return vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
+  }
+
+  vec3 wrapSphere(vec3 p) {
+    float R = uSphereR;
+    if (R < 1.0) return rotateOrbY(p);
+    float ax = p.z / R;
+    float az = -p.x / R;
+    float cx = cos(ax), sx = sin(ax);
+    vec3 d = vec3(0.0, cx, sx);
+    float cz = cos(az), sz = sin(az);
+    vec3 dir = vec3(d.x * cz - d.y * sz,
+                    d.x * sz + d.y * cz,
+                    d.z);
+    return rotateOrbY(vec3(0.0, -R, 0.0) + dir * (R + p.y));
+  }
+
+  void main() {
+    vColor = color;
+    vDensitySeed = fract(sin(aPhase * 78.233 + aSize * 12.9898) * 43758.5453);
+    float twinkleWave = 0.5 + 0.5 * sin(uTime * uTwinkleSpeed + aPhase * 3.3);
+    vTwinkle = 1.0 - uTwinkleAmount + uTwinkleAmount * twinkleWave;
+    vec3 wob = vec3(
+      sin(uTime * 0.7 + aPhase * 2.3),
+      sin(uTime * 1.1 + aPhase * 1.7),
+      cos(uTime * 0.8 + aPhase * 2.9)
+    ) * uWobble;
+    vec3 wp = wrapSphere(position + wob);
+    vec3 outN = normalize(wp - vec3(0.0, -uSphereR, 0.0));
+    vec3 toCam = normalize(cameraPosition - wp);
+    vBackface = dot(outN, toCam);
+    vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+    gl_Position = projectionMatrix * mv;
+    float dist = -mv.z;
+    vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+    float size = aSize * uSizeScale * uPointScale * 140.0 * uPixelRatio;
+    gl_PointSize = max(1.35, (size / max(0.001, dist)) * (1.0 + vFade * 1.4));
+  }
+`;
+
+const pointFrag = /* glsl */`
+  varying vec3 vColor;
+  varying float vTwinkle;
+  varying float vFade;
+  varying float vBackface;
+  varying float vDensitySeed;
+  uniform sampler2D uMap;
+  uniform vec3 uBgColor;
+  uniform float uDensity;
+  uniform float uPoolMultiplier;
+  uniform float uPointAlpha;
+  uniform float uPointDensity;
+  uniform vec3 uPointColor;
+  uniform float uPointColorMix;
+  uniform float uPointBlur;
+
+  void main() {
+    float horizonFade = smoothstep(-0.28, 0.08, vBackface);
+    float density = max(0.0, uDensity * uPointDensity);
+    float visibleDensity = clamp(density / max(1.0, uPoolMultiplier), 0.0, 1.0);
+    if (vDensitySeed > visibleDensity) discard;
+    vec4 tex = texture2D(uMap, gl_PointCoord);
+    float blurPower = mix(2.35, 0.45, clamp(uPointBlur, 0.0, 1.0));
+    float pointAlpha = pow(tex.a, blurPower);
+    if (pointAlpha < 0.01) discard;
+    vec3 sourceColor = mix(vColor, uPointColor, clamp(uPointColorMix, 0.0, 1.0));
+    vec3 col = mix(sourceColor * vTwinkle, uBgColor, vFade * 0.95);
+    float densityBoost = 1.0 + min(max(0.0, density - uPoolMultiplier), 12.0) * 0.05;
+    float alpha = pointAlpha * (1.0 - vFade) * horizonFade * uPointAlpha * densityBoost;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+const wireVert = /* glsl */`
+  uniform float uSphereR;
+  uniform float uOrbRotation;
+  uniform float uFadeNear;
+  uniform float uFadeFar;
+  varying float vFade;
+  varying float vBackface;
+  varying float vDepthLayer;
+
+  vec3 rotateOrbY(vec3 p) {
+    float c = cos(uOrbRotation);
+    float s = sin(uOrbRotation);
+    return vec3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
+  }
+
+  vec3 wrapSphere(vec3 p) {
+    float R = uSphereR;
+    if (R < 1.0) return rotateOrbY(p);
+    float ax = p.z / R;
+    float az = -p.x / R;
+    float cx = cos(ax), sx = sin(ax);
+    vec3 d = vec3(0.0, cx, sx);
+    float cz = cos(az), sz = sin(az);
+    vec3 dir = vec3(d.x * cz - d.y * sz,
+                    d.x * sz + d.y * cz,
+                    d.z);
+    return rotateOrbY(vec3(0.0, -R, 0.0) + dir * (R + p.y));
+  }
+
+  void main() {
+    vec3 wp = wrapSphere(position);
+    vec3 outN = normalize(wp - vec3(0.0, -uSphereR, 0.0));
+    vec3 toCam = normalize(cameraPosition - wp);
+    vBackface = dot(outN, toCam);
+    vec4 mv = modelViewMatrix * vec4(wp, 1.0);
+    gl_Position = projectionMatrix * mv;
+    float dist = -mv.z;
+    vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+    vDepthLayer = smoothstep(uFadeFar * 1.05, uFadeFar * 6.8, dist);
+  }
+`;
+
+const wireFrag = /* glsl */`
+  uniform vec3 uColor;
+  uniform vec3 uBgColor;
+  uniform float uAlpha;
+  varying float vFade;
+  varying float vBackface;
+  varying float vDepthLayer;
+
+  void main() {
+    float horizonFade = smoothstep(-0.30, 0.08, vBackface);
+    vec3 col = mix(uColor, uBgColor, clamp(vFade * 0.78 + vDepthLayer * 0.62, 0.0, 1.0));
+    float depthAlpha = mix(1.0, 0.14, vDepthLayer);
+    float alpha = uAlpha * (1.0 - vFade * 0.9) * horizonFade * depthAlpha;
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+function makeWireMaterial(color, alpha) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uSphereR: sharedUniforms.uSphereR,
+      uFadeNear: sharedUniforms.uFadeNear,
+      uFadeFar: sharedUniforms.uFadeFar,
+      uBgColor: sharedUniforms.uBgColor,
+      uColor: { value: color.clone ? color.clone() : new THREE.Color(color) },
+      uAlpha: { value: alpha },
+    },
+    vertexShader: wireVert,
+    fragmentShader: wireFrag,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+  });
+}
+
+function makePointsMaterial(sizeScale, densityUniform = particleDensityUniforms.atmosphere, poolMultiplier = 1) {
+  const density = densityUniform && typeof densityUniform.value === 'number'
+    ? densityUniform
+    : { value: densityUniform };
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      ...sharedUniforms,
+      uSizeScale: { value: sizeScale },
+      uDensity: density,
+      uPoolMultiplier: { value: poolMultiplier },
+    },
+    vertexShader: pointVert,
+    fragmentShader: pointFrag,
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+  });
+}
+
+function roundForDebug(value, places = 2) {
+  const m = 10 ** places;
+  return Math.round(value * m) / m;
+}
+
+function normalizeHexColor(value, fallback = DEFAULT_PARTICLE_COLOR) {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(trimmed)) {
+    return `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`.toLowerCase();
+  }
+  return fallback;
+}
+
+function cameraRotationFields() {
+  const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'XYZ');
+  return {
+    rotationX: euler.x,
+    rotationY: euler.y,
+    rotationZ: euler.z,
+    quaternionX: camera.quaternion.x,
+    quaternionY: camera.quaternion.y,
+    quaternionZ: camera.quaternion.z,
+    quaternionW: camera.quaternion.w,
+  };
+}
+
+function defaultCameraState() {
+  return {
+    x: DEFAULT_CAMERA_X,
+    y: DEFAULT_CAMERA_Y,
+    z: DEFAULT_CAMERA_Z,
+    targetX: DEFAULT_TARGET_X,
+    targetY: DEFAULT_TARGET_Y,
+    targetZ: DEFAULT_TARGET_Z,
+    fov: DEFAULT_CAMERA_FOV,
+    zoom: DEFAULT_CAMERA_ZOOM,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  };
+}
+
+function defaultCameraKeyAState() {
+  return {
+    x: 520,
+    y: 260,
+    z: 650,
+    targetX: 12,
+    targetY: 44,
+    targetZ: 8,
+    fov: 58,
+    zoom: 1,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  };
+}
+
+function defaultCameraKeyBState() {
+  return {
+    x: -420,
+    y: 176,
+    z: 398,
+    targetX: -100,
+    targetY: 72,
+    targetZ: 42,
+    fov: 48,
+    zoom: 1,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: 8,
+    fadeFar: 540,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  };
+}
+
+function defaultCameraKeyCState() {
+  return {
+    x: 770,
+    y: 118,
+    z: 250,
+    targetX: 260,
+    targetY: 88,
+    targetZ: 124,
+    fov: 42,
+    zoom: 1,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: 6,
+    fadeFar: 460,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  };
+}
+
+const CAMERA_SHOTS = {
+  'Low Orbit': {
+    x: 520,
+    y: 260,
+    z: 650,
+    targetX: 12,
+    targetY: 44,
+    targetZ: 8,
+    fov: 58,
+    zoom: 1,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: DEFAULT_FADE_FAR,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  },
+  Topographic: {
+    x: 0,
+    y: 1420,
+    z: 0,
+    targetX: 0,
+    targetY: 0,
+    targetZ: 0,
+    fov: 31,
+    zoom: 1,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: 1800,
+    maxPolarDeg: 99,
+  },
+  Macro: {
+    x: 348,
+    y: 88,
+    z: 28,
+    targetX: 260,
+    targetY: 116,
+    targetZ: -46,
+    fov: 36,
+    zoom: 1,
+    near: 0.35,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: 4,
+    fadeFar: 260,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  },
+  'Horizon Sweep': {
+    x: -760,
+    y: 132,
+    z: 530,
+    targetX: 112,
+    targetY: 54,
+    targetZ: -34,
+    fov: 64,
+    zoom: 1,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: 680,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  },
+};
+
+function normalizeCameraState(state = {}) {
+  const defaults = defaultCameraState();
+  const near = clamp(Number.isFinite(state.near) ? state.near : defaults.near, 0.01, 2000);
+  const far = Math.max(near + 1, Math.min(Number.isFinite(state.far) ? state.far : defaults.far, 50000));
+  const fadeNear = clamp(Number.isFinite(state.fadeNear) ? state.fadeNear : defaults.fadeNear, 0, 10000);
+  const fadeFar = Math.max(fadeNear + 0.1, Math.min(Number.isFinite(state.fadeFar) ? state.fadeFar : defaults.fadeFar, 20000));
+  return {
+    x: Number.isFinite(state.x) ? state.x : defaults.x,
+    y: Number.isFinite(state.y) ? state.y : defaults.y,
+    z: Number.isFinite(state.z) ? state.z : defaults.z,
+    targetX: Number.isFinite(state.targetX) ? state.targetX : defaults.targetX,
+    targetY: Number.isFinite(state.targetY) ? state.targetY : defaults.targetY,
+    targetZ: Number.isFinite(state.targetZ) ? state.targetZ : defaults.targetZ,
+    fov: clamp(Number.isFinite(state.fov) ? state.fov : defaults.fov, 20, 100),
+    zoom: clamp(Number.isFinite(state.zoom) ? state.zoom : defaults.zoom, 0.1, 10),
+    near,
+    far,
+    fadeNear,
+    fadeFar,
+    maxPolarDeg: clamp(Number.isFinite(state.maxPolarDeg) ? state.maxPolarDeg : defaults.maxPolarDeg, 1, 179),
+  };
+}
+
+function cameraStatePayload(state = null) {
+  const current = state ? normalizeCameraState(state) : {
+    x: camera.position.x,
+    y: camera.position.y,
+    z: camera.position.z,
+    targetX: controls.target.x,
+    targetY: controls.target.y,
+    targetZ: controls.target.z,
+    fov: camera.fov,
+    zoom: camera.zoom,
+    near: camera.near,
+    far: camera.far,
+    fadeNear: sharedUniforms.uFadeNear.value,
+    fadeFar: sharedUniforms.uFadeFar.value,
+    maxPolarDeg: radToDeg(controls.maxPolarAngle),
+  };
+  const rotation = state ? {} : cameraRotationFields();
+  return {
+    position: {
+      x: roundForDebug(current.x, 2),
+      y: roundForDebug(current.y, 2),
+      z: roundForDebug(current.z, 2),
+    },
+    target: {
+      x: roundForDebug(current.targetX, 2),
+      y: roundForDebug(current.targetY, 2),
+      z: roundForDebug(current.targetZ, 2),
+    },
+    rotation: state ? undefined : {
+      x: roundForDebug(rotation.rotationX, 5),
+      y: roundForDebug(rotation.rotationY, 5),
+      z: roundForDebug(rotation.rotationZ, 5),
+    },
+    rotationDeg: state ? undefined : {
+      x: roundForDebug(radToDeg(rotation.rotationX), 2),
+      y: roundForDebug(radToDeg(rotation.rotationY), 2),
+      z: roundForDebug(radToDeg(rotation.rotationZ), 2),
+    },
+    quaternion: state ? undefined : {
+      x: roundForDebug(rotation.quaternionX, 5),
+      y: roundForDebug(rotation.quaternionY, 5),
+      z: roundForDebug(rotation.quaternionZ, 5),
+      w: roundForDebug(rotation.quaternionW, 5),
+    },
+    fov: roundForDebug(current.fov, 2),
+    zoom: roundForDebug(current.zoom, 3),
+    clipping: {
+      near: roundForDebug(current.near, 2),
+      far: roundForDebug(current.far, 2),
+    },
+    fade: {
+      near: roundForDebug(current.fadeNear, 2),
+      far: roundForDebug(current.fadeFar, 2),
+    },
+    orbit: {
+      distance: state ? undefined : roundForDebug(camera.position.distanceTo(controls.target), 2),
+      maxPolarDeg: roundForDebug(current.maxPolarDeg, 2),
+      minDistance: controls.minDistance,
+      maxDistance: controls.maxDistance,
+    },
+  };
+}
+
+function cleanDebugObject(value) {
+  if (Array.isArray(value)) return value.map(cleanDebugObject);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, cleanDebugObject(v)])
+    );
+  }
+  return value;
+}
+
+function readSavedCameraState() {
+  try {
+    const raw = localStorage.getItem(CAMERA_STATE_KEY);
+    return raw ? normalizeCameraState(JSON.parse(raw)) : defaultCameraState();
+  } catch (e) {
+    return defaultCameraState();
+  }
+}
+
+function saveCameraState() {
+  try {
+    localStorage.setItem(CAMERA_STATE_KEY, JSON.stringify(normalizeCameraState({
+      x: camera.position.x,
+      y: camera.position.y,
+      z: camera.position.z,
+      targetX: controls.target.x,
+      targetY: controls.target.y,
+      targetZ: controls.target.z,
+      fov: camera.fov,
+      zoom: camera.zoom,
+      near: camera.near,
+      far: camera.far,
+      fadeNear: sharedUniforms.uFadeNear.value,
+      fadeFar: sharedUniforms.uFadeFar.value,
+      maxPolarDeg: radToDeg(controls.maxPolarAngle),
+    })));
+  } catch (e) {
+    console.warn('Unable to save generation camera state:', e);
+  }
+}
+
+function defaultCameraAnimationState() {
+  return {
+    active: false,
+    startedAt: 0,
+    duration: DEFAULT_CAMERA_ANIMATION_DURATION,
+    keyA: defaultCameraKeyAState(),
+    keyB: defaultCameraKeyBState(),
+    keyC: defaultCameraKeyCState(),
+  };
+}
+
+function normalizeCameraAnimationState(state = {}) {
+  const defaults = defaultCameraAnimationState();
+  return {
+    active: false,
+    startedAt: 0,
+    duration: clamp(Number.isFinite(state.duration) ? state.duration : defaults.duration, 0.1, 120),
+    keyA: normalizeCameraState(state.keyA || defaults.keyA),
+    keyB: normalizeCameraState(state.keyB || defaults.keyB),
+    keyC: normalizeCameraState(state.keyC || defaults.keyC),
+  };
+}
+
+function readSavedCameraAnimationState() {
+  try {
+    const raw = localStorage.getItem(CAMERA_ANIMATION_STATE_KEY);
+    return raw ? normalizeCameraAnimationState(JSON.parse(raw)) : defaultCameraAnimationState();
+  } catch (e) {
+    return defaultCameraAnimationState();
+  }
+}
+
+function saveCameraAnimationState() {
+  try {
+    localStorage.setItem(CAMERA_ANIMATION_STATE_KEY, JSON.stringify(normalizeCameraAnimationState(cameraAnimation)));
+  } catch (e) {
+    console.warn('Unable to save generation camera animation:', e);
+  }
+}
+
+function defaultSceneState() {
+  return {
+    orbRotationDeg: DEFAULT_ORB_ROTATION_DEG,
+  };
+}
+
+function normalizeSceneState(state = {}) {
+  const defaults = defaultSceneState();
+  return {
+    orbRotationDeg: clamp(Number.isFinite(state.orbRotationDeg) ? state.orbRotationDeg : defaults.orbRotationDeg, -3600, 3600),
+  };
+}
+
+function readSavedSceneState() {
+  try {
+    const raw = localStorage.getItem(SCENE_STATE_KEY);
+    return raw ? normalizeSceneState(JSON.parse(raw)) : defaultSceneState();
+  } catch (e) {
+    return defaultSceneState();
+  }
+}
+
+function sceneDebugPayload() {
+  return {
+    orbRotationDeg: roundForDebug(sceneSettings.orbRotationDeg, 3),
+    orbRotationRad: roundForDebug(sharedUniforms.uOrbRotation.value, 5),
+  };
+}
+
+function saveSceneState() {
+  try {
+    localStorage.setItem(SCENE_STATE_KEY, JSON.stringify(sceneDebugPayload()));
+  } catch (e) {
+    console.warn('Unable to save generation scene settings:', e);
+  }
+}
+
+function defaultParticleState() {
+  return {
+    pointScale: DEFAULT_PARTICLE_SCALE,
+    pointAlpha: DEFAULT_PARTICLE_ALPHA,
+    pointDensity: DEFAULT_PARTICLE_DENSITY,
+    atmosphereDensity: DEFAULT_ATMOSPHERE_DENSITY,
+    steamDensity: DEFAULT_STEAM_DENSITY,
+    flowDensity: DEFAULT_FLOW_DENSITY,
+    pointColor: DEFAULT_PARTICLE_COLOR,
+    pointColorMix: DEFAULT_PARTICLE_COLOR_MIX,
+    pointBlur: DEFAULT_PARTICLE_BLUR,
+    wobble: DEFAULT_PARTICLE_WOBBLE,
+    twinkleSpeed: DEFAULT_TWINKLE_SPEED,
+    twinkleAmount: DEFAULT_TWINKLE_AMOUNT,
+    steamSpeed: DEFAULT_STEAM_SPEED,
+    flowSpeed: DEFAULT_FLOW_SPEED,
+  };
+}
+
+function normalizeParticleState(state = {}) {
+  const defaults = defaultParticleState();
+  const densities = state.densities || {};
+  return {
+    pointScale: clamp(Number.isFinite(state.pointScale) ? state.pointScale : defaults.pointScale, 0.1, 5),
+    pointAlpha: clamp(Number.isFinite(state.pointAlpha) ? state.pointAlpha : defaults.pointAlpha, 0, 3),
+    pointDensity: clamp(Number.isFinite(state.pointDensity) ? state.pointDensity : defaults.pointDensity, 0, PARTICLE_DENSITY_MAX),
+    atmosphereDensity: clamp(Number.isFinite(state.atmosphereDensity) ? state.atmosphereDensity : Number.isFinite(densities.atmosphere) ? densities.atmosphere : defaults.atmosphereDensity, 0, PARTICLE_DENSITY_MAX),
+    steamDensity: clamp(Number.isFinite(state.steamDensity) ? state.steamDensity : Number.isFinite(state.hazeDensity) ? state.hazeDensity : Number.isFinite(densities.haze) ? densities.haze : Number.isFinite(densities.steam) ? densities.steam : defaults.steamDensity, 0, PARTICLE_DENSITY_MAX),
+    flowDensity: clamp(Number.isFinite(state.flowDensity) ? state.flowDensity : Number.isFinite(densities.flow) ? densities.flow : defaults.flowDensity, 0, PARTICLE_DENSITY_MAX),
+    pointColor: normalizeHexColor(state.pointColor, defaults.pointColor),
+    pointColorMix: clamp(Number.isFinite(state.pointColorMix) ? state.pointColorMix : defaults.pointColorMix, 0, 1),
+    pointBlur: clamp(Number.isFinite(state.pointBlur) ? state.pointBlur : defaults.pointBlur, 0, 1),
+    wobble: clamp(Number.isFinite(state.wobble) ? state.wobble : defaults.wobble, 0, 4),
+    twinkleSpeed: clamp(Number.isFinite(state.twinkleSpeed) ? state.twinkleSpeed : defaults.twinkleSpeed, 0, 8),
+    twinkleAmount: clamp(Number.isFinite(state.twinkleAmount) ? state.twinkleAmount : defaults.twinkleAmount, 0, 1),
+    steamSpeed: clamp(Number.isFinite(state.steamSpeed) ? state.steamSpeed : Number.isFinite(state.hazeSpeed) ? state.hazeSpeed : defaults.steamSpeed, 0, 5),
+    flowSpeed: clamp(Number.isFinite(state.flowSpeed) ? state.flowSpeed : defaults.flowSpeed, 0, 5),
+  };
+}
+
+function readSavedParticleState() {
+  try {
+    const raw = localStorage.getItem(PARTICLE_STATE_KEY);
+    return raw ? normalizeParticleState(JSON.parse(raw)) : defaultParticleState();
+  } catch (e) {
+    return defaultParticleState();
+  }
+}
+
+function particleDebugPayload() {
+  return {
+    pointScale: roundForDebug(sharedUniforms.uPointScale.value, 3),
+    pointAlpha: roundForDebug(sharedUniforms.uPointAlpha.value, 3),
+    pointDensity: roundForDebug(sharedUniforms.uPointDensity.value, 3),
+    densities: {
+      atmosphere: roundForDebug(particleDensityUniforms.atmosphere.value, 3),
+      haze: roundForDebug(particleDensityUniforms.steam.value, 3),
+      flow: roundForDebug(particleDensityUniforms.flow.value, 3),
+    },
+    pointColor: `#${sharedUniforms.uPointColor.value.getHexString()}`,
+    pointColorMix: roundForDebug(sharedUniforms.uPointColorMix.value, 3),
+    pointBlur: roundForDebug(sharedUniforms.uPointBlur.value, 3),
+    wobble: roundForDebug(sharedUniforms.uWobble.value, 3),
+    twinkleSpeed: roundForDebug(sharedUniforms.uTwinkleSpeed.value, 3),
+    twinkleAmount: roundForDebug(sharedUniforms.uTwinkleAmount.value, 3),
+    hazeSpeed: roundForDebug(particleSettings.steamSpeed, 3),
+    flowSpeed: roundForDebug(particleSettings.flowSpeed, 3),
+  };
+}
+
+function saveParticleState() {
+  try {
+    localStorage.setItem(PARTICLE_STATE_KEY, JSON.stringify(particleDebugPayload()));
+  } catch (e) {
+    console.warn('Unable to save generation particle state:', e);
+  }
+}
+
+function updateDebugData() {
+  if (!debugEls.data) return;
+  debugEls.data.value = JSON.stringify(cleanDebugObject({
+    camera: cameraStatePayload(),
+    cameraAnimation: {
+      active: cameraAnimation.active,
+      durationSeconds: roundForDebug(cameraAnimation.duration, 2),
+      keyframeA: cameraStatePayload(cameraAnimation.keyA),
+      keyframeB: cameraStatePayload(cameraAnimation.keyB),
+      keyframeC: cameraStatePayload(cameraAnimation.keyC),
+    },
+    scene: sceneDebugPayload(),
+    particles: particleDebugPayload(),
+    interaction: {
+      telemetryHudEnabled: !document.body.classList.contains('hide-telemetry'),
+    },
+  }), null, 2);
+}
+
+function cameraInputs() {
+  return [
+    debugEls.cameraX, debugEls.cameraY, debugEls.cameraZ, debugEls.cameraFov, debugEls.cameraZoom,
+    debugEls.cameraNear, debugEls.cameraFar, debugEls.targetX, debugEls.targetY, debugEls.targetZ,
+    debugEls.fadeNear, debugEls.fadeFar, debugEls.maxPolar,
+  ].filter(Boolean);
+}
+
+function sceneInputs() {
+  return [debugEls.orbRotationDeg].filter(Boolean);
+}
+
+function particleInputs() {
+  return [
+    debugEls.particleScale, debugEls.particleAlpha, debugEls.particleDensity,
+    debugEls.particleAtmosphereDensity, debugEls.particleSteamDensity, debugEls.particleFlowDensity,
+    debugEls.particleColor, debugEls.particleColorMix, debugEls.particleBlur, debugEls.particleWobble,
+    debugEls.twinkleSpeed, debugEls.twinkleAmount, debugEls.steamSpeed, debugEls.flowSpeed,
+  ].filter(Boolean);
+}
+
+function updateCameraDebug() {
+  if (!debugEls.cameraX || suppressCameraInput) return;
+  if (cameraInputs().includes(document.activeElement)) {
+    updateDebugData();
+    return;
+  }
+  debugEls.cameraX.value = camera.position.x.toFixed(1);
+  debugEls.cameraY.value = camera.position.y.toFixed(1);
+  debugEls.cameraZ.value = camera.position.z.toFixed(1);
+  debugEls.cameraFov.value = camera.fov.toFixed(1);
+  debugEls.cameraZoom.value = camera.zoom.toFixed(2);
+  debugEls.cameraNear.value = camera.near.toFixed(2);
+  debugEls.cameraFar.value = camera.far.toFixed(1);
+  debugEls.targetX.value = controls.target.x.toFixed(1);
+  debugEls.targetY.value = controls.target.y.toFixed(1);
+  debugEls.targetZ.value = controls.target.z.toFixed(1);
+  debugEls.fadeNear.value = sharedUniforms.uFadeNear.value.toFixed(1);
+  debugEls.fadeFar.value = sharedUniforms.uFadeFar.value.toFixed(1);
+  debugEls.maxPolar.value = radToDeg(controls.maxPolarAngle).toFixed(1);
+  updateDebugData();
+}
+
+function updateSceneDebug() {
+  if (!debugEls.orbRotationDeg || suppressSceneInput) return;
+  if (sceneInputs().includes(document.activeElement)) {
+    updateDebugData();
+    return;
+  }
+  debugEls.orbRotationDeg.value = sceneSettings.orbRotationDeg.toFixed(1);
+  updateDebugData();
+}
+
+function updateParticleDebug() {
+  if (!debugEls.particleScale || suppressParticleInput) return;
+  if (particleInputs().includes(document.activeElement)) {
+    updateDebugData();
+    return;
+  }
+  debugEls.particleScale.value = sharedUniforms.uPointScale.value.toFixed(2);
+  debugEls.particleAlpha.value = sharedUniforms.uPointAlpha.value.toFixed(2);
+  debugEls.particleDensity.value = sharedUniforms.uPointDensity.value.toFixed(2);
+  debugEls.particleAtmosphereDensity.value = particleDensityUniforms.atmosphere.value.toFixed(2);
+  debugEls.particleSteamDensity.value = particleDensityUniforms.steam.value.toFixed(2);
+  debugEls.particleFlowDensity.value = particleDensityUniforms.flow.value.toFixed(2);
+  debugEls.particleColor.value = `#${sharedUniforms.uPointColor.value.getHexString()}`;
+  debugEls.particleColorMix.value = sharedUniforms.uPointColorMix.value.toFixed(2);
+  debugEls.particleBlur.value = sharedUniforms.uPointBlur.value.toFixed(2);
+  debugEls.particleWobble.value = sharedUniforms.uWobble.value.toFixed(2);
+  debugEls.twinkleSpeed.value = sharedUniforms.uTwinkleSpeed.value.toFixed(2);
+  debugEls.twinkleAmount.value = sharedUniforms.uTwinkleAmount.value.toFixed(2);
+  debugEls.steamSpeed.value = particleSettings.steamSpeed.toFixed(2);
+  debugEls.flowSpeed.value = particleSettings.flowSpeed.toFixed(2);
+  updateDebugData();
+}
+
+function updateCameraAnimationDebug() {
+  if (debugEls.cameraAnimDuration && document.activeElement !== debugEls.cameraAnimDuration) {
+    debugEls.cameraAnimDuration.value = cameraAnimation.duration.toFixed(1);
+  }
+  updateDebugData();
+}
+
+function applyCameraState(state, persist = true) {
+  const next = normalizeCameraState(state);
+  applyingProgrammaticCameraState = true;
+  camera.position.set(next.x, next.y, next.z);
+  camera.fov = next.fov;
+  camera.zoom = next.zoom;
+  camera.near = next.near;
+  camera.far = next.far;
+  camera.updateProjectionMatrix();
+  controls.target.set(next.targetX, next.targetY, next.targetZ);
+  controls.maxPolarAngle = degToRad(next.maxPolarDeg);
+  controls.update();
+  applyingProgrammaticCameraState = false;
+  sharedUniforms.uFadeNear.value = next.fadeNear;
+  sharedUniforms.uFadeFar.value = next.fadeFar;
+  if (persist) saveCameraState();
+  updateCameraDebug();
+}
+
+function applySceneState(state, persist = true) {
+  const next = normalizeSceneState(state);
+  sceneSettings.orbRotationDeg = next.orbRotationDeg;
+  sharedUniforms.uOrbRotation.value = degToRad(next.orbRotationDeg);
+  if (persist) saveSceneState();
+  updateSceneDebug();
+}
+
+function applyParticleState(state, persist = true) {
+  const next = normalizeParticleState(state);
+  sharedUniforms.uPointScale.value = next.pointScale;
+  sharedUniforms.uPointAlpha.value = next.pointAlpha;
+  sharedUniforms.uPointDensity.value = next.pointDensity;
+  particleDensityUniforms.atmosphere.value = next.atmosphereDensity;
+  particleDensityUniforms.steam.value = next.steamDensity;
+  particleDensityUniforms.flow.value = next.flowDensity;
+  sharedUniforms.uPointColor.value.set(next.pointColor);
+  sharedUniforms.uPointColorMix.value = next.pointColorMix;
+  sharedUniforms.uPointBlur.value = next.pointBlur;
+  sharedUniforms.uWobble.value = next.wobble;
+  sharedUniforms.uTwinkleSpeed.value = next.twinkleSpeed;
+  sharedUniforms.uTwinkleAmount.value = next.twinkleAmount;
+  particleSettings.steamSpeed = next.steamSpeed;
+  particleSettings.flowSpeed = next.flowSpeed;
+  if (persist) saveParticleState();
+  updateParticleDebug();
+}
+
+function applyCameraDebugInputs() {
+  activeCameraShotName = 'Custom';
+  const next = {
+    x: parseFloat(debugEls.cameraX.value),
+    y: parseFloat(debugEls.cameraY.value),
+    z: parseFloat(debugEls.cameraZ.value),
+    fov: parseFloat(debugEls.cameraFov.value),
+    zoom: parseFloat(debugEls.cameraZoom.value),
+    near: parseFloat(debugEls.cameraNear.value),
+    far: parseFloat(debugEls.cameraFar.value),
+    targetX: parseFloat(debugEls.targetX.value),
+    targetY: parseFloat(debugEls.targetY.value),
+    targetZ: parseFloat(debugEls.targetZ.value),
+    fadeNear: parseFloat(debugEls.fadeNear.value),
+    fadeFar: parseFloat(debugEls.fadeFar.value),
+    maxPolarDeg: parseFloat(debugEls.maxPolar.value),
+  };
+  applyCameraState(next);
+}
+
+function applySceneDebugInputs() {
+  applySceneState({
+    orbRotationDeg: parseFloat(debugEls.orbRotationDeg.value),
+  });
+}
+
+function applyParticleDebugInputs() {
+  applyParticleState({
+    pointScale: parseFloat(debugEls.particleScale.value),
+    pointAlpha: parseFloat(debugEls.particleAlpha.value),
+    pointDensity: parseFloat(debugEls.particleDensity.value),
+    atmosphereDensity: parseFloat(debugEls.particleAtmosphereDensity.value),
+    steamDensity: parseFloat(debugEls.particleSteamDensity.value),
+    flowDensity: parseFloat(debugEls.particleFlowDensity.value),
+    pointColor: debugEls.particleColor.value,
+    pointColorMix: parseFloat(debugEls.particleColorMix.value),
+    pointBlur: parseFloat(debugEls.particleBlur.value),
+    wobble: parseFloat(debugEls.particleWobble.value),
+    twinkleSpeed: parseFloat(debugEls.twinkleSpeed.value),
+    twinkleAmount: parseFloat(debugEls.twinkleAmount.value),
+    steamSpeed: parseFloat(debugEls.steamSpeed.value),
+    flowSpeed: parseFloat(debugEls.flowSpeed.value),
+  });
+}
+
+function currentCameraState() {
+  return normalizeCameraState({
+    x: camera.position.x,
+    y: camera.position.y,
+    z: camera.position.z,
+    targetX: controls.target.x,
+    targetY: controls.target.y,
+    targetZ: controls.target.z,
+    fov: camera.fov,
+    zoom: camera.zoom,
+    near: camera.near,
+    far: camera.far,
+    fadeNear: sharedUniforms.uFadeNear.value,
+    fadeFar: sharedUniforms.uFadeFar.value,
+    maxPolarDeg: radToDeg(controls.maxPolarAngle),
+  });
+}
+
+function easeInOutExpo(t) {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t < 0.5
+    ? Math.pow(2, 20 * t - 10) / 2
+    : (2 - Math.pow(2, -20 * t + 10)) / 2;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function lerpCameraStates(from, to, t) {
+  const a = normalizeCameraState(from);
+  const b = normalizeCameraState(to);
+  return {
+    x: lerp(a.x, b.x, t),
+    y: lerp(a.y, b.y, t),
+    z: lerp(a.z, b.z, t),
+    targetX: lerp(a.targetX, b.targetX, t),
+    targetY: lerp(a.targetY, b.targetY, t),
+    targetZ: lerp(a.targetZ, b.targetZ, t),
+    fov: lerp(a.fov, b.fov, t),
+    zoom: lerp(a.zoom, b.zoom, t),
+    near: lerp(a.near, b.near, t),
+    far: lerp(a.far, b.far, t),
+    fadeNear: lerp(a.fadeNear, b.fadeNear, t),
+    fadeFar: lerp(a.fadeFar, b.fadeFar, t),
+    maxPolarDeg: lerp(a.maxPolarDeg, b.maxPolarDeg, t),
+  };
+}
+
+function updateCameraAnimation(now) {
+  if (!cameraAnimation.active) return;
+  const durationMs = Math.max(100, cameraAnimation.duration * 1000);
+  const t = clamp((now - cameraAnimation.startedAt) / durationMs, 0, 1);
+  const firstHalf = t < 0.5;
+  const localT = firstHalf ? t * 2 : (t - 0.5) * 2;
+  const eased = easeInOutExpo(localT);
+  const from = firstHalf ? cameraAnimation.keyA : cameraAnimation.keyB;
+  const to = firstHalf ? cameraAnimation.keyB : cameraAnimation.keyC;
+  applyCameraState(lerpCameraStates(from, to, eased), false);
+  if (t >= 1) {
+    cameraAnimation.active = false;
+    controls.enabled = true;
+    applyCameraState(cameraAnimation.keyC, true);
+    updateCameraAnimationDebug();
+  }
+}
+
+function playCameraAnimation() {
+  cameraAnimation.active = true;
+  cameraAnimation.startedAt = performance.now();
+  controls.enabled = false;
+  applyCameraState(cameraAnimation.keyA, false);
+  updateCameraAnimationDebug();
+}
+
+function stopCameraAnimation() {
+  cameraAnimation.active = false;
+  controls.enabled = true;
+  updateCameraAnimationDebug();
+}
+
+function setCameraKey(which) {
+  cameraAnimation[`key${which}`] = currentCameraState();
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function returnToCameraKey(which) {
+  stopCameraAnimation();
+  applyCameraState(cameraAnimation[`key${which}`], true);
+}
+
+function resetCameraAnimation() {
+  Object.assign(cameraAnimation, defaultCameraAnimationState());
+  stopCameraAnimation();
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
+function applyCameraShot(name) {
+  const shot = CAMERA_SHOTS[name];
+  if (!shot) return;
+  activeCameraShotName = name;
+  stopCameraAnimation();
+  applyCameraState(shot, true);
+  updateShotButtons();
+}
+
+function updateShotButtons() {
+  const pairs = [
+    ['Low Orbit', debugEls.shotLowOrbit],
+    ['Topographic', debugEls.shotTopographic],
+    ['Macro', debugEls.shotMacro],
+    ['Horizon Sweep', debugEls.shotHorizonSweep],
+  ];
+  for (const [name, button] of pairs) {
+    if (button) button.classList.toggle('active', activeCameraShotName === name);
+  }
+}
+
+function setDebugPanelCollapsed(collapsed, persist = true) {
+  if (!debugEls.panel || !debugEls.togglePanel) return;
+  debugEls.panel.classList.toggle('is-collapsed', collapsed);
+  debugEls.togglePanel.textContent = collapsed ? 'Show' : 'Hide';
+  if (persist) {
+    try {
+      localStorage.setItem(DEBUG_PANEL_STATE_KEY, collapsed ? 'collapsed' : 'open');
+    } catch (e) {
+      console.warn('Unable to save debug panel state:', e);
+    }
+  }
+}
+
+function readDebugPanelCollapsed() {
+  try {
+    return localStorage.getItem(DEBUG_PANEL_STATE_KEY) === 'collapsed';
+  } catch (e) {
+    return false;
+  }
+}
+
+function setTelemetryHudEnabled(enabled, persist = true) {
+  document.body.classList.toggle('hide-telemetry', !enabled);
+  if (debugEls.telemetryHudEnabled) debugEls.telemetryHudEnabled.checked = enabled;
+  if (persist) {
+    try {
+      localStorage.setItem(TELEMETRY_STATE_KEY, enabled ? 'on' : 'off');
+    } catch (e) {
+      console.warn('Unable to save telemetry HUD state:', e);
+    }
+  }
+  updateDebugData();
+}
+
+function readTelemetryHudEnabled() {
+  try {
+    return localStorage.getItem(TELEMETRY_STATE_KEY) !== 'off';
+  } catch (e) {
+    return true;
+  }
+}
+
+async function copyDebugData() {
+  const value = debugEls.data ? debugEls.data.value : '';
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch (e) {
+    debugEls.data.focus();
+    debugEls.data.select();
+    document.execCommand('copy');
+  }
+}
+
+function makeLineGeometry(positions) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function makePointGeometry(points) {
+  const positions = [];
+  const colors = [];
+  const sizes = [];
+  const phases = [];
+  for (const p of points) {
+    positions.push(p.x, p.y, p.z);
+    colors.push(p.color.r, p.color.g, p.color.b);
+    sizes.push(p.size);
+    phases.push(p.phase);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+  geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1));
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function pushLine(lines, a, b) {
+  lines.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+}
+
+function yawPoint(cx, cz, yaw, x, y, z) {
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return [cx + x * c - z * s, y, cz + x * s + z * c];
+}
+
+const BOX_EDGES = [
+  [0, 1], [1, 2], [2, 3], [3, 0],
+  [4, 5], [5, 6], [6, 7], [7, 4],
+  [0, 4], [1, 5], [2, 6], [3, 7],
+];
+
+function addWireBox(lines, cx, cz, w, h, d, yaw = 0, baseY = 0, detail = true) {
+  const hx = w * 0.5;
+  const hz = d * 0.5;
+  const corners = [
+    yawPoint(cx, cz, yaw, -hx, baseY, -hz),
+    yawPoint(cx, cz, yaw,  hx, baseY, -hz),
+    yawPoint(cx, cz, yaw,  hx, baseY,  hz),
+    yawPoint(cx, cz, yaw, -hx, baseY,  hz),
+    yawPoint(cx, cz, yaw, -hx, baseY + h, -hz),
+    yawPoint(cx, cz, yaw,  hx, baseY + h, -hz),
+    yawPoint(cx, cz, yaw,  hx, baseY + h,  hz),
+    yawPoint(cx, cz, yaw, -hx, baseY + h,  hz),
+  ];
+  for (const edge of BOX_EDGES) pushLine(lines, corners[edge[0]], corners[edge[1]]);
+  if (detail) {
+    for (let i = 1; i <= 3; i++) {
+      const t = i / 4;
+      const lx = -hx + w * t;
+      pushLine(lines, yawPoint(cx, cz, yaw, lx, baseY + h, -hz), yawPoint(cx, cz, yaw, lx, baseY + h, hz));
+    }
+    for (let i = 1; i <= 2; i++) {
+      const t = i / 3;
+      const lz = -hz + d * t;
+      pushLine(lines, yawPoint(cx, cz, yaw, -hx, baseY + h, lz), yawPoint(cx, cz, yaw, hx, baseY + h, lz));
+    }
+  }
+  return corners;
+}
+
+function addCircle(lines, cx, y, cz, radius, segments = 40) {
+  const pts = [];
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    pts.push([cx + Math.cos(a) * radius, y, cz + Math.sin(a) * radius]);
+  }
+  for (let i = 0; i < segments; i++) pushLine(lines, pts[i], pts[(i + 1) % segments]);
+  return pts;
+}
+
+function addCylinderWire(lines, cx, cz, radius, h, baseY = 0, segments = 34, rings = 6) {
+  const ringPts = [];
+  for (let r = 0; r < rings; r++) {
+    const y = baseY + h * (r / Math.max(1, rings - 1));
+    ringPts.push(addCircle(lines, cx, y, cz, radius, segments));
+  }
+  for (let i = 0; i < segments; i += 3) {
+    for (let r = 0; r < ringPts.length - 1; r++) pushLine(lines, ringPts[r][i], ringPts[r + 1][i]);
+  }
+}
+
+function coolingRadius(t, baseR, throatR, topR) {
+  if (t < 0.58) return baseR + (throatR - baseR) * smoothstep(0, 0.58, t);
+  return throatR + (topR - throatR) * smoothstep(0.58, 1, t);
+}
+
+function addCoolingTower(lines, detailLines, cx, cz, h, baseR, throatR, topR) {
+  const segments = 48;
+  const rings = 10;
+  const ringPts = [];
+  for (let r = 0; r < rings; r++) {
+    const t = r / (rings - 1);
+    const y = h * t;
+    ringPts.push(addCircle(lines, cx, y, cz, coolingRadius(t, baseR, throatR, topR), segments));
+  }
+  for (let i = 0; i < segments; i += 4) {
+    for (let r = 0; r < rings - 1; r++) pushLine(lines, ringPts[r][i], ringPts[r + 1][i]);
+  }
+  for (let i = 2; i < segments; i += 8) {
+    for (let r = 0; r < rings - 1; r++) pushLine(detailLines, ringPts[r][i], ringPts[r + 1][(i + 2) % segments]);
+  }
+}
+
+function addPipe(lines, a, b, radius = 2.2) {
+  const dx = b[0] - a[0];
+  const dz = b[2] - a[2];
+  const len = Math.hypot(dx, dz) || 1;
+  const ox = -dz / len * radius;
+  const oz = dx / len * radius;
+  pushLine(lines, [a[0] + ox, a[1], a[2] + oz], [b[0] + ox, b[1], b[2] + oz]);
+  pushLine(lines, [a[0] - ox, a[1], a[2] - oz], [b[0] - ox, b[1], b[2] - oz]);
+  for (let i = 0; i <= 4; i++) {
+    const t = i / 4;
+    const x = a[0] + dx * t;
+    const y = a[1] + (b[1] - a[1]) * t;
+    const z = a[2] + dz * t;
+    pushLine(lines, [x + ox, y, z + oz], [x - ox, y, z - oz]);
+  }
+}
+
+function addGroundGrid(lines) {
+  const limit = 900;
+  const major = 150;
+  const minor = 75;
+  for (let x = -limit; x <= limit; x += minor) {
+    const y = Math.abs(x % major) < 0.001 ? 0.4 : 0.2;
+    pushLine(lines, [x, y, -limit], [x, y, limit]);
+  }
+  for (let z = -limit; z <= limit; z += minor) {
+    const y = Math.abs(z % major) < 0.001 ? 0.4 : 0.2;
+    pushLine(lines, [-limit, y, z], [limit, y, z]);
+  }
+  addCircle(lines, 0, 0.6, 0, 760, 96);
+  addCircle(lines, 0, 0.6, 0, 1040, 128);
+}
+
+function addTransmissionTower(lines, x, z, h = 145, w = 42) {
+  const base = [
+    [x - w, 0, z - w * 0.62],
+    [x + w, 0, z - w * 0.62],
+    [x + w, 0, z + w * 0.62],
+    [x - w, 0, z + w * 0.62],
+  ];
+  const waist = [
+    [x - w * 0.28, h * 0.62, z - w * 0.25],
+    [x + w * 0.28, h * 0.62, z - w * 0.25],
+    [x + w * 0.28, h * 0.62, z + w * 0.25],
+    [x - w * 0.28, h * 0.62, z + w * 0.25],
+  ];
+  const top = [x, h, z];
+  for (let i = 0; i < 4; i++) {
+    pushLine(lines, base[i], waist[i]);
+    pushLine(lines, waist[i], top);
+    pushLine(lines, base[i], waist[(i + 1) % 4]);
+  }
+  const armY = h * 0.76;
+  const arm = [[x - w * 1.25, armY, z], [x + w * 1.25, armY, z]];
+  const upper = [[x - w * 0.86, h * 0.9, z], [x + w * 0.86, h * 0.9, z]];
+  pushLine(lines, arm[0], arm[1]);
+  pushLine(lines, upper[0], upper[1]);
+  pushLine(lines, arm[0], [x, h * 0.66, z]);
+  pushLine(lines, arm[1], [x, h * 0.66, z]);
+  pushLine(lines, upper[0], [x, h, z]);
+  pushLine(lines, upper[1], [x, h, z]);
+  return { arm, upper, top };
+}
+
+function addSubstation(lines, accentLines, x, z) {
+  for (let i = 0; i < 5; i++) {
+    addWireBox(lines, x + i * 36, z, 18, 24, 32, 0.08, 0, false);
+    addCylinderWire(lines, x + i * 36, z - 30, 7, 32, 0, 18, 4);
+    addCylinderWire(lines, x + i * 36, z + 30, 7, 32, 0, 18, 4);
+    pushLine(accentLines, [x + i * 36 - 9, 35, z], [x + i * 36 + 9, 35, z]);
+  }
+  for (let row = -1; row <= 1; row++) {
+    const zz = z + row * 44;
+    pushLine(lines, [x - 34, 42, zz], [x + 186, 42, zz]);
+    for (let i = 0; i < 7; i++) {
+      const xx = x - 22 + i * 36;
+      pushLine(lines, [xx, 0, zz], [xx, 42, zz]);
+      pushLine(lines, [xx - 6, 42, zz], [xx + 6, 42, zz]);
+    }
+  }
+}
+
+function addServiceRoads(lines) {
+  const roadY = 1.1;
+  const roads = [
+    [[-520, roadY, -165], [390, roadY, -165]],
+    [[-520, roadY, 118], [470, roadY, 118]],
+    [[-390, roadY, -360], [-390, roadY, 330]],
+    [[225, roadY, -360], [225, roadY, 360]],
+    [[-120, roadY, -300], [520, roadY, 312]],
+  ];
+  for (const [a, b] of roads) {
+    addPipe(lines, a, b, 4.5);
+  }
+}
+
+function seededRandom(index) {
+  const x = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function localPoint(cx, cz, yaw, x, y, z) {
+  return yawPoint(cx, cz, yaw, x, y, z);
+}
+
+function addPolyline(lines, pts) {
+  for (let i = 0; i < pts.length - 1; i++) pushLine(lines, pts[i], pts[i + 1]);
+}
+
+function addWaterCorridor(waterLines, detailLines) {
+  const y = 0.45;
+  const river = [
+    [-870, y, -468],
+    [-742, y, -342],
+    [-684, y, -168],
+    [-634, y, 54],
+    [-558, y, 256],
+    [-462, y, 462],
+    [-338, y, 660],
+  ];
+  for (let i = 0; i < river.length - 1; i++) {
+    addPipe(waterLines, river[i], river[i + 1], 68);
+  }
+  for (let i = 0; i < river.length - 1; i++) {
+    const a = river[i], b = river[i + 1];
+    const dx = b[0] - a[0], dz = b[2] - a[2];
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len;
+    const nz = dx / len;
+    for (let band = -1; band <= 1; band++) {
+      const offset = band * 24;
+      pushLine(
+        detailLines,
+        [a[0] + nx * offset, y + 0.32, a[2] + nz * offset],
+        [b[0] + nx * offset, y + 0.32, b[2] + nz * offset]
+      );
+    }
+  }
+}
+
+function addBridge(lines, accentLines, cx, cz, yaw, length = 174, width = 46, height = 34) {
+  const deckY = 10;
+  addWireBox(lines, cx, cz, length, 7, width, yaw, deckY, false);
+  for (const side of [-1, 1]) {
+    const z = side * width * 0.5;
+    const topY = deckY + height;
+    pushLine(lines, localPoint(cx, cz, yaw, -length * 0.48, topY, z), localPoint(cx, cz, yaw, length * 0.48, topY, z));
+    for (let i = 0; i <= 8; i++) {
+      const x = -length * 0.45 + length * 0.9 * (i / 8);
+      const p0 = localPoint(cx, cz, yaw, x, deckY + 7, z);
+      const p1 = localPoint(cx, cz, yaw, x, topY, z);
+      pushLine(lines, p0, p1);
+      if (i < 8) {
+        const nx = -length * 0.45 + length * 0.9 * ((i + 1) / 8);
+        pushLine(lines, p0, localPoint(cx, cz, yaw, nx, topY, z));
+      }
+    }
+  }
+  for (let i = 0; i <= 6; i++) {
+    const x = -length * 0.38 + length * 0.76 * (i / 6);
+    pushLine(accentLines, localPoint(cx, cz, yaw, x, deckY + 11, -width * 0.28), localPoint(cx, cz, yaw, x, deckY + 11, width * 0.28));
+  }
+}
+
+function addDam(lines, accentLines, cx, cz, yaw, length = 190) {
+  addWireBox(lines, cx, cz, length, 42, 24, yaw, 0, false);
+  addWireBox(lines, cx, cz, length * 0.86, 18, 54, yaw, 42, false);
+  for (let i = 0; i < 7; i++) {
+    const x = -length * 0.39 + i * (length * 0.78 / 6);
+    const left = localPoint(cx, cz, yaw, x - 8, 5, -18);
+    const right = localPoint(cx, cz, yaw, x + 8, 5, 18);
+    addWireBox(lines, (left[0] + right[0]) * 0.5, (left[2] + right[2]) * 0.5, 12, 30, 18, yaw, 5, false);
+    pushLine(accentLines, localPoint(cx, cz, yaw, x - 10, 34, -22), localPoint(cx, cz, yaw, x + 10, 34, 22));
+  }
+  for (let i = 0; i <= 10; i++) {
+    const x = -length * 0.46 + length * 0.92 * (i / 10);
+    pushLine(lines, localPoint(cx, cz, yaw, x, 0.8, -52), localPoint(cx, cz, yaw, x, 0.8, -112));
+  }
+}
+
+function addCityDistrict(lines, accentLines) {
+  let seed = 1;
+  for (let row = 0; row < 7; row++) {
+    for (let col = 0; col < 9; col++) {
+      seed++;
+      if (seededRandom(seed) < 0.16) continue;
+      const x = -930 + col * 58 + seededRandom(seed + 11) * 8;
+      const z = -55 + row * 58 + seededRandom(seed + 23) * 9;
+      const w = 24 + seededRandom(seed + 31) * 24;
+      const d = 20 + seededRandom(seed + 41) * 26;
+      const h = 18 + Math.pow(seededRandom(seed + 53), 1.75) * 148;
+      addWireBox(lines, x, z, w, h, d, seededRandom(seed + 67) * 0.22 - 0.11, 0, h > 86);
+      if (h > 104 && seededRandom(seed + 71) > 0.78) {
+        pushLine(accentLines, [x - w * 0.28, h + 2, z], [x + w * 0.28, h + 2, z]);
+      }
+    }
+  }
+  for (let row = 0; row <= 7; row++) {
+    const z = -84 + row * 58;
+    addPipe(lines, [-984, 1.0, z], [-430, 1.0, z + 18], 2.4);
+  }
+  for (let col = 0; col <= 9; col++) {
+    const x = -958 + col * 58;
+    addPipe(lines, [x, 1.0, -110], [x + 18, 1.0, 390], 2.1);
+  }
+
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 7; col++) {
+      seed++;
+      if (seededRandom(seed + 101) < 0.22) continue;
+      const x = 414 + col * 62 + seededRandom(seed + 111) * 9;
+      const z = -620 + row * 62 + seededRandom(seed + 121) * 12;
+      const h = 14 + seededRandom(seed + 131) * 94;
+      addWireBox(lines, x, z, 24 + seededRandom(seed + 141) * 28, h, 24 + seededRandom(seed + 151) * 24, -0.08, 0, h > 54);
+    }
+  }
+}
+
+function createUrbanParticles(count) {
+  const points = [];
+  for (let i = 0; i < count; i++) {
+    const leftBank = i % 3 !== 0;
+    const x = leftBank ? rand(-980, -414) : rand(390, 870);
+    const z = leftBank ? rand(-108, 406) : rand(-648, -360);
+    const y = Math.pow(Math.random(), 2.2) * 130 + rand(2, 18);
+    points.push({
+      x,
+      y,
+      z,
+      color: Math.random() < 0.05 ? accentYellow : (Math.random() < 0.45 ? greyLight : greyMid),
+      size: rand(0.28, 0.95),
+      phase: rand(0, 1000),
+    });
+  }
+  return new THREE.Points(makePointGeometry(points), makePointsMaterial(0.78, particleDensityUniforms.atmosphere, ATMOSPHERE_POOL_MULTIPLIER));
+}
+
+function createAtmosphereParticles(count) {
+  const points = [];
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(Math.random()) * rand(180, 1060);
+    const y = Math.pow(Math.random(), 1.8) * 420 + rand(0, 16);
+    const tint = Math.random() < 0.14 ? greyLight : greyMid;
+    points.push({
+      x: Math.cos(a) * r,
+      y,
+      z: Math.sin(a) * r,
+      color: tint,
+      size: rand(0.42, 1.5),
+      phase: Math.random() * 1000,
+    });
+  }
+  return new THREE.Points(makePointGeometry(points), makePointsMaterial(0.95, particleDensityUniforms.atmosphere, ATMOSPHERE_POOL_MULTIPLIER));
+}
+
+const hazeSources = [
+  { x: -760, z: -340, y: 18, radius: 120, spread: 220, rise: 116, swirl: 0.10 },
+  { x: -560, z: 78, y: 14, radius: 150, spread: 260, rise: 96, swirl: -0.08 },
+  { x: -406, z: 478, y: 16, radius: 130, spread: 240, rise: 104, swirl: 0.07 },
+  { x: -850, z: 230, y: 24, radius: 180, spread: 260, rise: 118, swirl: -0.06 },
+];
+
+const hazeParticles = [];
+let hazeGeo = null;
+
+function createHazeParticles(count) {
+  const points = [];
+  for (let i = 0; i < count; i++) {
+    const sourceIndex = Math.floor(Math.random() * hazeSources.length);
+    const source = hazeSources[sourceIndex];
+    const t = Math.random();
+    const a = Math.random() * Math.PI * 2;
+    const radius = source.radius + t * source.spread * Math.random();
+    hazeParticles.push({
+      sourceIndex,
+      t,
+      phase: a,
+      spin: rand(0.18, 0.62) * (Math.random() < 0.5 ? -1 : 1),
+      speed: rand(0.012, 0.038),
+    });
+    points.push({
+      x: source.x + Math.cos(a) * radius + rand(-24, 24),
+      y: source.y + t * source.rise + rand(0, 18),
+      z: source.z + Math.sin(a) * radius + rand(-24, 24),
+      color: Math.random() < 0.10 ? greyLight : greyMist,
+      size: rand(0.62, 1.75),
+      phase: rand(0, 1000),
+    });
+  }
+  hazeGeo = makePointGeometry(points);
+  return new THREE.Points(hazeGeo, makePointsMaterial(0.98, particleDensityUniforms.steam, STEAM_POOL_MULTIPLIER));
+}
+
+const flowPaths = [];
+const flowData = [];
+let flowGeo = null;
+
+function addFlowPath(points) {
+  const lengths = [];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    total += Math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1], points[i + 1][2] - points[i][2]);
+    lengths.push(total);
+  }
+  flowPaths.push({ points, lengths, total: Math.max(1, total) });
+}
+
+function sampleFlowPath(path, t, target) {
+  const distance = ((t % 1) + 1) % 1 * path.total;
+  let seg = 0;
+  while (seg < path.lengths.length - 1 && distance > path.lengths[seg]) seg++;
+  const prev = seg === 0 ? 0 : path.lengths[seg - 1];
+  const next = path.lengths[seg];
+  const local = (distance - prev) / Math.max(0.0001, next - prev);
+  const a = path.points[seg];
+  const b = path.points[seg + 1];
+  target[0] = a[0] + (b[0] - a[0]) * local;
+  target[1] = a[1] + (b[1] - a[1]) * local;
+  target[2] = a[2] + (b[2] - a[2]) * local;
+  return target;
+}
+
+function createFlowParticles(count) {
+  const points = [];
+  const tmp = [0, 0, 0];
+  for (let i = 0; i < count; i++) {
+    const pathIndex = Math.floor(Math.random() * flowPaths.length);
+    const path = flowPaths[pathIndex];
+    const t = Math.random();
+    sampleFlowPath(path, t, tmp);
+    flowData.push({
+      pathIndex,
+      t,
+      speed: rand(0.025, 0.075),
+      phase: rand(0, 1000),
+      offset: rand(-2.4, 2.4),
+    });
+    points.push({
+      x: tmp[0] + rand(-1.4, 1.4),
+      y: tmp[1] + rand(-1.1, 1.1),
+      z: tmp[2] + rand(-1.4, 1.4),
+      color: Math.random() < 0.22 ? accentYellow : greyDark,
+      size: rand(0.55, 1.35),
+      phase: rand(0, 1000),
+    });
+  }
+  flowGeo = makePointGeometry(points);
+  return new THREE.Points(flowGeo, makePointsMaterial(1.02, particleDensityUniforms.flow, FLOW_POOL_MULTIPLIER));
+}
+
+function buildPlant() {
+  lblText.textContent = 'Extruding turbine hall and substation frames...';
+  const groundLines = [];
+  const waterLines = [];
+  const cityLines = [];
+  const structureLines = [];
+  const detailLines = [];
+  const accentLines = [];
+  const powerLines = [];
+
+  addGroundGrid(groundLines);
+  addWaterCorridor(waterLines, detailLines);
+  addDam(structureLines, accentLines, -684, -164, 0.34, 184);
+  addDam(structureLines, accentLines, -476, 424, -0.46, 164);
+  addBridge(cityLines, accentLines, -620, 60, 1.2, 198, 44, 34);
+  addBridge(cityLines, accentLines, -760, -350, 0.82, 176, 42, 28);
+  addBridge(cityLines, accentLines, -410, 546, 1.0, 210, 46, 36);
+  addCityDistrict(cityLines, accentLines);
+  addServiceRoads(detailLines);
+
+  addWireBox(structureLines, -84, -28, 230, 64, 112, -0.06, 0);
+  addWireBox(detailLines, -84, -28, 194, 18, 78, -0.06, 66);
+  addWireBox(structureLines, 118, -38, 132, 154, 98, 0.08, 0);
+  addWireBox(detailLines, 118, -38, 102, 48, 72, 0.08, 158);
+  addWireBox(structureLines, 2, -178, 146, 44, 74, -0.02, 0);
+  addWireBox(detailLines, -236, -76, 92, 42, 54, 0.12, 0);
+  addWireBox(detailLines, 55, 98, 104, 36, 54, -0.08, 0);
+
+  addCoolingTower(structureLines, detailLines, -270, 246, 142, 48, 28, 39);
+  addCoolingTower(structureLines, detailLines, -126, 252, 132, 43, 25, 35);
+  addCylinderWire(structureLines, 248, -52, 15, 232, 0, 36, 8);
+  addCylinderWire(structureLines, 294, -34, 12, 208, 0, 32, 7);
+  addCylinderWire(detailLines, 198, -84, 8, 110, 0, 24, 5);
+
+  addPipe(structureLines, [-210, 52, 210], [-64, 58, 18], 4);
+  addPipe(structureLines, [-106, 48, 216], [16, 58, 20], 4);
+  addPipe(detailLines, [14, 72, -60], [206, 92, -56], 3);
+  addPipe(detailLines, [136, 126, -28], [244, 158, -52], 2.8);
+  addPipe(accentLines, [-170, 74, -22], [92, 78, -38], 2.2);
+  addPipe(accentLines, [92, 88, -38], [242, 144, -52], 2.2);
+
+  addSubstation(structureLines, accentLines, 314, 176);
+  const towerA = addTransmissionTower(powerLines, 552, 182, 138, 36);
+  const towerB = addTransmissionTower(powerLines, 720, 204, 128, 32);
+  const towerC = addTransmissionTower(powerLines, 874, 226, 118, 28);
+  for (let i = 0; i < 2; i++) {
+    pushLine(powerLines, towerA.arm[i], towerB.arm[i]);
+    pushLine(powerLines, towerB.arm[i], towerC.arm[i]);
+    pushLine(powerLines, towerA.upper[i], towerB.upper[i]);
+    pushLine(powerLines, towerB.upper[i], towerC.upper[i]);
+  }
+  pushLine(powerLines, [490, 48, 176], towerA.arm[0]);
+  pushLine(powerLines, [490, 48, 220], towerA.arm[1]);
+
+  for (let i = 0; i < 8; i++) {
+    const x = -190 + i * 38;
+    addCylinderWire(detailLines, x, -140, 8, 26, 0, 20, 4);
+    pushLine(accentLines, [x - 8, 30, -140], [x + 8, 30, -140]);
+  }
+
+  addFlowPath([[330, 45, 176], [490, 48, 176], towerA.arm[0], towerB.arm[0], towerC.arm[0]]);
+  addFlowPath([[338, 45, 220], [490, 48, 220], towerA.arm[1], towerB.arm[1], towerC.arm[1]]);
+  addFlowPath([[286, 42, 132], [372, 42, 132], [430, 46, 176], [490, 48, 176], towerA.upper[0], towerB.upper[0], towerC.upper[0]]);
+  addFlowPath([[286, 42, 264], [372, 42, 264], [430, 46, 220], [490, 48, 220], towerA.upper[1], towerB.upper[1], towerC.upper[1]]);
+
+  const groundMesh = new THREE.LineSegments(makeLineGeometry(groundLines), makeWireMaterial(greyLight, 0.18));
+  const waterMesh = new THREE.LineSegments(makeLineGeometry(waterLines), makeWireMaterial(greyLight, 0.24));
+  const cityMesh = new THREE.LineSegments(makeLineGeometry(cityLines), makeWireMaterial(greyMid, 0.28));
+  const structureMesh = new THREE.LineSegments(makeLineGeometry(structureLines), makeWireMaterial(greyDark, 0.68));
+  const detailMesh = new THREE.LineSegments(makeLineGeometry(detailLines), makeWireMaterial(greyMid, 0.34));
+  const accentMesh = new THREE.LineSegments(makeLineGeometry(accentLines), makeWireMaterial(accentYellow, 0.58));
+  const powerMesh = new THREE.LineSegments(makeLineGeometry(powerLines), makeWireMaterial(greyDark, 0.42));
+  scene.add(groundMesh, waterMesh, cityMesh, structureMesh, detailMesh, accentMesh, powerMesh);
+
+  scene.add(createAtmosphereParticles(14500));
+  scene.add(createUrbanParticles(3600));
+  scene.add(createHazeParticles(2800));
+  scene.add(createFlowParticles(3000));
+}
+
+function updateHaze(dt, elapsed) {
+  if (!hazeGeo) return;
+  const arr = hazeGeo.attributes.position.array;
+  for (let i = 0; i < hazeParticles.length; i++) {
+    const d = hazeParticles[i];
+    const source = hazeSources[d.sourceIndex];
+    d.t = (d.t + d.speed * dt * particleSettings.steamSpeed) % 1;
+    const growth = Math.pow(d.t, 0.72);
+    const radius = source.radius + source.spread * growth * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(d.phase * 1.7)));
+    const angle = d.phase + elapsed * source.swirl * d.spin + d.t * 0.72;
+    const ix = i * 3;
+    arr[ix + 0] = source.x + Math.cos(angle) * radius + Math.sin(elapsed * 0.16 + d.phase) * 7;
+    arr[ix + 1] = source.y + source.rise * growth + Math.sin(elapsed * 0.11 + d.phase) * 4;
+    arr[ix + 2] = source.z + Math.sin(angle) * radius + Math.cos(elapsed * 0.13 + d.phase) * 7;
+  }
+  hazeGeo.attributes.position.needsUpdate = true;
+}
+
+function updateFlow(dt, elapsed) {
+  if (!flowGeo) return;
+  const arr = flowGeo.attributes.position.array;
+  const tmp = [0, 0, 0];
+  for (let i = 0; i < flowData.length; i++) {
+    const d = flowData[i];
+    const path = flowPaths[d.pathIndex];
+    d.t = (d.t + d.speed * dt * particleSettings.flowSpeed) % 1;
+    sampleFlowPath(path, d.t, tmp);
+    const pulse = Math.sin(elapsed * 3.1 + d.phase) * d.offset;
+    const ix = i * 3;
+    arr[ix + 0] = tmp[0] + pulse * 0.35;
+    arr[ix + 1] = tmp[1] + Math.sin(elapsed * 2.2 + d.phase) * 0.8;
+    arr[ix + 2] = tmp[2] + pulse * 0.35;
+  }
+  flowGeo.attributes.position.needsUpdate = true;
+}
+
+function updateHud(elapsed) {
+  const output = 842 + Math.sin(elapsed * 0.16) * 18 + Math.sin(elapsed * 0.071) * 9;
+  const haze = 0.72 + Math.sin(elapsed * 0.24) * 0.06;
+  const flow = 1 + Math.sin(elapsed * 0.34) * 0.08;
+  hudStatus.textContent = `TURBINES 04 - GRID FLOW ${flow.toFixed(2)} - CITY HAZE ${haze.toFixed(2)}`;
+  readoutOutput.textContent = `Output ${output.toFixed(1)} MW`;
+  readoutSteam.textContent = `City haze ${haze.toFixed(2)}`;
+  readoutGrid.textContent = `Bus frequency ${(59.98 + Math.sin(elapsed * 0.41) * 0.02).toFixed(2)} hz`;
+}
+
+function finishLoad() {
+  lblText.textContent = 'Generation plant ready';
+  requestAnimationFrame(() => {
+    document.body.classList.add('scene-ready');
+    loader.classList.add('gone');
+    setTimeout(() => loader.remove(), 900);
+  });
+}
+
+for (const input of cameraInputs()) {
+  input.addEventListener('input', applyCameraDebugInputs);
+}
+
+for (const input of sceneInputs()) {
+  input.addEventListener('input', applySceneDebugInputs);
+}
+
+for (const input of particleInputs()) {
+  input.addEventListener('input', applyParticleDebugInputs);
+}
+
+if (debugEls.cameraAnimDuration) {
+  debugEls.cameraAnimDuration.addEventListener('input', () => {
+    const duration = parseFloat(debugEls.cameraAnimDuration.value);
+    if (Number.isFinite(duration)) {
+      cameraAnimation.duration = clamp(duration, 0.1, 120);
+      saveCameraAnimationState();
+      updateCameraAnimationDebug();
+    }
+  });
+}
+
+if (debugEls.setCameraKeyA) debugEls.setCameraKeyA.addEventListener('click', () => setCameraKey('A'));
+if (debugEls.setCameraKeyB) debugEls.setCameraKeyB.addEventListener('click', () => setCameraKey('B'));
+if (debugEls.setCameraKeyC) debugEls.setCameraKeyC.addEventListener('click', () => setCameraKey('C'));
+if (debugEls.returnCameraKeyA) debugEls.returnCameraKeyA.addEventListener('click', () => returnToCameraKey('A'));
+if (debugEls.returnCameraKeyB) debugEls.returnCameraKeyB.addEventListener('click', () => returnToCameraKey('B'));
+if (debugEls.returnCameraKeyC) debugEls.returnCameraKeyC.addEventListener('click', () => returnToCameraKey('C'));
+if (debugEls.playCameraMove) debugEls.playCameraMove.addEventListener('click', playCameraAnimation);
+if (debugEls.resetCameraMove) debugEls.resetCameraMove.addEventListener('click', resetCameraAnimation);
+if (debugEls.shotLowOrbit) debugEls.shotLowOrbit.addEventListener('click', () => applyCameraShot('Low Orbit'));
+if (debugEls.shotTopographic) debugEls.shotTopographic.addEventListener('click', () => applyCameraShot('Topographic'));
+if (debugEls.shotMacro) debugEls.shotMacro.addEventListener('click', () => applyCameraShot('Macro'));
+if (debugEls.shotHorizonSweep) debugEls.shotHorizonSweep.addEventListener('click', () => applyCameraShot('Horizon Sweep'));
+if (debugEls.togglePanel) {
+  debugEls.togglePanel.addEventListener('click', () => {
+    setDebugPanelCollapsed(!debugEls.panel.classList.contains('is-collapsed'));
+  });
+}
+if (debugEls.copy) debugEls.copy.addEventListener('click', copyDebugData);
+if (debugEls.resetCamera) {
+  debugEls.resetCamera.addEventListener('click', () => {
+    activeCameraShotName = 'Custom';
+    stopCameraAnimation();
+    applyCameraState(defaultCameraState(), true);
+    updateShotButtons();
+  });
+}
+if (debugEls.resetParticles) {
+  debugEls.resetParticles.addEventListener('click', () => applyParticleState(defaultParticleState(), true));
+}
+if (debugEls.telemetryHudEnabled) {
+  debugEls.telemetryHudEnabled.addEventListener('change', () => {
+    setTelemetryHudEnabled(debugEls.telemetryHudEnabled.checked);
+  });
+}
+
+controls.addEventListener('change', () => {
+  if (applyingProgrammaticCameraState || cameraAnimation.active) return;
+  activeCameraShotName = 'Custom';
+  updateCameraDebug();
+  updateShotButtons();
+});
+controls.addEventListener('end', () => {
+  if (!cameraAnimation.active) saveCameraState();
+});
+
+window.addEventListener('keydown', (event) => {
+  if (event.key.toLowerCase() === 'p' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+      event.preventDefault();
+      playCameraAnimation();
+    }
+  }
+});
+
+Object.assign(cameraAnimation, readSavedCameraAnimationState(), { active: false, startedAt: 0 });
+applyCameraState(readSavedCameraState(), false);
+applySceneState(readSavedSceneState(), false);
+applyParticleState(readSavedParticleState(), false);
+setTelemetryHudEnabled(readTelemetryHudEnabled(), false);
+setDebugPanelCollapsed(readDebugPanelCollapsed(), false);
+updateCameraAnimationDebug();
+updateShotButtons();
+
+buildPlant();
+finishLoad();
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  sharedUniforms.uPixelRatio.value = renderer.getPixelRatio();
+});
+
+const clock = new THREE.Clock();
+let hudTick = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const elapsed = clock.elapsedTime;
+  sharedUniforms.uTime.value = elapsed;
+  updateHaze(dt, elapsed);
+  updateFlow(dt, elapsed);
+  updateCameraAnimation(performance.now());
+  controls.update();
+  if (elapsed - hudTick > 0.18) {
+    hudTick = elapsed;
+    updateHud(elapsed);
+  }
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
