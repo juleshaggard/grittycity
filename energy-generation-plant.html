@@ -387,17 +387,30 @@
     </div>
     <div class="debug-menu__section">Camera Move</div>
     <div class="debug-menu__grid">
-      <label>Time S <input id="cameraAnimDuration" type="number" min="0.1" max="120" step="0.1" /></label>
+      <label>Total S <input id="cameraAnimDuration" type="number" min="0.1" max="1200" step="0.1" readonly /></label>
+      <label>Move A-B <input id="cameraMoveAB" type="number" min="0.1" max="120" step="0.1" /></label>
+      <label>Move B-C <input id="cameraMoveBC" type="number" min="0.1" max="120" step="0.1" /></label>
+      <label>Move C-D <input id="cameraMoveCD" type="number" min="0.1" max="120" step="0.1" /></label>
+      <label>Move D-E <input id="cameraMoveDE" type="number" min="0.1" max="120" step="0.1" /></label>
+      <label>Hold A <input id="cameraHoldA" type="number" min="0" max="120" step="0.1" /></label>
+      <label>Hold B <input id="cameraHoldB" type="number" min="0" max="120" step="0.1" /></label>
+      <label>Hold C <input id="cameraHoldC" type="number" min="0" max="120" step="0.1" /></label>
+      <label>Hold D <input id="cameraHoldD" type="number" min="0" max="120" step="0.1" /></label>
+      <label>Hold E <input id="cameraHoldE" type="number" min="0" max="120" step="0.1" /></label>
     </div>
     <div class="debug-menu__actions">
       <button id="setCameraKeyA" type="button">Set A</button>
       <button id="setCameraKeyB" type="button">Set B</button>
       <button id="setCameraKeyC" type="button">Set C</button>
+      <button id="setCameraKeyD" type="button">Set D</button>
+      <button id="setCameraKeyE" type="button">Set E</button>
     </div>
     <div class="debug-menu__actions">
       <button id="returnCameraKeyA" type="button">Return to A</button>
       <button id="returnCameraKeyB" type="button">Return to B</button>
       <button id="returnCameraKeyC" type="button">Return to C</button>
+      <button id="returnCameraKeyD" type="button">Return to D</button>
+      <button id="returnCameraKeyE" type="button">Return to E</button>
     </div>
     <div class="debug-menu__actions">
       <button id="playCameraMove" type="button">Play</button>
@@ -409,7 +422,8 @@
       <label>Point Alpha <input id="particleAlpha" type="number" min="0" max="3" step="0.05" /></label>
       <label>Point Density <input id="particleDensity" type="number" min="0" max="10" step="0.05" /></label>
       <label>Atmo Density <input id="particleAtmosphereDensity" type="number" min="0" max="10" step="0.05" /></label>
-      <label>Haze Density <input id="particleSteamDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Grid Density <input id="particleGridDensity" type="number" min="0" max="10" step="0.05" /></label>
+      <label>Water Density <input id="particleSteamDensity" type="number" min="0" max="10" step="0.05" /></label>
       <label>Flow Density <input id="particleFlowDensity" type="number" min="0" max="10" step="0.05" /></label>
       <label>Point Color <input id="particleColor" type="color" /></label>
       <label>Color Mix <input id="particleColorMix" type="number" min="0" max="1" step="0.05" /></label>
@@ -417,7 +431,8 @@
       <label>Wobble <input id="particleWobble" type="number" min="0" max="4" step="0.05" /></label>
       <label>Twinkle Speed <input id="twinkleSpeed" type="number" min="0" max="8" step="0.1" /></label>
       <label>Twinkle Amt <input id="twinkleAmount" type="number" min="0" max="1" step="0.05" /></label>
-      <label>Haze Speed <input id="steamSpeed" type="number" min="0" max="5" step="0.05" /></label>
+      <label>Grid Speed <input id="gridSpeed" type="number" min="0" max="5" step="0.05" /></label>
+      <label>Water Speed <input id="steamSpeed" type="number" min="0" max="5" step="0.05" /></label>
       <label>Flow Speed <input id="flowSpeed" type="number" min="0" max="5" step="0.05" /></label>
     </div>
     <div class="debug-menu__section">Interaction</div>
@@ -470,10 +485,20 @@ const debugEls = {
   maxPolar: document.getElementById('maxPolar'),
   orbRotationDeg: document.getElementById('orbRotationDeg'),
   cameraAnimDuration: document.getElementById('cameraAnimDuration'),
+  cameraMoveAB: document.getElementById('cameraMoveAB'),
+  cameraMoveBC: document.getElementById('cameraMoveBC'),
+  cameraMoveCD: document.getElementById('cameraMoveCD'),
+  cameraMoveDE: document.getElementById('cameraMoveDE'),
+  cameraHoldA: document.getElementById('cameraHoldA'),
+  cameraHoldB: document.getElementById('cameraHoldB'),
+  cameraHoldC: document.getElementById('cameraHoldC'),
+  cameraHoldD: document.getElementById('cameraHoldD'),
+  cameraHoldE: document.getElementById('cameraHoldE'),
   particleScale: document.getElementById('particleScale'),
   particleAlpha: document.getElementById('particleAlpha'),
   particleDensity: document.getElementById('particleDensity'),
   particleAtmosphereDensity: document.getElementById('particleAtmosphereDensity'),
+  particleGridDensity: document.getElementById('particleGridDensity'),
   particleSteamDensity: document.getElementById('particleSteamDensity'),
   particleFlowDensity: document.getElementById('particleFlowDensity'),
   particleColor: document.getElementById('particleColor'),
@@ -482,6 +507,7 @@ const debugEls = {
   particleWobble: document.getElementById('particleWobble'),
   twinkleSpeed: document.getElementById('twinkleSpeed'),
   twinkleAmount: document.getElementById('twinkleAmount'),
+  gridSpeed: document.getElementById('gridSpeed'),
   steamSpeed: document.getElementById('steamSpeed'),
   flowSpeed: document.getElementById('flowSpeed'),
   telemetryHudEnabled: document.getElementById('telemetryHudEnabled'),
@@ -493,9 +519,13 @@ const debugEls = {
   setCameraKeyA: document.getElementById('setCameraKeyA'),
   setCameraKeyB: document.getElementById('setCameraKeyB'),
   setCameraKeyC: document.getElementById('setCameraKeyC'),
+  setCameraKeyD: document.getElementById('setCameraKeyD'),
+  setCameraKeyE: document.getElementById('setCameraKeyE'),
   returnCameraKeyA: document.getElementById('returnCameraKeyA'),
   returnCameraKeyB: document.getElementById('returnCameraKeyB'),
   returnCameraKeyC: document.getElementById('returnCameraKeyC'),
+  returnCameraKeyD: document.getElementById('returnCameraKeyD'),
+  returnCameraKeyE: document.getElementById('returnCameraKeyE'),
   playCameraMove: document.getElementById('playCameraMove'),
   resetCameraMove: document.getElementById('resetCameraMove'),
   shotLowOrbit: document.getElementById('shotLowOrbit'),
@@ -514,27 +544,33 @@ container.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xffffff);
 
-const DEFAULT_CAMERA_X = 520;
-const DEFAULT_CAMERA_Y = 260;
-const DEFAULT_CAMERA_Z = 650;
-const DEFAULT_TARGET_X = 12;
-const DEFAULT_TARGET_Y = 44;
-const DEFAULT_TARGET_Z = 8;
-const DEFAULT_CAMERA_FOV = 58;
+const DEFAULT_CAMERA_X = 1337.87;
+const DEFAULT_CAMERA_Y = 217.59;
+const DEFAULT_CAMERA_Z = 6208.74;
+const DEFAULT_TARGET_X = 106.3;
+const DEFAULT_TARGET_Y = 66.7;
+const DEFAULT_TARGET_Z = -171.7;
+const DEFAULT_CAMERA_FOV = 37;
 const DEFAULT_CAMERA_ZOOM = 1;
 const DEFAULT_CAMERA_NEAR = 0.5;
-const DEFAULT_CAMERA_FAR = 7000;
+const DEFAULT_CAMERA_FAR = 14000;
+const DEFAULT_CAMERA_MAX_DISTANCE = 6500;
 const DEFAULT_FADE_NEAR = 12;
-const DEFAULT_FADE_FAR = 780;
+const DEFAULT_FADE_FAR = 9000;
 const DEFAULT_MAX_POLAR_DEG = 108;
 const DEFAULT_ORB_ROTATION_DEG = 0;
-const DEFAULT_CAMERA_ANIMATION_DURATION = 5.5;
-const DEFAULT_PARTICLE_SCALE = 1;
-const DEFAULT_PARTICLE_ALPHA = 0.92;
-const DEFAULT_PARTICLE_DENSITY = 1;
-const DEFAULT_ATMOSPHERE_DENSITY = 3;
-const DEFAULT_STEAM_DENSITY = 3;
-const DEFAULT_FLOW_DENSITY = 3;
+const DEFAULT_CAMERA_ANIMATION_DURATION = 21;
+const DEFAULT_CAMERA_MOVE_DURATION = 3;
+const CAMERA_KEY_NAMES = ['A', 'B', 'C', 'D', 'E'];
+const CAMERA_SEGMENT_NAMES = ['AB', 'BC', 'CD', 'DE'];
+const DEFAULT_CAMERA_HOLD_DURATIONS = { A: 3, B: 3, C: 3, D: 0, E: 0 };
+const DEFAULT_PARTICLE_SCALE = 4.3;
+const DEFAULT_PARTICLE_ALPHA = 2.45;
+const DEFAULT_PARTICLE_DENSITY = 2.4;
+const DEFAULT_ATMOSPHERE_DENSITY = 3.3;
+const DEFAULT_GRID_PARTICLE_DENSITY = 4.15;
+const DEFAULT_STEAM_DENSITY = 4.9;
+const DEFAULT_FLOW_DENSITY = 3.4;
 const PARTICLE_DENSITY_MAX = 10;
 const DEFAULT_PARTICLE_COLOR = '#a4a4aa';
 const DEFAULT_PARTICLE_COLOR_MIX = 0.12;
@@ -542,15 +578,17 @@ const DEFAULT_PARTICLE_BLUR = 0.74;
 const DEFAULT_PARTICLE_WOBBLE = 0.34;
 const DEFAULT_TWINKLE_SPEED = 1.45;
 const DEFAULT_TWINKLE_AMOUNT = 0.2;
+const DEFAULT_GRID_PARTICLE_SPEED = 1;
 const DEFAULT_STEAM_SPEED = 0.72;
 const DEFAULT_FLOW_SPEED = 1;
 const ATMOSPHERE_POOL_MULTIPLIER = 3;
+const GRID_PARTICLE_POOL_MULTIPLIER = 3;
 const STEAM_POOL_MULTIPLIER = 3;
 const FLOW_POOL_MULTIPLIER = 3;
-const CAMERA_STATE_KEY = 'generation-camera-transform-v1';
-const CAMERA_ANIMATION_STATE_KEY = 'generation-camera-animation-v1';
+const CAMERA_STATE_KEY = 'generation-camera-transform-v5';
+const CAMERA_ANIMATION_STATE_KEY = 'generation-camera-animation-v6';
 const SCENE_STATE_KEY = 'generation-scene-settings-v2';
-const PARTICLE_STATE_KEY = 'generation-particle-settings-v1';
+const PARTICLE_STATE_KEY = 'generation-particle-settings-v3';
 const DEBUG_PANEL_STATE_KEY = 'generation-debug-panel-v1';
 const TELEMETRY_STATE_KEY = 'generation-telemetry-hud-v1';
 
@@ -568,7 +606,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.065;
 controls.minDistance = 90;
-controls.maxDistance = 2500;
+controls.maxDistance = DEFAULT_CAMERA_MAX_DISTANCE;
 controls.maxPolarAngle = THREE.MathUtils.degToRad(DEFAULT_MAX_POLAR_DEG);
 controls.target.set(DEFAULT_TARGET_X, DEFAULT_TARGET_Y, DEFAULT_TARGET_Z);
 controls.mouseButtons = {
@@ -578,10 +616,23 @@ controls.mouseButtons = {
 };
 
 const GLOBE_R = 4200;
+const GLOBE_OCCLUSION_INSET = 22;
+const GENERATION_GLOBAL_GRID_YAW = -0.08;
+const GENERATION_GLOBAL_GRID_ORIGIN_X = 420;
+const GENERATION_GLOBAL_GRID_ORIGIN_Z = 80;
+const GENERATION_GLOBAL_GRID_SPACING = 320;
+const GENERATION_RIVER_GRID_PATH = [
+  [-6.27, -6.30], [-5.87, -5.47], [-5.48, -4.73], [-5.03, -3.91],
+  [-4.60, -3.19], [-4.28, -2.59], [-3.88, -2.03], [-3.51, -1.60],
+  [-3.38, -1.05], [-3.28, -0.34], [-3.09, 0.30], [-2.84, 0.97],
+  [-2.51, 1.62], [-2.22, 2.21], [-1.84, 2.90], [-1.47, 3.58],
+  [-1.02, 4.31], [-0.49, 5.01], [0.00, 5.72],
+];
 const greyDark = new THREE.Color('#595b62');
 const greyMid = new THREE.Color('#898a91');
 const greyLight = new THREE.Color('#bfc0c7');
 const greyMist = new THREE.Color('#d9dadd');
+const waterMist = new THREE.Color('#aebbc5');
 const accentYellow = new THREE.Color('#FCE132');
 
 function clamp(value, min, max) {
@@ -603,6 +654,29 @@ function rand(min, max) {
 function smoothstep(edge0, edge1, x) {
   const t = clamp((x - edge0) / Math.max(0.0001, edge1 - edge0), 0, 1);
   return t * t * (3 - 2 * t);
+}
+
+function generationRiverGxAt(gz) {
+  if (gz <= GENERATION_RIVER_GRID_PATH[0][1]) return GENERATION_RIVER_GRID_PATH[0][0];
+  for (let i = 0; i < GENERATION_RIVER_GRID_PATH.length - 1; i++) {
+    const a = GENERATION_RIVER_GRID_PATH[i];
+    const b = GENERATION_RIVER_GRID_PATH[i + 1];
+    if (gz >= a[1] && gz <= b[1]) {
+      const t = (gz - a[1]) / Math.max(0.001, b[1] - a[1]);
+      return a[0] + (b[0] - a[0]) * t;
+    }
+  }
+  return GENERATION_RIVER_GRID_PATH[GENERATION_RIVER_GRID_PATH.length - 1][0];
+}
+
+function generationGlobalGridPoint(lx, lz, y = 0.22) {
+  const cy = Math.cos(GENERATION_GLOBAL_GRID_YAW);
+  const sy = Math.sin(GENERATION_GLOBAL_GRID_YAW);
+  return [
+    GENERATION_GLOBAL_GRID_ORIGIN_X + lx * cy - lz * sy,
+    y,
+    GENERATION_GLOBAL_GRID_ORIGIN_Z + lx * sy + lz * cy,
+  ];
 }
 
 function makeSpriteTexture() {
@@ -646,6 +720,7 @@ const sharedUniforms = {
 };
 const particleDensityUniforms = {
   atmosphere: { value: DEFAULT_ATMOSPHERE_DENSITY },
+  gridParticles: { value: DEFAULT_GRID_PARTICLE_DENSITY },
   steam: { value: DEFAULT_STEAM_DENSITY },
   flow: { value: DEFAULT_FLOW_DENSITY },
 };
@@ -653,6 +728,7 @@ const sceneSettings = {
   orbRotationDeg: DEFAULT_ORB_ROTATION_DEG,
 };
 const particleSettings = {
+  gridSpeed: DEFAULT_GRID_PARTICLE_SPEED,
   steamSpeed: DEFAULT_STEAM_SPEED,
   flowSpeed: DEFAULT_FLOW_SPEED,
 };
@@ -663,7 +739,19 @@ const cameraAnimation = {
   keyA: null,
   keyB: null,
   keyC: null,
+  keyD: null,
+  keyE: null,
+  moveDurations: null,
+  holdDurations: null,
 };
+const CAMERA_TOP_DOWN_LOOK_BIAS = 180;
+const cameraAnimLookMatrix = new THREE.Matrix4();
+const cameraAnimLookPosition = new THREE.Vector3();
+const cameraAnimLookTarget = new THREE.Vector3();
+const cameraAnimQuatA = new THREE.Quaternion();
+const cameraAnimQuatB = new THREE.Quaternion();
+const cameraAnimQuatC = new THREE.Quaternion();
+const cameraAnimQuatOut = new THREE.Quaternion();
 let suppressCameraInput = false;
 let suppressSceneInput = false;
 let suppressParticleInput = false;
@@ -678,6 +766,7 @@ const pointVert = /* glsl */`
   varying float vFade;
   varying float vBackface;
   varying float vDensitySeed;
+  varying float vDepthLayer;
   uniform float uTime;
   uniform float uPixelRatio;
   uniform float uSizeScale;
@@ -728,8 +817,10 @@ const pointVert = /* glsl */`
     gl_Position = projectionMatrix * mv;
     float dist = -mv.z;
     vFade = clamp(1.0 - (dist - uFadeNear) / max(1.0, uFadeFar - uFadeNear), 0.0, 1.0);
+    vDepthLayer = smoothstep(uFadeFar * 1.15, uFadeFar * 6.2, dist);
     float size = aSize * uSizeScale * uPointScale * 140.0 * uPixelRatio;
-    gl_PointSize = max(1.35, (size / max(0.001, dist)) * (1.0 + vFade * 1.4));
+    float projectedSize = (size / max(0.001, dist)) * (1.0 + vFade * 1.4);
+    gl_PointSize = max(0.55, projectedSize * mix(1.0, 0.68, vDepthLayer));
   }
 `;
 
@@ -739,6 +830,7 @@ const pointFrag = /* glsl */`
   varying float vFade;
   varying float vBackface;
   varying float vDensitySeed;
+  varying float vDepthLayer;
   uniform sampler2D uMap;
   uniform vec3 uBgColor;
   uniform float uDensity;
@@ -752,7 +844,7 @@ const pointFrag = /* glsl */`
   void main() {
     float horizonFade = smoothstep(-0.28, 0.08, vBackface);
     float density = max(0.0, uDensity * uPointDensity);
-    float visibleDensity = clamp(density / max(1.0, uPoolMultiplier), 0.0, 1.0);
+    float visibleDensity = clamp((density / max(1.0, uPoolMultiplier)) * mix(1.0, 0.34, vDepthLayer), 0.0, 1.0);
     if (vDensitySeed > visibleDensity) discard;
     vec4 tex = texture2D(uMap, gl_PointCoord);
     float blurPower = mix(2.35, 0.45, clamp(uPointBlur, 0.0, 1.0));
@@ -760,8 +852,10 @@ const pointFrag = /* glsl */`
     if (pointAlpha < 0.01) discard;
     vec3 sourceColor = mix(vColor, uPointColor, clamp(uPointColorMix, 0.0, 1.0));
     vec3 col = mix(sourceColor * vTwinkle, uBgColor, vFade * 0.95);
+    col = mix(col, uBgColor, vDepthLayer * 0.72);
     float densityBoost = 1.0 + min(max(0.0, density - uPoolMultiplier), 12.0) * 0.05;
-    float alpha = pointAlpha * (1.0 - vFade) * horizonFade * uPointAlpha * densityBoost;
+    float farAlpha = mix(1.0, 0.16, vDepthLayer);
+    float alpha = pointAlpha * (1.0 - vFade) * horizonFade * uPointAlpha * densityBoost * farAlpha;
     if (alpha < 0.01) discard;
     gl_FragColor = vec4(col, alpha);
   }
@@ -831,6 +925,7 @@ function makeWireMaterial(color, alpha) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uSphereR: sharedUniforms.uSphereR,
+      uOrbRotation: sharedUniforms.uOrbRotation,
       uFadeNear: sharedUniforms.uFadeNear,
       uFadeFar: sharedUniforms.uFadeFar,
       uBgColor: sharedUniforms.uBgColor,
@@ -863,6 +958,20 @@ function makePointsMaterial(sizeScale, densityUniform = particleDensityUniforms.
     depthWrite: false,
     blending: THREE.NormalBlending,
   });
+}
+
+function buildGlobeOcclusionLayer() {
+  const geo = new THREE.SphereGeometry(GLOBE_R - GLOBE_OCCLUSION_INSET, 128, 64);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    side: THREE.FrontSide,
+    depthTest: true,
+    depthWrite: true,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = 'generation-globe-white-occlusion-shell';
+  mesh.position.set(0, -GLOBE_R, 0);
+  scene.add(mesh);
 }
 
 function roundForDebug(value, places = 2) {
@@ -913,13 +1022,49 @@ function defaultCameraState() {
 
 function defaultCameraKeyAState() {
   return {
-    x: 520,
-    y: 260,
-    z: 650,
-    targetX: 12,
-    targetY: 44,
-    targetZ: 8,
-    fov: 58,
+    x: -4172.88,
+    y: -737.48,
+    z: 5193.27,
+    targetX: -137.51,
+    targetY: -86.59,
+    targetZ: 139.35,
+    fov: 20,
+    zoom: 1,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: 5000,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  };
+}
+
+function defaultCameraKeyBState() {
+  return {
+    x: 2248.82,
+    y: 1366.25,
+    z: 1808.15,
+    targetX: -591,
+    targetY: -80.91,
+    targetZ: -125.94,
+    fov: 20,
+    zoom: 1,
+    near: DEFAULT_CAMERA_NEAR,
+    far: DEFAULT_CAMERA_FAR,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: 1200,
+    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
+  };
+}
+
+function defaultCameraKeyCState() {
+  return {
+    x: 1337.87,
+    y: 217.59,
+    z: 6208.74,
+    targetX: 106.3,
+    targetY: 66.7,
+    targetZ: -171.7,
+    fov: 37,
     zoom: 1,
     near: DEFAULT_CAMERA_NEAR,
     far: DEFAULT_CAMERA_FAR,
@@ -929,38 +1074,38 @@ function defaultCameraKeyAState() {
   };
 }
 
-function defaultCameraKeyBState() {
+function defaultCameraKeyDState() {
   return {
-    x: -420,
-    y: 176,
-    z: 398,
-    targetX: -100,
-    targetY: 72,
-    targetZ: 42,
-    fov: 48,
+    x: -760,
+    y: 132,
+    z: 530,
+    targetX: 112,
+    targetY: 54,
+    targetZ: -34,
+    fov: 64,
     zoom: 1,
     near: DEFAULT_CAMERA_NEAR,
     far: DEFAULT_CAMERA_FAR,
-    fadeNear: 8,
-    fadeFar: 540,
+    fadeNear: DEFAULT_FADE_NEAR,
+    fadeFar: 1200,
     maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
   };
 }
 
-function defaultCameraKeyCState() {
+function defaultCameraKeyEState() {
   return {
-    x: 770,
-    y: 118,
-    z: 250,
+    x: 348,
+    y: 88,
+    z: 28,
     targetX: 260,
-    targetY: 88,
-    targetZ: 124,
-    fov: 42,
+    targetY: 116,
+    targetZ: -46,
+    fov: 36,
     zoom: 1,
-    near: DEFAULT_CAMERA_NEAR,
+    near: 0.35,
     far: DEFAULT_CAMERA_FAR,
-    fadeNear: 6,
-    fadeFar: 460,
+    fadeNear: 4,
+    fadeFar: 1200,
     maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
   };
 }
@@ -1157,26 +1302,80 @@ function saveCameraState() {
   }
 }
 
+function defaultCameraMoveDurations(duration = DEFAULT_CAMERA_ANIMATION_DURATION) {
+  const perMove = duration === DEFAULT_CAMERA_ANIMATION_DURATION
+    ? DEFAULT_CAMERA_MOVE_DURATION
+    : Math.max(0.1, duration / CAMERA_SEGMENT_NAMES.length);
+  return CAMERA_SEGMENT_NAMES.reduce((durations, segment) => {
+    durations[segment] = perMove;
+    return durations;
+  }, {});
+}
+
+function defaultCameraHoldDurations() {
+  return CAMERA_KEY_NAMES.reduce((durations, key) => {
+    durations[key] = DEFAULT_CAMERA_HOLD_DURATIONS[key] ?? 0;
+    return durations;
+  }, {});
+}
+
+function normalizeCameraMoveDurations(source = null, fallbackDuration = DEFAULT_CAMERA_ANIMATION_DURATION) {
+  const fallback = defaultCameraMoveDurations(fallbackDuration);
+  return CAMERA_SEGMENT_NAMES.reduce((durations, segment) => {
+    durations[segment] = clamp(Number.isFinite(source?.[segment]) ? source[segment] : fallback[segment], 0.1, 120);
+    return durations;
+  }, {});
+}
+
+function normalizeCameraHoldDurations(source = null) {
+  const fallback = defaultCameraHoldDurations();
+  return CAMERA_KEY_NAMES.reduce((durations, key) => {
+    durations[key] = clamp(Number.isFinite(source?.[key]) ? source[key] : fallback[key], 0, 120);
+    return durations;
+  }, {});
+}
+
+function totalCameraAnimationDuration(moveDurations = cameraAnimation.moveDurations, holdDurations = cameraAnimation.holdDurations) {
+  const moves = normalizeCameraMoveDurations(moveDurations);
+  const holds = normalizeCameraHoldDurations(holdDurations);
+  const moveTotal = CAMERA_SEGMENT_NAMES.reduce((total, segment) => total + moves[segment], 0);
+  const holdTotal = CAMERA_KEY_NAMES.reduce((total, key) => total + holds[key], 0);
+  return moveTotal + holdTotal;
+}
+
 function defaultCameraAnimationState() {
+  const moveDurations = defaultCameraMoveDurations();
+  const holdDurations = defaultCameraHoldDurations();
   return {
     active: false,
     startedAt: 0,
-    duration: DEFAULT_CAMERA_ANIMATION_DURATION,
+    duration: totalCameraAnimationDuration(moveDurations, holdDurations),
     keyA: defaultCameraKeyAState(),
     keyB: defaultCameraKeyBState(),
     keyC: defaultCameraKeyCState(),
+    keyD: defaultCameraKeyDState(),
+    keyE: defaultCameraKeyEState(),
+    moveDurations,
+    holdDurations,
   };
 }
 
 function normalizeCameraAnimationState(state = {}) {
   const defaults = defaultCameraAnimationState();
+  const legacyDuration = Number.isFinite(state.duration) ? state.duration : defaults.duration;
+  const moveDurations = normalizeCameraMoveDurations(state.moveDurations, legacyDuration);
+  const holdDurations = normalizeCameraHoldDurations(state.holdDurations);
   return {
     active: false,
     startedAt: 0,
-    duration: clamp(Number.isFinite(state.duration) ? state.duration : defaults.duration, 0.1, 120),
+    duration: totalCameraAnimationDuration(moveDurations, holdDurations),
     keyA: normalizeCameraState(state.keyA || defaults.keyA),
     keyB: normalizeCameraState(state.keyB || defaults.keyB),
     keyC: normalizeCameraState(state.keyC || defaults.keyC),
+    keyD: normalizeCameraState(state.keyD || defaults.keyD),
+    keyE: normalizeCameraState(state.keyE || defaults.keyE),
+    moveDurations,
+    holdDurations,
   };
 }
 
@@ -1240,6 +1439,7 @@ function defaultParticleState() {
     pointAlpha: DEFAULT_PARTICLE_ALPHA,
     pointDensity: DEFAULT_PARTICLE_DENSITY,
     atmosphereDensity: DEFAULT_ATMOSPHERE_DENSITY,
+    gridDensity: DEFAULT_GRID_PARTICLE_DENSITY,
     steamDensity: DEFAULT_STEAM_DENSITY,
     flowDensity: DEFAULT_FLOW_DENSITY,
     pointColor: DEFAULT_PARTICLE_COLOR,
@@ -1248,6 +1448,7 @@ function defaultParticleState() {
     wobble: DEFAULT_PARTICLE_WOBBLE,
     twinkleSpeed: DEFAULT_TWINKLE_SPEED,
     twinkleAmount: DEFAULT_TWINKLE_AMOUNT,
+    gridSpeed: DEFAULT_GRID_PARTICLE_SPEED,
     steamSpeed: DEFAULT_STEAM_SPEED,
     flowSpeed: DEFAULT_FLOW_SPEED,
   };
@@ -1261,7 +1462,8 @@ function normalizeParticleState(state = {}) {
     pointAlpha: clamp(Number.isFinite(state.pointAlpha) ? state.pointAlpha : defaults.pointAlpha, 0, 3),
     pointDensity: clamp(Number.isFinite(state.pointDensity) ? state.pointDensity : defaults.pointDensity, 0, PARTICLE_DENSITY_MAX),
     atmosphereDensity: clamp(Number.isFinite(state.atmosphereDensity) ? state.atmosphereDensity : Number.isFinite(densities.atmosphere) ? densities.atmosphere : defaults.atmosphereDensity, 0, PARTICLE_DENSITY_MAX),
-    steamDensity: clamp(Number.isFinite(state.steamDensity) ? state.steamDensity : Number.isFinite(state.hazeDensity) ? state.hazeDensity : Number.isFinite(densities.haze) ? densities.haze : Number.isFinite(densities.steam) ? densities.steam : defaults.steamDensity, 0, PARTICLE_DENSITY_MAX),
+    gridDensity: clamp(Number.isFinite(state.gridDensity) ? state.gridDensity : Number.isFinite(state.gridParticles) ? state.gridParticles : Number.isFinite(densities.gridParticles) ? densities.gridParticles : Number.isFinite(densities.grid) ? densities.grid : defaults.gridDensity, 0, PARTICLE_DENSITY_MAX),
+    steamDensity: clamp(Number.isFinite(state.steamDensity) ? state.steamDensity : Number.isFinite(state.waterDensity) ? state.waterDensity : Number.isFinite(state.hazeDensity) ? state.hazeDensity : Number.isFinite(densities.water) ? densities.water : Number.isFinite(densities.haze) ? densities.haze : Number.isFinite(densities.steam) ? densities.steam : defaults.steamDensity, 0, PARTICLE_DENSITY_MAX),
     flowDensity: clamp(Number.isFinite(state.flowDensity) ? state.flowDensity : Number.isFinite(densities.flow) ? densities.flow : defaults.flowDensity, 0, PARTICLE_DENSITY_MAX),
     pointColor: normalizeHexColor(state.pointColor, defaults.pointColor),
     pointColorMix: clamp(Number.isFinite(state.pointColorMix) ? state.pointColorMix : defaults.pointColorMix, 0, 1),
@@ -1269,7 +1471,8 @@ function normalizeParticleState(state = {}) {
     wobble: clamp(Number.isFinite(state.wobble) ? state.wobble : defaults.wobble, 0, 4),
     twinkleSpeed: clamp(Number.isFinite(state.twinkleSpeed) ? state.twinkleSpeed : defaults.twinkleSpeed, 0, 8),
     twinkleAmount: clamp(Number.isFinite(state.twinkleAmount) ? state.twinkleAmount : defaults.twinkleAmount, 0, 1),
-    steamSpeed: clamp(Number.isFinite(state.steamSpeed) ? state.steamSpeed : Number.isFinite(state.hazeSpeed) ? state.hazeSpeed : defaults.steamSpeed, 0, 5),
+    gridSpeed: clamp(Number.isFinite(state.gridSpeed) ? state.gridSpeed : defaults.gridSpeed, 0, 5),
+    steamSpeed: clamp(Number.isFinite(state.steamSpeed) ? state.steamSpeed : Number.isFinite(state.waterSpeed) ? state.waterSpeed : Number.isFinite(state.hazeSpeed) ? state.hazeSpeed : defaults.steamSpeed, 0, 5),
     flowSpeed: clamp(Number.isFinite(state.flowSpeed) ? state.flowSpeed : defaults.flowSpeed, 0, 5),
   };
 }
@@ -1290,7 +1493,8 @@ function particleDebugPayload() {
     pointDensity: roundForDebug(sharedUniforms.uPointDensity.value, 3),
     densities: {
       atmosphere: roundForDebug(particleDensityUniforms.atmosphere.value, 3),
-      haze: roundForDebug(particleDensityUniforms.steam.value, 3),
+      gridParticles: roundForDebug(particleDensityUniforms.gridParticles.value, 3),
+      water: roundForDebug(particleDensityUniforms.steam.value, 3),
       flow: roundForDebug(particleDensityUniforms.flow.value, 3),
     },
     pointColor: `#${sharedUniforms.uPointColor.value.getHexString()}`,
@@ -1299,7 +1503,8 @@ function particleDebugPayload() {
     wobble: roundForDebug(sharedUniforms.uWobble.value, 3),
     twinkleSpeed: roundForDebug(sharedUniforms.uTwinkleSpeed.value, 3),
     twinkleAmount: roundForDebug(sharedUniforms.uTwinkleAmount.value, 3),
-    hazeSpeed: roundForDebug(particleSettings.steamSpeed, 3),
+    gridSpeed: roundForDebug(particleSettings.gridSpeed, 3),
+    waterSpeed: roundForDebug(particleSettings.steamSpeed, 3),
     flowSpeed: roundForDebug(particleSettings.flowSpeed, 3),
   };
 }
@@ -1318,10 +1523,25 @@ function updateDebugData() {
     camera: cameraStatePayload(),
     cameraAnimation: {
       active: cameraAnimation.active,
-      durationSeconds: roundForDebug(cameraAnimation.duration, 2),
+      durationSeconds: roundForDebug(totalCameraAnimationDuration(), 2),
+      moveDurations: cleanDebugObject({
+        AB: roundForDebug(cameraAnimation.moveDurations?.AB, 2),
+        BC: roundForDebug(cameraAnimation.moveDurations?.BC, 2),
+        CD: roundForDebug(cameraAnimation.moveDurations?.CD, 2),
+        DE: roundForDebug(cameraAnimation.moveDurations?.DE, 2),
+      }),
+      holdDurations: cleanDebugObject({
+        A: roundForDebug(cameraAnimation.holdDurations?.A, 2),
+        B: roundForDebug(cameraAnimation.holdDurations?.B, 2),
+        C: roundForDebug(cameraAnimation.holdDurations?.C, 2),
+        D: roundForDebug(cameraAnimation.holdDurations?.D, 2),
+        E: roundForDebug(cameraAnimation.holdDurations?.E, 2),
+      }),
       keyframeA: cameraStatePayload(cameraAnimation.keyA),
       keyframeB: cameraStatePayload(cameraAnimation.keyB),
       keyframeC: cameraStatePayload(cameraAnimation.keyC),
+      keyframeD: cameraStatePayload(cameraAnimation.keyD),
+      keyframeE: cameraStatePayload(cameraAnimation.keyE),
     },
     scene: sceneDebugPayload(),
     particles: particleDebugPayload(),
@@ -1339,6 +1559,13 @@ function cameraInputs() {
   ].filter(Boolean);
 }
 
+function cameraAnimationTimingInputs() {
+  return [
+    ...CAMERA_SEGMENT_NAMES.map((segment) => debugEls[`cameraMove${segment}`]),
+    ...CAMERA_KEY_NAMES.map((key) => debugEls[`cameraHold${key}`]),
+  ].filter(Boolean);
+}
+
 function sceneInputs() {
   return [debugEls.orbRotationDeg].filter(Boolean);
 }
@@ -1346,9 +1573,9 @@ function sceneInputs() {
 function particleInputs() {
   return [
     debugEls.particleScale, debugEls.particleAlpha, debugEls.particleDensity,
-    debugEls.particleAtmosphereDensity, debugEls.particleSteamDensity, debugEls.particleFlowDensity,
+    debugEls.particleAtmosphereDensity, debugEls.particleGridDensity, debugEls.particleSteamDensity, debugEls.particleFlowDensity,
     debugEls.particleColor, debugEls.particleColorMix, debugEls.particleBlur, debugEls.particleWobble,
-    debugEls.twinkleSpeed, debugEls.twinkleAmount, debugEls.steamSpeed, debugEls.flowSpeed,
+    debugEls.twinkleSpeed, debugEls.twinkleAmount, debugEls.gridSpeed, debugEls.steamSpeed, debugEls.flowSpeed,
   ].filter(Boolean);
 }
 
@@ -1394,6 +1621,7 @@ function updateParticleDebug() {
   debugEls.particleAlpha.value = sharedUniforms.uPointAlpha.value.toFixed(2);
   debugEls.particleDensity.value = sharedUniforms.uPointDensity.value.toFixed(2);
   debugEls.particleAtmosphereDensity.value = particleDensityUniforms.atmosphere.value.toFixed(2);
+  debugEls.particleGridDensity.value = particleDensityUniforms.gridParticles.value.toFixed(2);
   debugEls.particleSteamDensity.value = particleDensityUniforms.steam.value.toFixed(2);
   debugEls.particleFlowDensity.value = particleDensityUniforms.flow.value.toFixed(2);
   debugEls.particleColor.value = `#${sharedUniforms.uPointColor.value.getHexString()}`;
@@ -1402,6 +1630,7 @@ function updateParticleDebug() {
   debugEls.particleWobble.value = sharedUniforms.uWobble.value.toFixed(2);
   debugEls.twinkleSpeed.value = sharedUniforms.uTwinkleSpeed.value.toFixed(2);
   debugEls.twinkleAmount.value = sharedUniforms.uTwinkleAmount.value.toFixed(2);
+  debugEls.gridSpeed.value = particleSettings.gridSpeed.toFixed(2);
   debugEls.steamSpeed.value = particleSettings.steamSpeed.toFixed(2);
   debugEls.flowSpeed.value = particleSettings.flowSpeed.toFixed(2);
   updateDebugData();
@@ -1409,7 +1638,19 @@ function updateParticleDebug() {
 
 function updateCameraAnimationDebug() {
   if (debugEls.cameraAnimDuration && document.activeElement !== debugEls.cameraAnimDuration) {
-    debugEls.cameraAnimDuration.value = cameraAnimation.duration.toFixed(1);
+    debugEls.cameraAnimDuration.value = totalCameraAnimationDuration().toFixed(1);
+  }
+  for (const segment of CAMERA_SEGMENT_NAMES) {
+    const input = debugEls[`cameraMove${segment}`];
+    if (input && document.activeElement !== input) {
+      input.value = cameraAnimation.moveDurations[segment].toFixed(1);
+    }
+  }
+  for (const key of CAMERA_KEY_NAMES) {
+    const input = debugEls[`cameraHold${key}`];
+    if (input && document.activeElement !== input) {
+      input.value = cameraAnimation.holdDurations[key].toFixed(1);
+    }
   }
   updateDebugData();
 }
@@ -1447,6 +1688,7 @@ function applyParticleState(state, persist = true) {
   sharedUniforms.uPointAlpha.value = next.pointAlpha;
   sharedUniforms.uPointDensity.value = next.pointDensity;
   particleDensityUniforms.atmosphere.value = next.atmosphereDensity;
+  particleDensityUniforms.gridParticles.value = next.gridDensity;
   particleDensityUniforms.steam.value = next.steamDensity;
   particleDensityUniforms.flow.value = next.flowDensity;
   sharedUniforms.uPointColor.value.set(next.pointColor);
@@ -1455,6 +1697,7 @@ function applyParticleState(state, persist = true) {
   sharedUniforms.uWobble.value = next.wobble;
   sharedUniforms.uTwinkleSpeed.value = next.twinkleSpeed;
   sharedUniforms.uTwinkleAmount.value = next.twinkleAmount;
+  particleSettings.gridSpeed = next.gridSpeed;
   particleSettings.steamSpeed = next.steamSpeed;
   particleSettings.flowSpeed = next.flowSpeed;
   if (persist) saveParticleState();
@@ -1481,6 +1724,22 @@ function applyCameraDebugInputs() {
   applyCameraState(next);
 }
 
+function applyCameraAnimationTimingInputs() {
+  const moveDurations = {};
+  for (const segment of CAMERA_SEGMENT_NAMES) {
+    moveDurations[segment] = parseFloat(debugEls[`cameraMove${segment}`]?.value);
+  }
+  const holdDurations = {};
+  for (const key of CAMERA_KEY_NAMES) {
+    holdDurations[key] = parseFloat(debugEls[`cameraHold${key}`]?.value);
+  }
+  cameraAnimation.moveDurations = normalizeCameraMoveDurations(moveDurations, cameraAnimation.duration);
+  cameraAnimation.holdDurations = normalizeCameraHoldDurations(holdDurations);
+  cameraAnimation.duration = totalCameraAnimationDuration();
+  saveCameraAnimationState();
+  updateCameraAnimationDebug();
+}
+
 function applySceneDebugInputs() {
   applySceneState({
     orbRotationDeg: parseFloat(debugEls.orbRotationDeg.value),
@@ -1493,6 +1752,7 @@ function applyParticleDebugInputs() {
     pointAlpha: parseFloat(debugEls.particleAlpha.value),
     pointDensity: parseFloat(debugEls.particleDensity.value),
     atmosphereDensity: parseFloat(debugEls.particleAtmosphereDensity.value),
+    gridDensity: parseFloat(debugEls.particleGridDensity.value),
     steamDensity: parseFloat(debugEls.particleSteamDensity.value),
     flowDensity: parseFloat(debugEls.particleFlowDensity.value),
     pointColor: debugEls.particleColor.value,
@@ -1501,6 +1761,7 @@ function applyParticleDebugInputs() {
     wobble: parseFloat(debugEls.particleWobble.value),
     twinkleSpeed: parseFloat(debugEls.twinkleSpeed.value),
     twinkleAmount: parseFloat(debugEls.twinkleAmount.value),
+    gridSpeed: parseFloat(debugEls.gridSpeed.value),
     steamSpeed: parseFloat(debugEls.steamSpeed.value),
     flowSpeed: parseFloat(debugEls.flowSpeed.value),
   });
@@ -1532,8 +1793,29 @@ function easeInOutExpo(t) {
     : (2 - Math.pow(2, -20 * t + 10)) / 2;
 }
 
+function smootherstep01(t) {
+  const x = clamp(t, 0, 1);
+  return x * x * x * (x * (x * 6 - 15) + 10);
+}
+
+function cameraSequenceProgress(t) {
+  const x = clamp(t, 0, 1);
+  return lerp(smootherstep01(x), easeInOutExpo(x), 0.18);
+}
+
 function lerp(a, b, t) {
   return a + (b - a) * t;
+}
+
+function catmullRom(p0, p1, p2, p3, t) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return 0.5 * (
+    2 * p1 +
+    (-p0 + p2) * t +
+    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+  );
 }
 
 function lerpCameraStates(from, to, t) {
@@ -1556,29 +1838,168 @@ function lerpCameraStates(from, to, t) {
   };
 }
 
+function catmullCameraStates(p0, p1, p2, p3, t) {
+  const a = normalizeCameraState(p0);
+  const b = normalizeCameraState(p1);
+  const c = normalizeCameraState(p2);
+  const d = normalizeCameraState(p3);
+  return normalizeCameraState({
+    x: catmullRom(a.x, b.x, c.x, d.x, t),
+    y: catmullRom(a.y, b.y, c.y, d.y, t),
+    z: catmullRom(a.z, b.z, c.z, d.z, t),
+    targetX: catmullRom(a.targetX, b.targetX, c.targetX, d.targetX, t),
+    targetY: catmullRom(a.targetY, b.targetY, c.targetY, d.targetY, t),
+    targetZ: catmullRom(a.targetZ, b.targetZ, c.targetZ, d.targetZ, t),
+    fov: catmullRom(a.fov, b.fov, c.fov, d.fov, t),
+    zoom: catmullRom(a.zoom, b.zoom, c.zoom, d.zoom, t),
+    near: catmullRom(a.near, b.near, c.near, d.near, t),
+    far: catmullRom(a.far, b.far, c.far, d.far, t),
+    fadeNear: catmullRom(a.fadeNear, b.fadeNear, c.fadeNear, d.fadeNear, t),
+    fadeFar: catmullRom(a.fadeFar, b.fadeFar, c.fadeFar, d.fadeFar, t),
+    maxPolarDeg: catmullRom(a.maxPolarDeg, b.maxPolarDeg, c.maxPolarDeg, d.maxPolarDeg, t),
+  });
+}
+
+function setStableLookTargetForState(state, fallbackState, outTarget) {
+  const next = normalizeCameraState(state);
+  outTarget.set(next.targetX, next.targetY, next.targetZ);
+  const dx = next.targetX - next.x;
+  const dz = next.targetZ - next.z;
+  if (Math.hypot(dx, dz) > 0.001) return outTarget;
+
+  const fallback = normalizeCameraState(fallbackState || defaultCameraState());
+  let bearingX = fallback.targetX - fallback.x;
+  let bearingZ = fallback.targetZ - fallback.z;
+  let bearingLength = Math.hypot(bearingX, bearingZ);
+  if (bearingLength < 0.001) {
+    bearingX = 1;
+    bearingZ = 0;
+    bearingLength = 1;
+  }
+  outTarget.x += (bearingX / bearingLength) * CAMERA_TOP_DOWN_LOOK_BIAS;
+  outTarget.z += (bearingZ / bearingLength) * CAMERA_TOP_DOWN_LOOK_BIAS;
+  return outTarget;
+}
+
+function cameraQuaternionFromState(state, fallbackState, outQuat) {
+  const next = normalizeCameraState(state);
+  cameraAnimLookPosition.set(next.x, next.y, next.z);
+  setStableLookTargetForState(next, fallbackState, cameraAnimLookTarget);
+  cameraAnimLookMatrix.lookAt(cameraAnimLookPosition, cameraAnimLookTarget, camera.up);
+  return outQuat.setFromRotationMatrix(cameraAnimLookMatrix);
+}
+
+function cameraStateForKeyIndex(index) {
+  const key = CAMERA_KEY_NAMES[clamp(index, 0, CAMERA_KEY_NAMES.length - 1)];
+  return cameraAnimation[`key${key}`];
+}
+
+function cameraSegmentState(segmentIndex, t) {
+  const lastIndex = CAMERA_KEY_NAMES.length - 1;
+  const fromIndex = clamp(segmentIndex, 0, lastIndex - 1);
+  return catmullCameraStates(
+    cameraStateForKeyIndex(Math.max(0, fromIndex - 1)),
+    cameraStateForKeyIndex(fromIndex),
+    cameraStateForKeyIndex(fromIndex + 1),
+    cameraStateForKeyIndex(Math.min(lastIndex, fromIndex + 2)),
+    t
+  );
+}
+
+function cameraQuaternionForKeyIndex(index) {
+  const lastIndex = CAMERA_KEY_NAMES.length - 1;
+  const keyIndex = clamp(index, 0, lastIndex);
+  const fallbackIndex = keyIndex < lastIndex ? keyIndex + 1 : keyIndex - 1;
+  return cameraQuaternionFromState(
+    cameraStateForKeyIndex(keyIndex),
+    cameraStateForKeyIndex(fallbackIndex),
+    cameraAnimQuatOut
+  );
+}
+
+function cameraSegmentQuaternion(segmentIndex, t) {
+  const fromIndex = clamp(segmentIndex, 0, CAMERA_KEY_NAMES.length - 2);
+  cameraQuaternionFromState(cameraStateForKeyIndex(fromIndex), cameraStateForKeyIndex(fromIndex + 1), cameraAnimQuatA);
+  cameraQuaternionFromState(cameraStateForKeyIndex(fromIndex + 1), cameraStateForKeyIndex(fromIndex), cameraAnimQuatB);
+  return cameraAnimQuatOut.copy(cameraAnimQuatA).slerp(cameraAnimQuatB, t);
+}
+
+function cameraAnimationFrameAtElapsed(elapsedSeconds) {
+  const moves = normalizeCameraMoveDurations(cameraAnimation.moveDurations);
+  const holds = normalizeCameraHoldDurations(cameraAnimation.holdDurations);
+  let cursor = 0;
+
+  for (let index = 0; index < CAMERA_KEY_NAMES.length; index++) {
+    const key = CAMERA_KEY_NAMES[index];
+    const holdDuration = holds[key];
+    if (elapsedSeconds <= cursor + holdDuration) {
+      return {
+        state: cameraStateForKeyIndex(index),
+        quaternion: cameraQuaternionForKeyIndex(index),
+      };
+    }
+    cursor += holdDuration;
+
+    if (index < CAMERA_SEGMENT_NAMES.length) {
+      const segment = CAMERA_SEGMENT_NAMES[index];
+      const moveDuration = moves[segment];
+      if (elapsedSeconds <= cursor + moveDuration) {
+        const localT = clamp((elapsedSeconds - cursor) / moveDuration, 0, 1);
+        const easedT = easeInOutExpo(localT);
+        return {
+          state: cameraSegmentState(index, easedT),
+          quaternion: cameraSegmentQuaternion(index, easedT),
+        };
+      }
+      cursor += moveDuration;
+    }
+  }
+
+  const finalIndex = CAMERA_KEY_NAMES.length - 1;
+  return {
+    state: cameraStateForKeyIndex(finalIndex),
+    quaternion: cameraQuaternionForKeyIndex(finalIndex),
+  };
+}
+
+function applyCameraAnimationFrame(frame) {
+  const next = normalizeCameraState(frame.state);
+  applyingProgrammaticCameraState = true;
+  camera.position.set(next.x, next.y, next.z);
+  camera.fov = next.fov;
+  camera.zoom = next.zoom;
+  camera.near = next.near;
+  camera.far = next.far;
+  camera.updateProjectionMatrix();
+  controls.target.set(next.targetX, next.targetY, next.targetZ);
+  controls.maxPolarAngle = degToRad(next.maxPolarDeg);
+  camera.quaternion.copy(frame.quaternion);
+  camera.updateMatrixWorld();
+  applyingProgrammaticCameraState = false;
+  sharedUniforms.uFadeNear.value = next.fadeNear;
+  sharedUniforms.uFadeFar.value = next.fadeFar;
+  updateCameraDebug();
+}
+
 function updateCameraAnimation(now) {
   if (!cameraAnimation.active) return;
-  const durationMs = Math.max(100, cameraAnimation.duration * 1000);
-  const t = clamp((now - cameraAnimation.startedAt) / durationMs, 0, 1);
-  const firstHalf = t < 0.5;
-  const localT = firstHalf ? t * 2 : (t - 0.5) * 2;
-  const eased = easeInOutExpo(localT);
-  const from = firstHalf ? cameraAnimation.keyA : cameraAnimation.keyB;
-  const to = firstHalf ? cameraAnimation.keyB : cameraAnimation.keyC;
-  applyCameraState(lerpCameraStates(from, to, eased), false);
-  if (t >= 1) {
+  const durationSeconds = Math.max(0.1, totalCameraAnimationDuration());
+  const elapsedSeconds = (now - cameraAnimation.startedAt) / 1000;
+  applyCameraAnimationFrame(cameraAnimationFrameAtElapsed(elapsedSeconds));
+  if (elapsedSeconds >= durationSeconds) {
     cameraAnimation.active = false;
     controls.enabled = true;
-    applyCameraState(cameraAnimation.keyC, true);
+    applyCameraState(cameraAnimation.keyE, true);
     updateCameraAnimationDebug();
   }
 }
 
 function playCameraAnimation() {
+  cameraAnimation.duration = totalCameraAnimationDuration();
   cameraAnimation.active = true;
   cameraAnimation.startedAt = performance.now();
   controls.enabled = false;
-  applyCameraState(cameraAnimation.keyA, false);
+  applyCameraAnimationFrame(cameraAnimationFrameAtElapsed(0));
   updateCameraAnimationDebug();
 }
 
@@ -1763,6 +2184,42 @@ function addCircle(lines, cx, y, cz, radius, segments = 40) {
   return pts;
 }
 
+function addAxisCircle(lines, center, radius, axis = 'y', segments = 22) {
+  const pts = [];
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * Math.PI * 2;
+    if (axis === 'x') pts.push([center[0], center[1] + Math.cos(a) * radius, center[2] + Math.sin(a) * radius]);
+    else if (axis === 'z') pts.push([center[0] + Math.cos(a) * radius, center[1] + Math.sin(a) * radius, center[2]]);
+    else pts.push([center[0] + Math.cos(a) * radius, center[1], center[2] + Math.sin(a) * radius]);
+  }
+  for (let i = 0; i < segments; i++) pushLine(lines, pts[i], pts[(i + 1) % segments]);
+  return pts;
+}
+
+function addJoint(lines, center, radius = 3.2) {
+  addAxisCircle(lines, center, radius, 'x', 22);
+  addAxisCircle(lines, center, radius * 0.75, 'y', 18);
+}
+
+function addLink(lines, a, b, thickness = 2.4) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const dz = b[2] - a[2];
+  const len = Math.hypot(dx, dy, dz) || 1;
+  const nx = -dz / Math.max(1, Math.hypot(dx, dz)) * thickness * 0.5;
+  const nz = dx / Math.max(1, Math.hypot(dx, dz)) * thickness * 0.5;
+  pushLine(lines, [a[0] + nx, a[1], a[2] + nz], [b[0] + nx, b[1], b[2] + nz]);
+  pushLine(lines, [a[0] - nx, a[1], a[2] - nz], [b[0] - nx, b[1], b[2] - nz]);
+  const steps = Math.max(2, Math.min(6, Math.round(len / 26)));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = a[0] + dx * t;
+    const y = a[1] + dy * t;
+    const z = a[2] + dz * t;
+    pushLine(lines, [x + nx, y, z + nz], [x - nx, y, z - nz]);
+  }
+}
+
 function addCylinderWire(lines, cx, cz, radius, h, baseY = 0, segments = 34, rings = 6) {
   const ringPts = [];
   for (let r = 0; r < rings; r++) {
@@ -1811,22 +2268,6 @@ function addPipe(lines, a, b, radius = 2.2) {
     const z = a[2] + dz * t;
     pushLine(lines, [x + ox, y, z + oz], [x - ox, y, z - oz]);
   }
-}
-
-function addGroundGrid(lines) {
-  const limit = 900;
-  const major = 150;
-  const minor = 75;
-  for (let x = -limit; x <= limit; x += minor) {
-    const y = Math.abs(x % major) < 0.001 ? 0.4 : 0.2;
-    pushLine(lines, [x, y, -limit], [x, y, limit]);
-  }
-  for (let z = -limit; z <= limit; z += minor) {
-    const y = Math.abs(z % major) < 0.001 ? 0.4 : 0.2;
-    pushLine(lines, [-limit, y, z], [limit, y, z]);
-  }
-  addCircle(lines, 0, 0.6, 0, 760, 96);
-  addCircle(lines, 0, 0.6, 0, 1040, 128);
 }
 
 function addTransmissionTower(lines, x, z, h = 145, w = 42) {
@@ -1878,20 +2319,6 @@ function addSubstation(lines, accentLines, x, z) {
   }
 }
 
-function addServiceRoads(lines) {
-  const roadY = 1.1;
-  const roads = [
-    [[-520, roadY, -165], [390, roadY, -165]],
-    [[-520, roadY, 118], [470, roadY, 118]],
-    [[-390, roadY, -360], [-390, roadY, 330]],
-    [[225, roadY, -360], [225, roadY, 360]],
-    [[-120, roadY, -300], [520, roadY, 312]],
-  ];
-  for (const [a, b] of roads) {
-    addPipe(lines, a, b, 4.5);
-  }
-}
-
 function seededRandom(index) {
   const x = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
   return x - Math.floor(x);
@@ -1908,6 +2335,12 @@ function addPolyline(lines, pts) {
 function addWaterCorridor(waterLines, detailLines) {
   const y = 0.45;
   const river = [
+    [-1740, y, -1770],
+    [-1592, y, -1514],
+    [-1450, y, -1290],
+    [-1286, y, -1040],
+    [-1128, y, -820],
+    [-1012, y, -638],
     [-870, y, -468],
     [-742, y, -342],
     [-684, y, -168],
@@ -1915,6 +2348,12 @@ function addWaterCorridor(waterLines, detailLines) {
     [-558, y, 256],
     [-462, y, 462],
     [-338, y, 660],
+    [-230, y, 842],
+    [-94, y, 1052],
+    [42, y, 1260],
+    [206, y, 1480],
+    [392, y, 1690],
+    [566, y, 1904],
   ];
   for (let i = 0; i < river.length - 1; i++) {
     addPipe(waterLines, river[i], river[i + 1], 68);
@@ -1934,29 +2373,77 @@ function addWaterCorridor(waterLines, detailLines) {
       );
     }
   }
+  return river;
 }
 
-function addBridge(lines, accentLines, cx, cz, yaw, length = 174, width = 46, height = 34) {
-  const deckY = 10;
-  addWireBox(lines, cx, cz, length, 7, width, yaw, deckY, false);
+function addGoldenGateBridge(lines, accentLines, cx, cz, yaw, length = 262, width = 58, towerHeight = 92) {
+  const deckY = 13;
+  const deckH = 8;
+  const towerX = length * 0.27;
+  const towerTopY = deckY + towerHeight;
+  const cableSag = 30;
+  const anchorX = length * 0.58;
+
+  addWireBox(lines, cx, cz, length, deckH, width, yaw, deckY, false);
+  for (const z of [-width * 0.36, 0, width * 0.36]) {
+    pushLine(lines, localPoint(cx, cz, yaw, -length * 0.50, deckY + deckH + 2, z), localPoint(cx, cz, yaw, length * 0.50, deckY + deckH + 2, z));
+  }
+
+  for (const tx of [-towerX, towerX]) {
+    for (const side of [-1, 1]) {
+      const z = side * width * 0.34;
+      const p = localPoint(cx, cz, yaw, tx, 0, z);
+      addWireBox(lines, p[0], p[2], 10, towerHeight, 9, yaw, deckY + deckH, false);
+      addWireBox(lines, p[0], p[2], 16, 7, 11, yaw, deckY + towerHeight * 0.52, false);
+      addWireBox(lines, p[0], p[2], 20, 6, 12, yaw, towerTopY - 4, false);
+      pushLine(lines, localPoint(cx, cz, yaw, tx - 10, deckY + deckH, z), localPoint(cx, cz, yaw, tx + 10, towerTopY, z));
+      pushLine(lines, localPoint(cx, cz, yaw, tx + 10, deckY + deckH, z), localPoint(cx, cz, yaw, tx - 10, towerTopY, z));
+    }
+    pushLine(lines, localPoint(cx, cz, yaw, tx, towerTopY - 4, -width * 0.43), localPoint(cx, cz, yaw, tx, towerTopY - 4, width * 0.43));
+    pushLine(lines, localPoint(cx, cz, yaw, tx, deckY + towerHeight * 0.52, -width * 0.43), localPoint(cx, cz, yaw, tx, deckY + towerHeight * 0.52, width * 0.43));
+  }
+
+  function cableY(x) {
+    const u = x / towerX;
+    return towerTopY - cableSag * (1 - u * u);
+  }
+
   for (const side of [-1, 1]) {
-    const z = side * width * 0.5;
-    const topY = deckY + height;
-    pushLine(lines, localPoint(cx, cz, yaw, -length * 0.48, topY, z), localPoint(cx, cz, yaw, length * 0.48, topY, z));
-    for (let i = 0; i <= 8; i++) {
-      const x = -length * 0.45 + length * 0.9 * (i / 8);
-      const p0 = localPoint(cx, cz, yaw, x, deckY + 7, z);
-      const p1 = localPoint(cx, cz, yaw, x, topY, z);
-      pushLine(lines, p0, p1);
-      if (i < 8) {
-        const nx = -length * 0.45 + length * 0.9 * ((i + 1) / 8);
-        pushLine(lines, p0, localPoint(cx, cz, yaw, nx, topY, z));
+    const z = side * width * 0.42;
+    let prev = localPoint(cx, cz, yaw, -anchorX, deckY + 19, z);
+    for (let i = 1; i <= 44; i++) {
+      const t = i / 44;
+      const x = -anchorX + anchorX * 2 * t;
+      let y;
+      if (x < -towerX) {
+        const k = (x + anchorX) / (anchorX - towerX);
+        y = deckY + 19 + (towerTopY - (deckY + 19)) * smoothstep(0, 1, k);
+      } else if (x > towerX) {
+        const k = (x - towerX) / (anchorX - towerX);
+        y = towerTopY + ((deckY + 19) - towerTopY) * smoothstep(0, 1, k);
+      } else {
+        y = cableY(x);
+      }
+      const next = localPoint(cx, cz, yaw, x, y, z);
+      pushLine(lines, prev, next);
+      prev = next;
+    }
+
+    for (let i = 0; i <= 18; i++) {
+      const x = -towerX + (towerX * 2) * (i / 18);
+      const topY = cableY(x);
+      const deckPoint = localPoint(cx, cz, yaw, x, deckY + deckH + 2, z);
+      const cablePoint = localPoint(cx, cz, yaw, x, topY, z);
+      pushLine(lines, deckPoint, cablePoint);
+      if (i % 3 === 0) {
+        pushLine(accentLines, localPoint(cx, cz, yaw, x - 3, deckY + deckH + 5, z * 0.72), localPoint(cx, cz, yaw, x + 3, deckY + deckH + 5, z * 0.72));
       }
     }
   }
-  for (let i = 0; i <= 6; i++) {
-    const x = -length * 0.38 + length * 0.76 * (i / 6);
-    pushLine(accentLines, localPoint(cx, cz, yaw, x, deckY + 11, -width * 0.28), localPoint(cx, cz, yaw, x, deckY + 11, width * 0.28));
+
+  for (let i = 0; i <= 10; i++) {
+    const x = -length * 0.46 + length * 0.92 * (i / 10);
+    pushLine(accentLines, localPoint(cx, cz, yaw, x, deckY + deckH + 3, -width * 0.18), localPoint(cx, cz, yaw, x, deckY + deckH + 3, width * 0.18));
   }
 }
 
@@ -1973,44 +2460,6 @@ function addDam(lines, accentLines, cx, cz, yaw, length = 190) {
   for (let i = 0; i <= 10; i++) {
     const x = -length * 0.46 + length * 0.92 * (i / 10);
     pushLine(lines, localPoint(cx, cz, yaw, x, 0.8, -52), localPoint(cx, cz, yaw, x, 0.8, -112));
-  }
-}
-
-function addCityDistrict(lines, accentLines) {
-  let seed = 1;
-  for (let row = 0; row < 7; row++) {
-    for (let col = 0; col < 9; col++) {
-      seed++;
-      if (seededRandom(seed) < 0.16) continue;
-      const x = -930 + col * 58 + seededRandom(seed + 11) * 8;
-      const z = -55 + row * 58 + seededRandom(seed + 23) * 9;
-      const w = 24 + seededRandom(seed + 31) * 24;
-      const d = 20 + seededRandom(seed + 41) * 26;
-      const h = 18 + Math.pow(seededRandom(seed + 53), 1.75) * 148;
-      addWireBox(lines, x, z, w, h, d, seededRandom(seed + 67) * 0.22 - 0.11, 0, h > 86);
-      if (h > 104 && seededRandom(seed + 71) > 0.78) {
-        pushLine(accentLines, [x - w * 0.28, h + 2, z], [x + w * 0.28, h + 2, z]);
-      }
-    }
-  }
-  for (let row = 0; row <= 7; row++) {
-    const z = -84 + row * 58;
-    addPipe(lines, [-984, 1.0, z], [-430, 1.0, z + 18], 2.4);
-  }
-  for (let col = 0; col <= 9; col++) {
-    const x = -958 + col * 58;
-    addPipe(lines, [x, 1.0, -110], [x + 18, 1.0, 390], 2.1);
-  }
-
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 7; col++) {
-      seed++;
-      if (seededRandom(seed + 101) < 0.22) continue;
-      const x = 414 + col * 62 + seededRandom(seed + 111) * 9;
-      const z = -620 + row * 62 + seededRandom(seed + 121) * 12;
-      const h = 14 + seededRandom(seed + 131) * 94;
-      addWireBox(lines, x, z, 24 + seededRandom(seed + 141) * 28, h, 24 + seededRandom(seed + 151) * 24, -0.08, 0, h > 54);
-    }
   }
 }
 
@@ -2093,18 +2542,36 @@ function createHazeParticles(count) {
 const flowPaths = [];
 const flowData = [];
 let flowGeo = null;
+const riverFlowPaths = [];
+const riverFlowData = [];
+let riverFlowGeo = null;
+const windParticleData = [];
+let windParticleGeo = null;
+const windRotorData = [];
+let windRotorBladeGeo = null;
+const overarchingGridParticleData = [];
+let overarchingGridParticleGeo = null;
+let generationWindTurbineCount = 0;
 
-function addFlowPath(points) {
+function makeSamplePath(points) {
   const lengths = [];
   let total = 0;
   for (let i = 0; i < points.length - 1; i++) {
     total += Math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1], points[i + 1][2] - points[i][2]);
     lengths.push(total);
   }
-  flowPaths.push({ points, lengths, total: Math.max(1, total) });
+  return { points, lengths, total: Math.max(1, total) };
 }
 
-function sampleFlowPath(path, t, target) {
+function addFlowPath(points) {
+  flowPaths.push(makeSamplePath(points));
+}
+
+function addRiverFlowPath(points) {
+  riverFlowPaths.push(makeSamplePath(points));
+}
+
+function sampleFlowPath(path, t, target, tangent = null) {
   const distance = ((t % 1) + 1) % 1 * path.total;
   let seg = 0;
   while (seg < path.lengths.length - 1 && distance > path.lengths[seg]) seg++;
@@ -2116,6 +2583,15 @@ function sampleFlowPath(path, t, target) {
   target[0] = a[0] + (b[0] - a[0]) * local;
   target[1] = a[1] + (b[1] - a[1]) * local;
   target[2] = a[2] + (b[2] - a[2]) * local;
+  if (tangent) {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const dz = b[2] - a[2];
+    const len = Math.hypot(dx, dy, dz) || 1;
+    tangent[0] = dx / len;
+    tangent[1] = dy / len;
+    tangent[2] = dz / len;
+  }
   return target;
 }
 
@@ -2147,9 +2623,472 @@ function createFlowParticles(count) {
   return new THREE.Points(flowGeo, makePointsMaterial(1.02, particleDensityUniforms.flow, FLOW_POOL_MULTIPLIER));
 }
 
+function createRiverParticles(count) {
+  const points = [];
+  const tmp = [0, 0, 0];
+  const tangent = [1, 0, 0];
+  for (let i = 0; i < count; i++) {
+    const pathIndex = Math.floor(Math.random() * riverFlowPaths.length);
+    const path = riverFlowPaths[pathIndex];
+    const t = Math.random();
+    sampleFlowPath(path, t, tmp, tangent);
+    const nx = -tangent[2];
+    const nz = tangent[0];
+    const lane = rand(-34, 34);
+    const phase = rand(0, 1000);
+    riverFlowData.push({
+      pathIndex,
+      t,
+      lane,
+      phase,
+      speed: rand(0.020, 0.056),
+      ripple: rand(1.4, 5.8),
+    });
+    points.push({
+      x: tmp[0] + nx * lane + rand(-2.2, 2.2),
+      y: tmp[1] + rand(1.2, 4.8),
+      z: tmp[2] + nz * lane + rand(-2.2, 2.2),
+      color: Math.random() < 0.08 ? accentYellow : (Math.random() < 0.62 ? waterMist : greyLight),
+      size: rand(0.42, 1.18),
+      phase,
+    });
+  }
+  riverFlowGeo = makePointGeometry(points);
+  return new THREE.Points(riverFlowGeo, makePointsMaterial(0.82, particleDensityUniforms.steam, STEAM_POOL_MULTIPLIER));
+}
+
+function createWindFarmParticles(count) {
+  const points = [];
+  const runs = [];
+  windParticleData.length = 0;
+
+  for (let gz = -7; gz <= 7; gz++) {
+    const riverGx = generationRiverGxAt(gz);
+    const eastEdgeGx = Math.floor(riverGx - 1.25);
+    const westEdgeGx = Math.max(-8, eastEdgeGx - 6);
+    if (eastEdgeGx <= westEdgeGx) continue;
+    runs.push({
+      a: generationGlobalGridPoint((westEdgeGx - 0.36) * GENERATION_GLOBAL_GRID_SPACING, (gz + rand(-0.12, 0.12)) * GENERATION_GLOBAL_GRID_SPACING, 0),
+      b: generationGlobalGridPoint((eastEdgeGx + 0.28) * GENERATION_GLOBAL_GRID_SPACING, (gz + rand(-0.12, 0.12)) * GENERATION_GLOBAL_GRID_SPACING, 0),
+    });
+  }
+
+  for (let i = 0; i < count; i++) {
+    const run = runs[Math.floor(Math.random() * runs.length)];
+    const y = rand(74, 178);
+    const t = Math.random();
+    const a = [run.a[0], y, run.a[2]];
+    const b = [run.b[0], y + rand(-10, 14), run.b[2]];
+    const x = a[0] + (b[0] - a[0]) * t + rand(-2.8, 2.8);
+    const z = a[2] + (b[2] - a[2]) * t + rand(-2.8, 2.8);
+    const phase = rand(0, 1000);
+    windParticleData.push({
+      ax: a[0],
+      ay: a[1],
+      az: a[2],
+      bx: b[0],
+      by: b[1],
+      bz: b[2],
+      t,
+      phase,
+      speed: rand(0.018, 0.052),
+      drift: rand(1.4, 4.2),
+    });
+    points.push({
+      x,
+      y: a[1] + (b[1] - a[1]) * t,
+      z,
+      color: Math.random() < 0.045 ? accentYellow : (Math.random() < 0.48 ? greyLight : greyMist),
+      size: rand(0.36, 1.05),
+      phase,
+    });
+  }
+  windParticleGeo = makePointGeometry(points);
+  return new THREE.Points(windParticleGeo, makePointsMaterial(0.72, particleDensityUniforms.atmosphere, ATMOSPHERE_POOL_MULTIPLIER));
+}
+
+function buildGenerationOverarchingGrid() {
+  const yaw = GENERATION_GLOBAL_GRID_YAW;
+  const originX = GENERATION_GLOBAL_GRID_ORIGIN_X;
+  const originZ = GENERATION_GLOBAL_GRID_ORIGIN_Z;
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
+  const linePositions = [];
+  const points = [];
+  const c = new THREE.Color();
+  overarchingGridParticleData.length = 0;
+
+  function local(lx, lz, y = 0.18) {
+    return [originX + lx * cy - lz * sy, y, originZ + lx * sy + lz * cy];
+  }
+
+  function addWrappedRun(run) {
+    const [x0, z0, x1, z1] = run;
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const segments = Math.max(12, Math.ceil(len / 38));
+    let prev = local(x0, z0, 0.2);
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      const next = local(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t, 0.2);
+      pushLine(linePositions, prev, next);
+      prev = next;
+    }
+  }
+
+  const runs = [];
+  const longExtent = 4300;
+  const crossExtent = 3500;
+  const spacing = GENERATION_GLOBAL_GRID_SPACING;
+  const halfX = spacing * 8;
+  const halfZ = spacing * 7;
+  for (let z = -halfZ; z <= halfZ; z += spacing) {
+    runs.push([-longExtent, z, longExtent, z]);
+  }
+  for (let x = -halfX; x <= halfX; x += spacing) {
+    runs.push([x, -crossExtent, x, crossExtent]);
+  }
+
+  for (const run of runs) {
+    const a = local(run[0], run[1], 0.22);
+    const b = local(run[2], run[3], 0.22);
+    addWrappedRun(run);
+    const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
+    const steps = Math.floor((len / 11.5) * GRID_PARTICLE_POOL_MULTIPLIER);
+    for (let i = 0; i < steps; i++) {
+      const t = i / Math.max(1, steps - 1);
+      const y = 0.24 + Math.random() * 0.18;
+      const x = a[0] + (b[0] - a[0]) * t + rand(-0.9, 0.9);
+      const z = a[2] + (b[2] - a[2]) * t + rand(-0.9, 0.9);
+      overarchingGridParticleData.push({
+        ax: a[0],
+        az: a[2],
+        bx: b[0],
+        bz: b[2],
+        t,
+        y,
+        speed: rand(0.010, 0.034) * (Math.random() < 0.5 ? -1 : 1),
+        jitter: rand(0.18, 0.56),
+        phase: rand(0, Math.PI * 2),
+      });
+      if (Math.random() < 0.035) c.copy(accentYellow).lerp(greyLight, Math.random() * 0.2);
+      else if (Math.random() < 0.22) c.copy(greyLight).lerp(greyMist, Math.random() * 0.42);
+      else c.copy(greyMid).lerp(greyLight, Math.random() * 0.65);
+      points.push({
+        x,
+        y,
+        z,
+        color: c.clone(),
+        size: rand(0.72, 1.42),
+        phase: rand(0, Math.PI * 2),
+      });
+    }
+  }
+
+  const gridLineMesh = new THREE.LineSegments(makeLineGeometry(linePositions), makeWireMaterial(greyLight, 0.11));
+  gridLineMesh.name = 'generation-overarching-grid-lines';
+  scene.add(gridLineMesh);
+
+  overarchingGridParticleGeo = makePointGeometry(points);
+  const gridPointMesh = new THREE.Points(
+    overarchingGridParticleGeo,
+    makePointsMaterial(0.88, particleDensityUniforms.gridParticles, GRID_PARTICLE_POOL_MULTIPLIER)
+  );
+  gridPointMesh.name = 'generation-overarching-grid-particles';
+  scene.add(gridPointMesh);
+}
+
+function buildGenerationSkidsteers() {
+  const machines = [
+    { x: -690, z: -222, tx: -684, tz: -164, scale: 0.72 },
+    { x: -742, z: -404, tx: -760, tz: -350, scale: 0.66, rotOffset: 0.08 },
+    { x: -456, z: 494, tx: -410, tz: 546, scale: 0.68 },
+    { x: -338, z: 220, tx: -270, tz: 246, scale: 0.76 },
+    { x: -170, z: 206, tx: -126, tz: 252, scale: 0.70, rotOffset: -0.06 },
+    { x: -134, z: -104, tx: -84, tz: -28, scale: 0.70 },
+    { x: 18, z: -246, tx: 2, tz: -178, scale: 0.64 },
+    { x: 184, z: -102, tx: 248, tz: -52, scale: 0.70, rotOffset: 0.04 },
+    { x: 264, z: 126, tx: 314, tz: 176, scale: 0.66 },
+    { x: 376, z: 236, tx: 314, tz: 176, scale: 0.62 },
+    { x: 526, z: 230, tx: 552, tz: 182, scale: 0.58 },
+    { x: 708, z: 260, tx: 720, tz: 204, scale: 0.58, rotOffset: -0.08 },
+    { x: 1018, z: 318, tx: 1038, tz: 254, scale: 0.56 },
+    { x: 1378, z: 392, tx: 1362, tz: 322, scale: 0.54 },
+    { x: 1710, z: 486, tx: 1712, tz: 412, scale: 0.52, rotOffset: 0.06 },
+    { x: 2084, z: 594, tx: 2086, tz: 526, scale: 0.50, rotOffset: -0.05 },
+    { x: -846, z: -520, tx: -870, tz: -468, scale: 0.62 },
+    { x: -512, z: 520, tx: -476, tz: 424, scale: 0.60 },
+  ];
+  const bodyLines = [];
+  const accentLines = [];
+  const toolLines = [];
+
+  function yawToward(machine) {
+    if (Number.isFinite(machine.rot)) return machine.rot;
+    return Math.atan2(machine.x - machine.tx, machine.tz - machine.z) + (machine.rotOffset || 0);
+  }
+
+  function appendMachine(machine) {
+    const originX = machine.x;
+    const originZ = machine.z;
+    const yaw = yawToward(machine);
+    const scale = machine.scale;
+
+    function point(lx, y, lz) {
+      const p = yawPoint(originX, originZ, yaw, lx * scale, y * scale, lz * scale);
+      return [p[0], p[1], p[2]];
+    }
+
+    function box(lx, lz, w, h, d, baseY, target = bodyLines, detail = false) {
+      const p = point(lx, 0, lz);
+      return addWireBox(target, p[0], p[2], w * scale, h * scale, d * scale, yaw, baseY * scale, detail);
+    }
+
+    box(-11, 0, 5.2, 4.8, 28, 2.8);
+    box(11, 0, 5.2, 4.8, 28, 2.8);
+    box(0, -2, 22, 8.5, 23, 6.7);
+    box(0, -10, 15, 6.4, 8.5, 12.2);
+    box(0, 6, 15, 11, 11, 16.6);
+    box(0, 11, 11, 8.5, 8, 26.6, accentLines);
+
+    for (const lx of [-11, 11]) {
+      for (const lz of [-10, 2, 12]) {
+        addAxisCircle(accentLines, point(lx, 2.8, lz), 2.25 * scale, 'x', 16);
+      }
+    }
+
+    const loaderA = point(-10.2, 13.8, 0);
+    const loaderB = point(-12.4, 20.8, 17);
+    const loaderC = point(10.2, 13.8, 0);
+    const loaderD = point(12.4, 20.8, 17);
+    addLink(bodyLines, loaderA, loaderB, 1.6 * scale);
+    addLink(bodyLines, loaderC, loaderD, 1.6 * scale);
+    pushLine(accentLines, loaderB, loaderD);
+
+    const shoulder = point(0, 25, 4);
+    const elbow = point(12, 38, 22);
+    const wrist = point(-5, 31, 40);
+    const tool = point(-10, 25, 51);
+    addJoint(accentLines, shoulder, 3.3 * scale);
+    addJoint(accentLines, elbow, 3.0 * scale);
+    addJoint(accentLines, wrist, 2.35 * scale);
+    addLink(bodyLines, shoulder, elbow, 2.6 * scale);
+    addLink(bodyLines, elbow, wrist, 2.25 * scale);
+    addLink(bodyLines, wrist, tool, 1.8 * scale);
+    pushLine(toolLines, tool, point(-16, 23, 56));
+    pushLine(toolLines, tool, point(-4, 23, 57));
+    pushLine(toolLines, point(-16, 23, 56), point(-19, 20, 61));
+    pushLine(toolLines, point(-4, 23, 57), point(-1, 20, 62));
+  }
+
+  for (const machine of machines) appendMachine(machine);
+
+  const group = new THREE.Group();
+  group.name = 'generation-skidsteer-robots';
+  group.add(new THREE.LineSegments(makeLineGeometry(bodyLines), makeWireMaterial(greyDark, 0.62)));
+  group.add(new THREE.LineSegments(makeLineGeometry(accentLines), makeWireMaterial(greyMid, 0.42)));
+  group.add(new THREE.LineSegments(makeLineGeometry(toolLines), makeWireMaterial(accentYellow, 0.64)));
+  scene.add(group);
+}
+
+function buildGenerationSolarArrays() {
+  const yaw = GENERATION_GLOBAL_GRID_YAW;
+  const pitch = -0.32;
+  const originX = GENERATION_GLOBAL_GRID_ORIGIN_X;
+  const originZ = GENERATION_GLOBAL_GRID_ORIGIN_Z;
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
+  const cp = Math.cos(pitch);
+  const sp = Math.sin(pitch);
+  const gridSpacing = GENERATION_GLOBAL_GRID_SPACING;
+  const panelW = 12.4;
+  const panelD = 4.35;
+  const panelT = 0.46;
+  const colGap = 1.7;
+  const rowGap = 2.05;
+  const panelLines = [];
+  const cellLines = [];
+  const edgeLines = [];
+
+  function gridPoint(lx, lz, y = 0.22) {
+    return [originX + lx * cy - lz * sy, y, originZ + lx * sy + lz * cy];
+  }
+
+  function panelTransform(cx, cz, baseY = 1.4) {
+    return function transform(x, y, z) {
+      const py = y * cp - z * sp;
+      const pz = y * sp + z * cp;
+      return [cx + x * cy - pz * sy, baseY + py, cz + x * sy + pz * cy];
+    };
+  }
+
+  const solarSites = [];
+  const solarSiteKeys = new Set();
+
+  function addSolarSite(gx, gz) {
+    if (gx < -5 || gx > 8 || gz < -7 || gz > 7) return;
+    if (gx >= -4 && gx <= 2 && gz >= -1 && gz <= 1) return;
+    const key = `${gx},${gz}`;
+    if (solarSiteKeys.has(key)) return;
+    solarSiteKeys.add(key);
+    solarSites.push([gx, gz]);
+  }
+
+  for (let gx = 1; gx <= 8; gx++) {
+    for (let gz = -5; gz <= 3; gz++) {
+      addSolarSite(gx, gz);
+    }
+  }
+
+  for (let gz = -7; gz <= 7; gz++) {
+    const riverGx = generationRiverGxAt(gz);
+    const startGx = Math.ceil(riverGx + 1.15);
+    const endGx = Math.min(8, startGx + 5);
+    for (let gx = startGx; gx <= endGx; gx++) {
+      addSolarSite(gx, gz);
+    }
+  }
+
+  for (const [gx, gz] of solarSites) {
+    const blockLocalX = gx * gridSpacing;
+    const blockLocalZ = gz * gridSpacing;
+    const cols = 6 + (gx % 2);
+    const rows = 10 + ((gx + Math.abs(gz)) % 3);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const lx = blockLocalX + (c - (cols - 1) * 0.5) * (panelW + colGap);
+        const lz = blockLocalZ + (r - (rows - 1) * 0.5) * (panelD + rowGap);
+        const center = gridPoint(lx, lz, 0);
+        const transform = panelTransform(center[0], center[2]);
+        const top = panelT;
+        const a = transform(-panelW * 0.5, top, -panelD * 0.5);
+        const b = transform(panelW * 0.5, top, -panelD * 0.5);
+        const c0 = transform(panelW * 0.5, top, panelD * 0.5);
+        const d = transform(-panelW * 0.5, top, panelD * 0.5);
+        pushLine(panelLines, a, b);
+        pushLine(panelLines, b, c0);
+        pushLine(panelLines, c0, d);
+        pushLine(panelLines, d, a);
+
+        for (const x of [-panelW * 0.24, 0, panelW * 0.24]) {
+          pushLine(cellLines, transform(x, top * 0.95, -panelD * 0.40), transform(x, top * 0.95, panelD * 0.40));
+        }
+        for (const z of [-panelD * 0.18, panelD * 0.18]) {
+          pushLine(cellLines, transform(-panelW * 0.40, top * 0.95, z), transform(panelW * 0.40, top * 0.95, z));
+        }
+        pushLine(cellLines, transform(-panelW * 0.36, top * 0.95, -panelD * 0.32), transform(panelW * 0.36, top * 0.95, panelD * 0.32));
+        pushLine(edgeLines, transform(-panelW * 0.5, top * 0.92, panelD * 0.5), transform(panelW * 0.5, top * 0.92, panelD * 0.5));
+      }
+    }
+  }
+
+  const group = new THREE.Group();
+  group.name = 'generation-solar-grid-arrays';
+  group.add(new THREE.LineSegments(makeLineGeometry(panelLines), makeWireMaterial(greyDark, 0.42)));
+  group.add(new THREE.LineSegments(makeLineGeometry(cellLines), makeWireMaterial(greyLight, 0.18)));
+  group.add(new THREE.LineSegments(makeLineGeometry(edgeLines), makeWireMaterial(greyDark, 0.52)));
+  scene.add(group);
+}
+
+function buildGenerationWindFarm() {
+  const towerLines = [];
+  const rotorGuideLines = [];
+  const rotorBladeLines = [];
+  const accentLines = [];
+  windRotorData.length = 0;
+  windRotorBladeGeo = null;
+
+  function rotorPoint(hub, angle, radius, bladeYaw) {
+    const localX = Math.cos(angle) * radius;
+    const localY = Math.sin(angle) * radius;
+    return [
+      hub[0] + localX * Math.cos(bladeYaw),
+      hub[1] + localY,
+      hub[2] + localX * Math.sin(bladeYaw),
+    ];
+  }
+
+  function addRotorCircle(lines, hub, radius, bladeYaw, segments = 28) {
+    let prev = rotorPoint(hub, 0, radius, bladeYaw);
+    for (let i = 1; i <= segments; i++) {
+      const next = rotorPoint(hub, (i / segments) * Math.PI * 2, radius, bladeYaw);
+      pushLine(lines, prev, next);
+      prev = next;
+    }
+  }
+
+  function addRotorBladeLines(lines, hub, radius, bladeYaw, phase) {
+    const lineOffset = lines.length;
+    for (let i = 0; i < 3; i++) {
+      const angle = phase + i * Math.PI * 2 / 3;
+      const tip = rotorPoint(hub, angle, radius, bladeYaw);
+      const innerA = rotorPoint(hub, angle + 0.035, radius * 0.36, bladeYaw);
+      const innerB = rotorPoint(hub, angle - 0.035, radius * 0.36, bladeYaw);
+      pushLine(lines, hub, tip);
+      pushLine(lines, innerA, tip);
+      pushLine(lines, innerB, tip);
+    }
+    return lineOffset;
+  }
+
+  function yawTowardRiver(base, gz) {
+    const riverPoint = generationGlobalGridPoint(generationRiverGxAt(gz) * GENERATION_GLOBAL_GRID_SPACING, gz * GENERATION_GLOBAL_GRID_SPACING, 0);
+    return Math.atan2(base[0] - riverPoint[0], riverPoint[2] - base[2]);
+  }
+
+  const windSites = [];
+  for (let gz = -7; gz <= 7; gz++) {
+    const riverGx = generationRiverGxAt(gz);
+    const eastEdgeGx = Math.floor(riverGx - 1.28);
+    const westEdgeGx = Math.max(-8, eastEdgeGx - 5);
+    for (let gx = westEdgeGx; gx <= eastEdgeGx; gx++) {
+      if (gx < -8 || gx > 2) continue;
+      windSites.push([gx, gz]);
+    }
+  }
+  generationWindTurbineCount = windSites.length;
+
+  for (const [gx, gz] of windSites) {
+    const seed = Math.abs(gx * 37 + gz * 53);
+    const lx = (gx + (gz % 2) * 0.08) * GENERATION_GLOBAL_GRID_SPACING;
+    const lz = (gz + (gx % 2) * 0.06) * GENERATION_GLOBAL_GRID_SPACING;
+    const base = generationGlobalGridPoint(lx, lz, 0);
+    const h = 92 + (seed % 48);
+    const rotorR = 27 + (seed % 4) * 3;
+    const turbineYaw = yawTowardRiver(base, gz) + Math.sin((gx + 9) * (gz + 11)) * 0.08;
+    addCylinderWire(towerLines, base[0], base[2], 3.8, h, 0, 18, 5);
+    addCircle(accentLines, base[0], 0.45, base[2], 12, 22);
+
+    const nacelleCenter = yawPoint(base[0], base[2], turbineYaw, 0, h - 4, 12);
+    addWireBox(towerLines, nacelleCenter[0], nacelleCenter[2], 12, 7.5, 22, turbineYaw, h - 8, false);
+    const hub = yawPoint(base[0], base[2], turbineYaw, 0, h, 25);
+    addJoint(accentLines, hub, 3.1);
+    const phase = (seed * 0.13) * Math.PI;
+    addRotorCircle(rotorGuideLines, hub, rotorR * 0.86, turbineYaw, 24);
+    const lineOffset = addRotorBladeLines(rotorBladeLines, hub, rotorR, turbineYaw, phase);
+    windRotorData.push({
+      hub,
+      radius: rotorR,
+      yaw: turbineYaw,
+      phase,
+      lineOffset,
+      speed: 1.45 + (seed % 9) * 0.07,
+      direction: (gx + gz) % 2 === 0 ? 1 : -1,
+    });
+  }
+
+  const group = new THREE.Group();
+  group.name = 'generation-wind-turbine-farm';
+  group.add(new THREE.LineSegments(makeLineGeometry(towerLines), makeWireMaterial(greyDark, 0.48)));
+  group.add(new THREE.LineSegments(makeLineGeometry(rotorGuideLines), makeWireMaterial(greyLight, 0.22)));
+  windRotorBladeGeo = makeLineGeometry(rotorBladeLines);
+  windRotorBladeGeo.attributes.position.setUsage(THREE.DynamicDrawUsage);
+  group.add(new THREE.LineSegments(windRotorBladeGeo, makeWireMaterial(greyDark, 0.54)));
+  group.add(new THREE.LineSegments(makeLineGeometry(accentLines), makeWireMaterial(accentYellow, 0.34)));
+  scene.add(group);
+}
+
 function buildPlant() {
   lblText.textContent = 'Extruding turbine hall and substation frames...';
-  const groundLines = [];
   const waterLines = [];
   const cityLines = [];
   const structureLines = [];
@@ -2157,15 +3096,12 @@ function buildPlant() {
   const accentLines = [];
   const powerLines = [];
 
-  addGroundGrid(groundLines);
-  addWaterCorridor(waterLines, detailLines);
+  const riverPath = addWaterCorridor(waterLines, detailLines);
+  addRiverFlowPath(riverPath.map(([x, y, z]) => [x, y + 3.2, z]));
   addDam(structureLines, accentLines, -684, -164, 0.34, 184);
   addDam(structureLines, accentLines, -476, 424, -0.46, 164);
-  addBridge(cityLines, accentLines, -620, 60, 1.2, 198, 44, 34);
-  addBridge(cityLines, accentLines, -760, -350, 0.82, 176, 42, 28);
-  addBridge(cityLines, accentLines, -410, 546, 1.0, 210, 46, 36);
-  addCityDistrict(cityLines, accentLines);
-  addServiceRoads(detailLines);
+  const downstreamBridgeYaw = Math.atan2(256 - 54, -558 - -634) + Math.PI * 0.5;
+  addGoldenGateBridge(cityLines, accentLines, -596, 155, downstreamBridgeYaw, 274, 58, 94);
 
   addWireBox(structureLines, -84, -28, 230, 64, 112, -0.06, 0);
   addWireBox(detailLines, -84, -28, 194, 18, 78, -0.06, 66);
@@ -2192,11 +3128,50 @@ function buildPlant() {
   const towerA = addTransmissionTower(powerLines, 552, 182, 138, 36);
   const towerB = addTransmissionTower(powerLines, 720, 204, 128, 32);
   const towerC = addTransmissionTower(powerLines, 874, 226, 118, 28);
+  const towerD = addTransmissionTower(powerLines, 1038, 254, 108, 26);
+  const towerE = addTransmissionTower(powerLines, 1196, 286, 100, 24);
+  const towerF = addTransmissionTower(powerLines, 1362, 322, 92, 22);
+  const towerG = addTransmissionTower(powerLines, 1534, 364, 86, 20);
+  const towerH = addTransmissionTower(powerLines, 1712, 412, 82, 19);
+  const towerI = addTransmissionTower(powerLines, 1896, 466, 78, 18);
+  const towerJ = addTransmissionTower(powerLines, 2086, 526, 74, 17);
+  const towerK = addTransmissionTower(powerLines, 2284, 592, 70, 16);
+  const towerL = addTransmissionTower(powerLines, 2490, 666, 66, 15);
+  const towerM = addTransmissionTower(powerLines, 2706, 748, 62, 14);
+  const towerN = addTransmissionTower(powerLines, 2930, 840, 58, 13);
+  const towerO = addTransmissionTower(powerLines, 3164, 942, 54, 12);
+  const towerP = addTransmissionTower(powerLines, 3408, 1056, 50, 11);
   for (let i = 0; i < 2; i++) {
     pushLine(powerLines, towerA.arm[i], towerB.arm[i]);
     pushLine(powerLines, towerB.arm[i], towerC.arm[i]);
+    pushLine(powerLines, towerC.arm[i], towerD.arm[i]);
+    pushLine(powerLines, towerD.arm[i], towerE.arm[i]);
+    pushLine(powerLines, towerE.arm[i], towerF.arm[i]);
+    pushLine(powerLines, towerF.arm[i], towerG.arm[i]);
+    pushLine(powerLines, towerG.arm[i], towerH.arm[i]);
+    pushLine(powerLines, towerH.arm[i], towerI.arm[i]);
+    pushLine(powerLines, towerI.arm[i], towerJ.arm[i]);
+    pushLine(powerLines, towerJ.arm[i], towerK.arm[i]);
+    pushLine(powerLines, towerK.arm[i], towerL.arm[i]);
+    pushLine(powerLines, towerL.arm[i], towerM.arm[i]);
+    pushLine(powerLines, towerM.arm[i], towerN.arm[i]);
+    pushLine(powerLines, towerN.arm[i], towerO.arm[i]);
+    pushLine(powerLines, towerO.arm[i], towerP.arm[i]);
     pushLine(powerLines, towerA.upper[i], towerB.upper[i]);
     pushLine(powerLines, towerB.upper[i], towerC.upper[i]);
+    pushLine(powerLines, towerC.upper[i], towerD.upper[i]);
+    pushLine(powerLines, towerD.upper[i], towerE.upper[i]);
+    pushLine(powerLines, towerE.upper[i], towerF.upper[i]);
+    pushLine(powerLines, towerF.upper[i], towerG.upper[i]);
+    pushLine(powerLines, towerG.upper[i], towerH.upper[i]);
+    pushLine(powerLines, towerH.upper[i], towerI.upper[i]);
+    pushLine(powerLines, towerI.upper[i], towerJ.upper[i]);
+    pushLine(powerLines, towerJ.upper[i], towerK.upper[i]);
+    pushLine(powerLines, towerK.upper[i], towerL.upper[i]);
+    pushLine(powerLines, towerL.upper[i], towerM.upper[i]);
+    pushLine(powerLines, towerM.upper[i], towerN.upper[i]);
+    pushLine(powerLines, towerN.upper[i], towerO.upper[i]);
+    pushLine(powerLines, towerO.upper[i], towerP.upper[i]);
   }
   pushLine(powerLines, [490, 48, 176], towerA.arm[0]);
   pushLine(powerLines, [490, 48, 220], towerA.arm[1]);
@@ -2207,24 +3182,38 @@ function buildPlant() {
     pushLine(accentLines, [x - 8, 30, -140], [x + 8, 30, -140]);
   }
 
-  addFlowPath([[330, 45, 176], [490, 48, 176], towerA.arm[0], towerB.arm[0], towerC.arm[0]]);
-  addFlowPath([[338, 45, 220], [490, 48, 220], towerA.arm[1], towerB.arm[1], towerC.arm[1]]);
-  addFlowPath([[286, 42, 132], [372, 42, 132], [430, 46, 176], [490, 48, 176], towerA.upper[0], towerB.upper[0], towerC.upper[0]]);
-  addFlowPath([[286, 42, 264], [372, 42, 264], [430, 46, 220], [490, 48, 220], towerA.upper[1], towerB.upper[1], towerC.upper[1]]);
+  addFlowPath([[330, 45, 176], [490, 48, 176], towerA.arm[0], towerB.arm[0], towerC.arm[0], towerD.arm[0], towerE.arm[0], towerF.arm[0], towerG.arm[0], towerH.arm[0], towerI.arm[0], towerJ.arm[0], towerK.arm[0], towerL.arm[0], towerM.arm[0], towerN.arm[0], towerO.arm[0], towerP.arm[0]]);
+  addFlowPath([[338, 45, 220], [490, 48, 220], towerA.arm[1], towerB.arm[1], towerC.arm[1], towerD.arm[1], towerE.arm[1], towerF.arm[1], towerG.arm[1], towerH.arm[1], towerI.arm[1], towerJ.arm[1], towerK.arm[1], towerL.arm[1], towerM.arm[1], towerN.arm[1], towerO.arm[1], towerP.arm[1]]);
+  addFlowPath([[286, 42, 132], [372, 42, 132], [430, 46, 176], [490, 48, 176], towerA.upper[0], towerB.upper[0], towerC.upper[0], towerD.upper[0], towerE.upper[0], towerF.upper[0], towerG.upper[0], towerH.upper[0], towerI.upper[0], towerJ.upper[0], towerK.upper[0], towerL.upper[0], towerM.upper[0], towerN.upper[0], towerO.upper[0], towerP.upper[0]]);
+  addFlowPath([[286, 42, 264], [372, 42, 264], [430, 46, 220], [490, 48, 220], towerA.upper[1], towerB.upper[1], towerC.upper[1], towerD.upper[1], towerE.upper[1], towerF.upper[1], towerG.upper[1], towerH.upper[1], towerI.upper[1], towerJ.upper[1], towerK.upper[1], towerL.upper[1], towerM.upper[1], towerN.upper[1], towerO.upper[1], towerP.upper[1]]);
+  addFlowPath([[-210, 52, 210], [-144, 58, 118], [-64, 58, 18], [74, 62, -22], [206, 92, -56]]);
+  addFlowPath([[-170, 74, -22], [-42, 82, -30], [92, 88, -38], [178, 116, -44], [242, 144, -52]]);
+  addFlowPath([[-182, 34, -86], [-84, 66, -76], [2, 72, -178], [96, 88, -122], [198, 104, -84]]);
+  addFlowPath([[-178, 42, 36], [-84, 68, 28], [28, 92, 18], [118, 154, -38], [190, 128, -54]]);
+  addFlowPath([[-236, 44, -76], [-146, 66, -58], [-28, 76, -42], [118, 132, -38], [198, 100, -84]]);
+  addFlowPath([[-270, 108, 246], [-210, 72, 210], [-106, 48, 216], [16, 58, 20], [136, 126, -28]]);
+  addFlowPath([[206, 92, -56], [248, 70, 32], [286, 42, 132], [314, 42, 176]]);
+  addFlowPath([[242, 144, -52], [282, 112, 36], [330, 45, 176], [430, 46, 176]]);
+  addFlowPath([[118, 154, -38], [194, 112, 24], [286, 42, 132], [372, 42, 132]]);
+  addFlowPath([[2, 44, -178], [94, 56, -92], [240, 42, 132], [314, 42, 176]]);
+  addFlowPath([[55, 36, 98], [162, 42, 124], [314, 42, 176], [490, 48, 176]]);
+  addFlowPath([[-84, 66, 12], [42, 84, 56], [194, 72, 132], [338, 45, 220], [490, 48, 220]]);
 
-  const groundMesh = new THREE.LineSegments(makeLineGeometry(groundLines), makeWireMaterial(greyLight, 0.18));
   const waterMesh = new THREE.LineSegments(makeLineGeometry(waterLines), makeWireMaterial(greyLight, 0.24));
   const cityMesh = new THREE.LineSegments(makeLineGeometry(cityLines), makeWireMaterial(greyMid, 0.28));
   const structureMesh = new THREE.LineSegments(makeLineGeometry(structureLines), makeWireMaterial(greyDark, 0.68));
   const detailMesh = new THREE.LineSegments(makeLineGeometry(detailLines), makeWireMaterial(greyMid, 0.34));
   const accentMesh = new THREE.LineSegments(makeLineGeometry(accentLines), makeWireMaterial(accentYellow, 0.58));
   const powerMesh = new THREE.LineSegments(makeLineGeometry(powerLines), makeWireMaterial(greyDark, 0.42));
-  scene.add(groundMesh, waterMesh, cityMesh, structureMesh, detailMesh, accentMesh, powerMesh);
+  scene.add(waterMesh, cityMesh, structureMesh, detailMesh, accentMesh, powerMesh);
+  buildGenerationOverarchingGrid();
+  buildGenerationSolarArrays();
+  buildGenerationWindFarm();
+  buildGenerationSkidsteers();
 
-  scene.add(createAtmosphereParticles(14500));
-  scene.add(createUrbanParticles(3600));
-  scene.add(createHazeParticles(2800));
-  scene.add(createFlowParticles(3000));
+  scene.add(createRiverParticles(4600));
+  scene.add(createWindFarmParticles(2200));
+  scene.add(createFlowParticles(11200));
 }
 
 function updateHaze(dt, elapsed) {
@@ -2263,13 +3252,121 @@ function updateFlow(dt, elapsed) {
   flowGeo.attributes.position.needsUpdate = true;
 }
 
+function updateRiverFlow(dt, elapsed) {
+  if (!riverFlowGeo) return;
+  const arr = riverFlowGeo.attributes.position.array;
+  const tmp = [0, 0, 0];
+  const tangent = [1, 0, 0];
+  for (let i = 0; i < riverFlowData.length; i++) {
+    const d = riverFlowData[i];
+    const path = riverFlowPaths[d.pathIndex];
+    d.t = (d.t + d.speed * dt * particleSettings.steamSpeed) % 1;
+    sampleFlowPath(path, d.t, tmp, tangent);
+    const nx = -tangent[2];
+    const nz = tangent[0];
+    const lateral = d.lane + Math.sin(elapsed * 1.7 + d.phase) * d.ripple;
+    const current = Math.sin(elapsed * 2.6 + d.phase * 0.7) * 2.2;
+    const ix = i * 3;
+    arr[ix + 0] = tmp[0] + nx * lateral + tangent[0] * current;
+    arr[ix + 1] = tmp[1] + 2.1 + Math.sin(elapsed * 3.2 + d.phase) * 0.5;
+    arr[ix + 2] = tmp[2] + nz * lateral + tangent[2] * current;
+  }
+  riverFlowGeo.attributes.position.needsUpdate = true;
+}
+
+function updateWindFarmParticles(dt, elapsed) {
+  if (!windParticleGeo) return;
+  const arr = windParticleGeo.attributes.position.array;
+  for (let i = 0; i < windParticleData.length; i++) {
+    const d = windParticleData[i];
+    d.t = (d.t + d.speed * dt * (0.6 + particleSettings.flowSpeed * 0.4)) % 1;
+    const dx = d.bx - d.ax;
+    const dy = d.by - d.ay;
+    const dz = d.bz - d.az;
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len;
+    const nz = dx / len;
+    const sway = Math.sin(elapsed * 1.35 + d.phase) * d.drift;
+    const lift = Math.sin(elapsed * 1.9 + d.phase * 0.71) * 1.1;
+    const ix = i * 3;
+    arr[ix + 0] = d.ax + dx * d.t + nx * sway;
+    arr[ix + 1] = d.ay + dy * d.t + lift;
+    arr[ix + 2] = d.az + dz * d.t + nz * sway;
+  }
+  windParticleGeo.attributes.position.needsUpdate = true;
+}
+
+function writeRotorPoint(arr, offset, hub, angle, radius, yaw) {
+  const localX = Math.cos(angle) * radius;
+  arr[offset + 0] = hub[0] + localX * Math.cos(yaw);
+  arr[offset + 1] = hub[1] + Math.sin(angle) * radius;
+  arr[offset + 2] = hub[2] + localX * Math.sin(yaw);
+}
+
+function copyRotorPoint(arr, from, to) {
+  arr[to + 0] = arr[from + 0];
+  arr[to + 1] = arr[from + 1];
+  arr[to + 2] = arr[from + 2];
+}
+
+function updateWindRotors(dt, elapsed) {
+  if (!windRotorBladeGeo || !windRotorData.length) return;
+  const arr = windRotorBladeGeo.attributes.position.array;
+  const windFactor = 0.72 + particleSettings.flowSpeed * 0.28;
+  for (const d of windRotorData) {
+    let offset = d.lineOffset;
+    const spin = d.phase + elapsed * d.speed * d.direction * windFactor;
+    for (let i = 0; i < 3; i++) {
+      const angle = spin + i * Math.PI * 2 / 3;
+      writeRotorPoint(arr, offset + 3, d.hub, angle, d.radius, d.yaw);
+      arr[offset + 0] = d.hub[0];
+      arr[offset + 1] = d.hub[1];
+      arr[offset + 2] = d.hub[2];
+      offset += 6;
+
+      writeRotorPoint(arr, offset, d.hub, angle + 0.035, d.radius * 0.36, d.yaw);
+      copyRotorPoint(arr, offset - 3, offset + 3);
+      offset += 6;
+
+      writeRotorPoint(arr, offset, d.hub, angle - 0.035, d.radius * 0.36, d.yaw);
+      copyRotorPoint(arr, offset - 9, offset + 3);
+      offset += 6;
+    }
+  }
+  windRotorBladeGeo.attributes.position.needsUpdate = true;
+}
+
+function updateOverarchingGridParticles(dt, elapsed) {
+  if (!overarchingGridParticleGeo || !overarchingGridParticleData.length) return;
+  const arr = overarchingGridParticleGeo.attributes.position.array;
+  const speed = particleSettings.gridSpeed;
+  const flowElapsed = elapsed * speed;
+  for (let i = 0; i < overarchingGridParticleData.length; i++) {
+    const d = overarchingGridParticleData[i];
+    d.t += d.speed * dt * speed;
+    if (d.t > 1) d.t -= 1;
+    if (d.t < 0) d.t += 1;
+    const dx = d.bx - d.ax;
+    const dz = d.bz - d.az;
+    const len = Math.max(0.001, Math.hypot(dx, dz));
+    const nx = -dz / len;
+    const nz = dx / len;
+    const sway = Math.sin(flowElapsed * 1.6 + d.phase) * d.jitter;
+    const ix = i * 3;
+    arr[ix + 0] = d.ax + dx * d.t + nx * sway;
+    arr[ix + 1] = d.y + Math.sin(flowElapsed * 2.05 + d.phase) * 0.06;
+    arr[ix + 2] = d.az + dz * d.t + nz * sway;
+  }
+  overarchingGridParticleGeo.attributes.position.needsUpdate = true;
+}
+
 function updateHud(elapsed) {
   const output = 842 + Math.sin(elapsed * 0.16) * 18 + Math.sin(elapsed * 0.071) * 9;
-  const haze = 0.72 + Math.sin(elapsed * 0.24) * 0.06;
+  const water = 0.72 + Math.sin(elapsed * 0.24) * 0.06;
   const flow = 1 + Math.sin(elapsed * 0.34) * 0.08;
-  hudStatus.textContent = `TURBINES 04 - GRID FLOW ${flow.toFixed(2)} - CITY HAZE ${haze.toFixed(2)}`;
+  hudStatus.textContent = `TURBINES ${String(generationWindTurbineCount).padStart(2, '0')} - GRID FLOW ${flow.toFixed(2)} - WATER FLOW ${water.toFixed(2)}`;
   readoutOutput.textContent = `Output ${output.toFixed(1)} MW`;
-  readoutSteam.textContent = `City haze ${haze.toFixed(2)}`;
+  readoutSteam.textContent = `River flow ${water.toFixed(2)}`;
   readoutGrid.textContent = `Bus frequency ${(59.98 + Math.sin(elapsed * 0.41) * 0.02).toFixed(2)} hz`;
 }
 
@@ -2294,23 +3391,20 @@ for (const input of particleInputs()) {
   input.addEventListener('input', applyParticleDebugInputs);
 }
 
-if (debugEls.cameraAnimDuration) {
-  debugEls.cameraAnimDuration.addEventListener('input', () => {
-    const duration = parseFloat(debugEls.cameraAnimDuration.value);
-    if (Number.isFinite(duration)) {
-      cameraAnimation.duration = clamp(duration, 0.1, 120);
-      saveCameraAnimationState();
-      updateCameraAnimationDebug();
-    }
-  });
+for (const input of cameraAnimationTimingInputs()) {
+  input.addEventListener('input', applyCameraAnimationTimingInputs);
 }
 
 if (debugEls.setCameraKeyA) debugEls.setCameraKeyA.addEventListener('click', () => setCameraKey('A'));
 if (debugEls.setCameraKeyB) debugEls.setCameraKeyB.addEventListener('click', () => setCameraKey('B'));
 if (debugEls.setCameraKeyC) debugEls.setCameraKeyC.addEventListener('click', () => setCameraKey('C'));
+if (debugEls.setCameraKeyD) debugEls.setCameraKeyD.addEventListener('click', () => setCameraKey('D'));
+if (debugEls.setCameraKeyE) debugEls.setCameraKeyE.addEventListener('click', () => setCameraKey('E'));
 if (debugEls.returnCameraKeyA) debugEls.returnCameraKeyA.addEventListener('click', () => returnToCameraKey('A'));
 if (debugEls.returnCameraKeyB) debugEls.returnCameraKeyB.addEventListener('click', () => returnToCameraKey('B'));
 if (debugEls.returnCameraKeyC) debugEls.returnCameraKeyC.addEventListener('click', () => returnToCameraKey('C'));
+if (debugEls.returnCameraKeyD) debugEls.returnCameraKeyD.addEventListener('click', () => returnToCameraKey('D'));
+if (debugEls.returnCameraKeyE) debugEls.returnCameraKeyE.addEventListener('click', () => returnToCameraKey('E'));
 if (debugEls.playCameraMove) debugEls.playCameraMove.addEventListener('click', playCameraAnimation);
 if (debugEls.resetCameraMove) debugEls.resetCameraMove.addEventListener('click', resetCameraAnimation);
 if (debugEls.shotLowOrbit) debugEls.shotLowOrbit.addEventListener('click', () => applyCameraShot('Low Orbit'));
@@ -2369,6 +3463,7 @@ setDebugPanelCollapsed(readDebugPanelCollapsed(), false);
 updateCameraAnimationDebug();
 updateShotButtons();
 
+buildGlobeOcclusionLayer();
 buildPlant();
 finishLoad();
 
@@ -2390,8 +3485,12 @@ function animate() {
   sharedUniforms.uTime.value = elapsed;
   updateHaze(dt, elapsed);
   updateFlow(dt, elapsed);
+  updateRiverFlow(dt, elapsed);
+  updateWindFarmParticles(dt, elapsed);
+  updateWindRotors(dt, elapsed);
+  updateOverarchingGridParticles(dt, elapsed);
   updateCameraAnimation(performance.now());
-  controls.update();
+  if (!cameraAnimation.active) controls.update();
   if (elapsed - hudTick > 0.18) {
     hudTick = elapsed;
     updateHud(elapsed);
