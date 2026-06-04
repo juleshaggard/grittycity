@@ -439,6 +439,8 @@
 }
 </script>
 
+<script src="bangkok-osm-cache.js"></script>
+
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -2268,6 +2270,15 @@ async function refreshOSMCache(record) {
 }
 
 async function fetchOverpass() {
+  if (window.BANGKOK_OSM_CACHE && Array.isArray(window.BANGKOK_OSM_CACHE.elements)) {
+    lblText.textContent = 'Loading bundled OSM snapshot...';
+    setBootVisionStatus('loading bundled osm snapshot');
+    writeOSMCache(window.BANGKOK_OSM_CACHE).catch((e) => {
+      console.warn('Unable to seed OSM cache from bundled snapshot:', e);
+    });
+    return window.BANGKOK_OSM_CACHE;
+  }
+
   const cached = await readOSMCache();
   if (isValidOSMRecord(cached)) {
     const now = Date.now();
@@ -4236,6 +4247,7 @@ function tick() {
 // BOOT
 // ============================================================
 (async function boot() {
+  let sceneBuilt = false;
   try {
     const data = await fetchOverpass();
     buildFromOSM(data);
@@ -4245,13 +4257,14 @@ function tick() {
     buildTraffic();
     buildStreams();
     buildEmbers();
+    sceneBuilt = true;
   } catch (e) {
     console.error(e);
     lblText.textContent = 'Map data unavailable';
     setBootVisionStatus('map data unavailable');
   }
   tick();
-  finishBootVision();
+  if (sceneBuilt) finishBootVision();
 })();
 </script>
 </body>

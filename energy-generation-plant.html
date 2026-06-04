@@ -2378,11 +2378,15 @@ function addWaterCorridor(waterLines, detailLines) {
 
 function addGoldenGateBridge(lines, accentLines, cx, cz, yaw, length = 262, width = 58, towerHeight = 92) {
   const deckY = 13;
-  const deckH = 8;
+  const deckH = Math.max(8, width * 0.14);
   const towerX = length * 0.27;
   const towerTopY = deckY + towerHeight;
-  const cableSag = 30;
+  const cableSag = towerHeight * 0.32;
   const anchorX = length * 0.58;
+  const towerW = Math.max(10, width * 0.16);
+  const towerD = Math.max(9, width * 0.15);
+  const crossW = Math.max(16, width * 0.25);
+  const crossD = Math.max(11, width * 0.18);
 
   addWireBox(lines, cx, cz, length, deckH, width, yaw, deckY, false);
   for (const z of [-width * 0.36, 0, width * 0.36]) {
@@ -2393,11 +2397,11 @@ function addGoldenGateBridge(lines, accentLines, cx, cz, yaw, length = 262, widt
     for (const side of [-1, 1]) {
       const z = side * width * 0.34;
       const p = localPoint(cx, cz, yaw, tx, 0, z);
-      addWireBox(lines, p[0], p[2], 10, towerHeight, 9, yaw, deckY + deckH, false);
-      addWireBox(lines, p[0], p[2], 16, 7, 11, yaw, deckY + towerHeight * 0.52, false);
-      addWireBox(lines, p[0], p[2], 20, 6, 12, yaw, towerTopY - 4, false);
-      pushLine(lines, localPoint(cx, cz, yaw, tx - 10, deckY + deckH, z), localPoint(cx, cz, yaw, tx + 10, towerTopY, z));
-      pushLine(lines, localPoint(cx, cz, yaw, tx + 10, deckY + deckH, z), localPoint(cx, cz, yaw, tx - 10, towerTopY, z));
+      addWireBox(lines, p[0], p[2], towerW, towerHeight, towerD, yaw, deckY + deckH, false);
+      addWireBox(lines, p[0], p[2], crossW, 7, crossD, yaw, deckY + towerHeight * 0.52, false);
+      addWireBox(lines, p[0], p[2], crossW * 1.18, 6, crossD * 1.08, yaw, towerTopY - 4, false);
+      pushLine(lines, localPoint(cx, cz, yaw, tx - towerW, deckY + deckH, z), localPoint(cx, cz, yaw, tx + towerW, towerTopY, z));
+      pushLine(lines, localPoint(cx, cz, yaw, tx + towerW, deckY + deckH, z), localPoint(cx, cz, yaw, tx - towerW, towerTopY, z));
     }
     pushLine(lines, localPoint(cx, cz, yaw, tx, towerTopY - 4, -width * 0.43), localPoint(cx, cz, yaw, tx, towerTopY - 4, width * 0.43));
     pushLine(lines, localPoint(cx, cz, yaw, tx, deckY + towerHeight * 0.52, -width * 0.43), localPoint(cx, cz, yaw, tx, deckY + towerHeight * 0.52, width * 0.43));
@@ -2549,6 +2553,33 @@ const windParticleData = [];
 let windParticleGeo = null;
 const windRotorData = [];
 let windRotorBladeGeo = null;
+const SKIDSTEER_LOOP_SECONDS = 240;
+const SKIDSTEER_PATROL_CYCLES = 20;
+const SKIDSTEER_FORWARD_YAW_OFFSET = 0;
+const SKIDSTEER_MOVEMENT_SCALE = 0.5;
+const SKIDSTEER_MACHINE_SPECS = [
+  { x: -690, z: -222, tx: -684, tz: -164, scale: 0.72 },
+  { x: -742, z: -404, tx: -760, tz: -350, scale: 0.66, rotOffset: 0.08 },
+  { x: -456, z: 494, tx: -410, tz: 546, scale: 0.68 },
+  { x: -338, z: 220, tx: -270, tz: 246, scale: 0.76 },
+  { x: -170, z: 206, tx: -126, tz: 252, scale: 0.70, rotOffset: -0.06 },
+  { x: -134, z: -104, tx: -84, tz: -28, scale: 0.70 },
+  { x: 18, z: -246, tx: 2, tz: -178, scale: 0.64 },
+  { x: 184, z: -102, tx: 248, tz: -52, scale: 0.70, rotOffset: 0.04 },
+  { x: 264, z: 126, tx: 314, tz: 176, scale: 0.66 },
+  { x: 376, z: 236, tx: 314, tz: 176, scale: 0.62 },
+  { x: 526, z: 230, tx: 552, tz: 182, scale: 0.58 },
+  { x: 708, z: 260, tx: 720, tz: 204, scale: 0.58, rotOffset: -0.08 },
+  { x: 1018, z: 318, tx: 1038, tz: 254, scale: 0.56 },
+  { x: 1378, z: 392, tx: 1362, tz: 322, scale: 0.54 },
+  { x: 1710, z: 486, tx: 1712, tz: 412, scale: 0.52, rotOffset: 0.06 },
+  { x: 2084, z: 594, tx: 2086, tz: 526, scale: 0.50, rotOffset: -0.05 },
+  { x: -846, z: -520, tx: -870, tz: -468, scale: 0.62 },
+  { x: -512, z: 520, tx: -476, tz: 424, scale: 0.60 },
+];
+let skidsteerBodyGeo = null;
+let skidsteerAccentGeo = null;
+let skidsteerToolGeo = null;
 const overarchingGridParticleData = [];
 let overarchingGridParticleGeo = null;
 let generationWindTurbineCount = 0;
@@ -2797,97 +2828,144 @@ function buildGenerationOverarchingGrid() {
   scene.add(gridPointMesh);
 }
 
-function buildGenerationSkidsteers() {
-  const machines = [
-    { x: -690, z: -222, tx: -684, tz: -164, scale: 0.72 },
-    { x: -742, z: -404, tx: -760, tz: -350, scale: 0.66, rotOffset: 0.08 },
-    { x: -456, z: 494, tx: -410, tz: 546, scale: 0.68 },
-    { x: -338, z: 220, tx: -270, tz: 246, scale: 0.76 },
-    { x: -170, z: 206, tx: -126, tz: 252, scale: 0.70, rotOffset: -0.06 },
-    { x: -134, z: -104, tx: -84, tz: -28, scale: 0.70 },
-    { x: 18, z: -246, tx: 2, tz: -178, scale: 0.64 },
-    { x: 184, z: -102, tx: 248, tz: -52, scale: 0.70, rotOffset: 0.04 },
-    { x: 264, z: 126, tx: 314, tz: 176, scale: 0.66 },
-    { x: 376, z: 236, tx: 314, tz: 176, scale: 0.62 },
-    { x: 526, z: 230, tx: 552, tz: 182, scale: 0.58 },
-    { x: 708, z: 260, tx: 720, tz: 204, scale: 0.58, rotOffset: -0.08 },
-    { x: 1018, z: 318, tx: 1038, tz: 254, scale: 0.56 },
-    { x: 1378, z: 392, tx: 1362, tz: 322, scale: 0.54 },
-    { x: 1710, z: 486, tx: 1712, tz: 412, scale: 0.52, rotOffset: 0.06 },
-    { x: 2084, z: 594, tx: 2086, tz: 526, scale: 0.50, rotOffset: -0.05 },
-    { x: -846, z: -520, tx: -870, tz: -468, scale: 0.62 },
-    { x: -512, z: 520, tx: -476, tz: 424, scale: 0.60 },
-  ];
+function skidsteerPose(machine, index, elapsed = 0) {
+  const loopT = ((elapsed / SKIDSTEER_LOOP_SECONDS * SKIDSTEER_PATROL_CYCLES + index * 0.071) % 1 + 1) % 1;
+  const angle = loopT * Math.PI * 2;
+  const dx = machine.tx - machine.x;
+  const dz = machine.tz - machine.z;
+  const len = Math.hypot(dx, dz) || 1;
+  const fx = dx / len;
+  const fz = dz / len;
+  const sx = -fz;
+  const sz = fx;
+  const longRange = (machine.pathLong || (178 + (index % 5) * 34)) * SKIDSTEER_MOVEMENT_SCALE;
+  const sideRange = (machine.pathSide || (68 + ((index + 2) % 4) * 22)) * SKIDSTEER_MOVEMENT_SCALE;
+  const driftRange = (18 + machine.scale * 12) * SKIDSTEER_MOVEMENT_SCALE;
+  const driftPhase = angle * 2 + index * 0.77;
+  const sideDrift = Math.sin(driftPhase) * driftRange;
+  const x = machine.x + fx * Math.sin(angle) * longRange + sx * (Math.cos(angle) * sideRange + sideDrift);
+  const z = machine.z + fz * Math.sin(angle) * longRange + sz * (Math.cos(angle) * sideRange + sideDrift);
+  const sideVelocity = -Math.sin(angle) * sideRange + Math.cos(driftPhase) * driftRange * 2;
+  const vx = fx * Math.cos(angle) * longRange + sx * sideVelocity;
+  const vz = fz * Math.cos(angle) * longRange + sz * sideVelocity;
+  const yaw = Math.atan2(-vx, vz)
+    + SKIDSTEER_FORWARD_YAW_OFFSET
+    + (machine.rotOffset || 0)
+    + Math.sin(angle + index * 0.5) * 0.055;
+  return { x, z, yaw };
+}
+
+function appendSkidsteerMachine(machine, index, elapsed, bodyLines, accentLines, toolLines) {
+  const pose = skidsteerPose(machine, index, elapsed);
+  const originX = pose.x;
+  const originZ = pose.z;
+  const yaw = Number.isFinite(machine.rot) ? machine.rot : pose.yaw;
+  const scale = machine.scale;
+
+  function point(lx, y, lz) {
+    const p = yawPoint(originX, originZ, yaw, lx * scale, y * scale, lz * scale);
+    return [p[0], p[1], p[2]];
+  }
+
+  function box(lx, lz, w, h, d, baseY, target = bodyLines, detail = false) {
+    const p = point(lx, 0, lz);
+    return addWireBox(target, p[0], p[2], w * scale, h * scale, d * scale, yaw, baseY * scale, detail);
+  }
+
+  box(-11, 0, 5.2, 4.8, 28, 2.8);
+  box(11, 0, 5.2, 4.8, 28, 2.8);
+  box(0, -2, 22, 8.5, 23, 6.7);
+  box(0, -10, 15, 6.4, 8.5, 12.2);
+  box(0, 6, 15, 11, 11, 16.6);
+  box(0, 11, 11, 8.5, 8, 26.6, accentLines);
+
+  const wheelCycle = ((elapsed / SKIDSTEER_LOOP_SECONDS * 420 + index * 0.19) % 1 + 1) % 1;
+  const treadCycle = ((elapsed / SKIDSTEER_LOOP_SECONDS * 300 + index * 0.37) % 1 + 1) % 1;
+
+  for (const lx of [-11, 11]) {
+    for (const lz of [-10, 2, 12]) {
+      const wheelCenter = point(lx, 2.8, lz);
+      const spokeAngle = (wheelCycle + lz * 0.013) * Math.PI * 2;
+      addAxisCircle(accentLines, wheelCenter, 2.25 * scale, 'x', 16);
+      pushLine(accentLines, wheelCenter, point(lx, 2.8 + Math.sin(spokeAngle) * 2.25, lz + Math.cos(spokeAngle) * 2.25));
+    }
+    for (let i = 0; i < 7; i++) {
+      const tick = (i / 7 + treadCycle) % 1;
+      const z = -13.5 + tick * 30;
+      pushLine(accentLines, point(lx - 2.65, 5.4, z), point(lx + 2.65, 5.4, z));
+    }
+  }
+
+  const loaderA = point(-10.2, 13.8, 0);
+  const loaderB = point(-12.4, 20.8, 17);
+  const loaderC = point(10.2, 13.8, 0);
+  const loaderD = point(12.4, 20.8, 17);
+  addLink(bodyLines, loaderA, loaderB, 1.6 * scale);
+  addLink(bodyLines, loaderC, loaderD, 1.6 * scale);
+  pushLine(accentLines, loaderB, loaderD);
+
+  const loopAngle = ((elapsed / SKIDSTEER_LOOP_SECONDS * SKIDSTEER_PATROL_CYCLES + index * 0.097) % 1) * Math.PI * 2;
+  const armPulse = Math.sin(loopAngle * 12 + index * 1.37);
+  const shoulder = point(0, 25, 4);
+  const elbow = point(12, 38 + armPulse * 1.8, 22);
+  const wrist = point(-5, 31 + armPulse * 1.15, 40);
+  const tool = point(-10, 25 + armPulse * 0.7, 51);
+  addJoint(accentLines, shoulder, 3.3 * scale);
+  addJoint(accentLines, elbow, 3.0 * scale);
+  addJoint(accentLines, wrist, 2.35 * scale);
+  addLink(bodyLines, shoulder, elbow, 2.6 * scale);
+  addLink(bodyLines, elbow, wrist, 2.25 * scale);
+  addLink(bodyLines, wrist, tool, 1.8 * scale);
+  pushLine(toolLines, tool, point(-16, 23, 56));
+  pushLine(toolLines, tool, point(-4, 23, 57));
+  pushLine(toolLines, point(-16, 23, 56), point(-19, 20, 61));
+  pushLine(toolLines, point(-4, 23, 57), point(-1, 20, 62));
+}
+
+function buildSkidsteerLineSets(elapsed = 0) {
   const bodyLines = [];
   const accentLines = [];
   const toolLines = [];
+  SKIDSTEER_MACHINE_SPECS.forEach((machine, index) => {
+    appendSkidsteerMachine(machine, index, elapsed, bodyLines, accentLines, toolLines);
+  });
+  return { bodyLines, accentLines, toolLines };
+}
 
-  function yawToward(machine) {
-    if (Number.isFinite(machine.rot)) return machine.rot;
-    return Math.atan2(machine.x - machine.tx, machine.tz - machine.z) + (machine.rotOffset || 0);
+function refreshLineGeometry(geo, lines) {
+  if (!geo) return;
+  const attr = geo.attributes.position;
+  if (attr.array.length !== lines.length) {
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+  } else {
+    attr.array.set(lines);
+    attr.needsUpdate = true;
   }
+  geo.computeBoundingSphere();
+}
 
-  function appendMachine(machine) {
-    const originX = machine.x;
-    const originZ = machine.z;
-    const yaw = yawToward(machine);
-    const scale = machine.scale;
-
-    function point(lx, y, lz) {
-      const p = yawPoint(originX, originZ, yaw, lx * scale, y * scale, lz * scale);
-      return [p[0], p[1], p[2]];
-    }
-
-    function box(lx, lz, w, h, d, baseY, target = bodyLines, detail = false) {
-      const p = point(lx, 0, lz);
-      return addWireBox(target, p[0], p[2], w * scale, h * scale, d * scale, yaw, baseY * scale, detail);
-    }
-
-    box(-11, 0, 5.2, 4.8, 28, 2.8);
-    box(11, 0, 5.2, 4.8, 28, 2.8);
-    box(0, -2, 22, 8.5, 23, 6.7);
-    box(0, -10, 15, 6.4, 8.5, 12.2);
-    box(0, 6, 15, 11, 11, 16.6);
-    box(0, 11, 11, 8.5, 8, 26.6, accentLines);
-
-    for (const lx of [-11, 11]) {
-      for (const lz of [-10, 2, 12]) {
-        addAxisCircle(accentLines, point(lx, 2.8, lz), 2.25 * scale, 'x', 16);
-      }
-    }
-
-    const loaderA = point(-10.2, 13.8, 0);
-    const loaderB = point(-12.4, 20.8, 17);
-    const loaderC = point(10.2, 13.8, 0);
-    const loaderD = point(12.4, 20.8, 17);
-    addLink(bodyLines, loaderA, loaderB, 1.6 * scale);
-    addLink(bodyLines, loaderC, loaderD, 1.6 * scale);
-    pushLine(accentLines, loaderB, loaderD);
-
-    const shoulder = point(0, 25, 4);
-    const elbow = point(12, 38, 22);
-    const wrist = point(-5, 31, 40);
-    const tool = point(-10, 25, 51);
-    addJoint(accentLines, shoulder, 3.3 * scale);
-    addJoint(accentLines, elbow, 3.0 * scale);
-    addJoint(accentLines, wrist, 2.35 * scale);
-    addLink(bodyLines, shoulder, elbow, 2.6 * scale);
-    addLink(bodyLines, elbow, wrist, 2.25 * scale);
-    addLink(bodyLines, wrist, tool, 1.8 * scale);
-    pushLine(toolLines, tool, point(-16, 23, 56));
-    pushLine(toolLines, tool, point(-4, 23, 57));
-    pushLine(toolLines, point(-16, 23, 56), point(-19, 20, 61));
-    pushLine(toolLines, point(-4, 23, 57), point(-1, 20, 62));
-  }
-
-  for (const machine of machines) appendMachine(machine);
-
+function buildGenerationSkidsteers() {
+  const { bodyLines, accentLines, toolLines } = buildSkidsteerLineSets(0);
   const group = new THREE.Group();
   group.name = 'generation-skidsteer-robots';
-  group.add(new THREE.LineSegments(makeLineGeometry(bodyLines), makeWireMaterial(greyDark, 0.62)));
-  group.add(new THREE.LineSegments(makeLineGeometry(accentLines), makeWireMaterial(greyMid, 0.42)));
-  group.add(new THREE.LineSegments(makeLineGeometry(toolLines), makeWireMaterial(accentYellow, 0.64)));
+  skidsteerBodyGeo = makeLineGeometry(bodyLines);
+  skidsteerAccentGeo = makeLineGeometry(accentLines);
+  skidsteerToolGeo = makeLineGeometry(toolLines);
+  skidsteerBodyGeo.attributes.position.setUsage(THREE.DynamicDrawUsage);
+  skidsteerAccentGeo.attributes.position.setUsage(THREE.DynamicDrawUsage);
+  skidsteerToolGeo.attributes.position.setUsage(THREE.DynamicDrawUsage);
+  group.add(new THREE.LineSegments(skidsteerBodyGeo, makeWireMaterial(greyDark, 0.62)));
+  group.add(new THREE.LineSegments(skidsteerAccentGeo, makeWireMaterial(greyMid, 0.42)));
+  group.add(new THREE.LineSegments(skidsteerToolGeo, makeWireMaterial(accentYellow, 0.64)));
   scene.add(group);
+}
+
+function updateSkidsteers(elapsed) {
+  if (!skidsteerBodyGeo || !skidsteerAccentGeo || !skidsteerToolGeo) return;
+  const { bodyLines, accentLines, toolLines } = buildSkidsteerLineSets(elapsed);
+  refreshLineGeometry(skidsteerBodyGeo, bodyLines);
+  refreshLineGeometry(skidsteerAccentGeo, accentLines);
+  refreshLineGeometry(skidsteerToolGeo, toolLines);
 }
 
 function buildGenerationSolarArrays() {
@@ -3101,7 +3179,7 @@ function buildPlant() {
   addDam(structureLines, accentLines, -684, -164, 0.34, 184);
   addDam(structureLines, accentLines, -476, 424, -0.46, 164);
   const downstreamBridgeYaw = Math.atan2(256 - 54, -558 - -634) + Math.PI * 0.5;
-  addGoldenGateBridge(cityLines, accentLines, -596, 155, downstreamBridgeYaw, 274, 58, 94);
+  addGoldenGateBridge(cityLines, accentLines, -596, 155, downstreamBridgeYaw, 645, 144, 222);
 
   addWireBox(structureLines, -84, -28, 230, 64, 112, -0.06, 0);
   addWireBox(detailLines, -84, -28, 194, 18, 78, -0.06, 66);
@@ -3488,6 +3566,7 @@ function animate() {
   updateRiverFlow(dt, elapsed);
   updateWindFarmParticles(dt, elapsed);
   updateWindRotors(dt, elapsed);
+  updateSkidsteers(elapsed);
   updateOverarchingGridParticles(dt, elapsed);
   updateCameraAnimation(performance.now());
   if (!cameraAnimation.active) controls.update();

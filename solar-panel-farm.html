@@ -490,6 +490,7 @@ controls.mouseButtons = {
 };
 
 const GLOBE_R = 5200;
+const GLOBE_OCCLUSION_INSET = 26;
 const greyA  = new THREE.Color('#b0b0b5');
 const greyB  = new THREE.Color('#8a8a90');
 const greyC  = new THREE.Color('#cccdd0');
@@ -796,6 +797,20 @@ function makePointsMaterial(sizeScale = 1.0, densityUniform = particleDensityUni
     depthWrite: false,
     blending: THREE.NormalBlending,
   });
+}
+
+function buildGlobeOcclusionLayer() {
+  const geo = new THREE.SphereGeometry(GLOBE_R - GLOBE_OCCLUSION_INSET, 128, 64);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    side: THREE.FrontSide,
+    depthTest: true,
+    depthWrite: true,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = 'solar-globe-white-occlusion-shell';
+  mesh.position.set(0, -GLOBE_R, 0);
+  scene.add(mesh);
 }
 
 const modelVert = /* glsl */`
@@ -2617,6 +2632,7 @@ function tick() {
 }
 
 (function boot() {
+  buildGlobeOcclusionLayer();
   const panelCount = buildPanelFarm();
   solarPanelCount = panelCount;
   buildEmbers();
