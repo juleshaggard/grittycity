@@ -389,28 +389,16 @@
     <div class="debug-menu__grid">
       <label>Total S <input id="cameraAnimDuration" type="number" min="0.1" max="1200" step="0.1" readonly /></label>
       <label>Move A-B <input id="cameraMoveAB" type="number" min="0.1" max="120" step="0.1" /></label>
-      <label>Move B-C <input id="cameraMoveBC" type="number" min="0.1" max="120" step="0.1" /></label>
-      <label>Move C-D <input id="cameraMoveCD" type="number" min="0.1" max="120" step="0.1" /></label>
-      <label>Move D-E <input id="cameraMoveDE" type="number" min="0.1" max="120" step="0.1" /></label>
       <label>Hold A <input id="cameraHoldA" type="number" min="0" max="120" step="0.1" /></label>
       <label>Hold B <input id="cameraHoldB" type="number" min="0" max="120" step="0.1" /></label>
-      <label>Hold C <input id="cameraHoldC" type="number" min="0" max="120" step="0.1" /></label>
-      <label>Hold D <input id="cameraHoldD" type="number" min="0" max="120" step="0.1" /></label>
-      <label>Hold E <input id="cameraHoldE" type="number" min="0" max="120" step="0.1" /></label>
     </div>
     <div class="debug-menu__actions">
       <button id="setCameraKeyA" type="button">Set A</button>
       <button id="setCameraKeyB" type="button">Set B</button>
-      <button id="setCameraKeyC" type="button">Set C</button>
-      <button id="setCameraKeyD" type="button">Set D</button>
-      <button id="setCameraKeyE" type="button">Set E</button>
     </div>
     <div class="debug-menu__actions">
       <button id="returnCameraKeyA" type="button">Return to A</button>
       <button id="returnCameraKeyB" type="button">Return to B</button>
-      <button id="returnCameraKeyC" type="button">Return to C</button>
-      <button id="returnCameraKeyD" type="button">Return to D</button>
-      <button id="returnCameraKeyE" type="button">Return to E</button>
     </div>
     <div class="debug-menu__actions">
       <button id="playCameraMove" type="button">Play</button>
@@ -486,14 +474,8 @@ const debugEls = {
   orbRotationDeg: document.getElementById('orbRotationDeg'),
   cameraAnimDuration: document.getElementById('cameraAnimDuration'),
   cameraMoveAB: document.getElementById('cameraMoveAB'),
-  cameraMoveBC: document.getElementById('cameraMoveBC'),
-  cameraMoveCD: document.getElementById('cameraMoveCD'),
-  cameraMoveDE: document.getElementById('cameraMoveDE'),
   cameraHoldA: document.getElementById('cameraHoldA'),
   cameraHoldB: document.getElementById('cameraHoldB'),
-  cameraHoldC: document.getElementById('cameraHoldC'),
-  cameraHoldD: document.getElementById('cameraHoldD'),
-  cameraHoldE: document.getElementById('cameraHoldE'),
   particleScale: document.getElementById('particleScale'),
   particleAlpha: document.getElementById('particleAlpha'),
   particleDensity: document.getElementById('particleDensity'),
@@ -518,14 +500,8 @@ const debugEls = {
   resetParticles: document.getElementById('resetParticleData'),
   setCameraKeyA: document.getElementById('setCameraKeyA'),
   setCameraKeyB: document.getElementById('setCameraKeyB'),
-  setCameraKeyC: document.getElementById('setCameraKeyC'),
-  setCameraKeyD: document.getElementById('setCameraKeyD'),
-  setCameraKeyE: document.getElementById('setCameraKeyE'),
   returnCameraKeyA: document.getElementById('returnCameraKeyA'),
   returnCameraKeyB: document.getElementById('returnCameraKeyB'),
-  returnCameraKeyC: document.getElementById('returnCameraKeyC'),
-  returnCameraKeyD: document.getElementById('returnCameraKeyD'),
-  returnCameraKeyE: document.getElementById('returnCameraKeyE'),
   playCameraMove: document.getElementById('playCameraMove'),
   resetCameraMove: document.getElementById('resetCameraMove'),
   shotLowOrbit: document.getElementById('shotLowOrbit'),
@@ -561,9 +537,9 @@ const DEFAULT_MAX_POLAR_DEG = 108;
 const DEFAULT_ORB_ROTATION_DEG = 0;
 const DEFAULT_CAMERA_ANIMATION_DURATION = 21;
 const DEFAULT_CAMERA_MOVE_DURATION = 3;
-const CAMERA_KEY_NAMES = ['A', 'B', 'C', 'D', 'E'];
-const CAMERA_SEGMENT_NAMES = ['AB', 'BC', 'CD', 'DE'];
-const DEFAULT_CAMERA_HOLD_DURATIONS = { A: 3, B: 3, C: 3, D: 0, E: 0 };
+const CAMERA_KEY_NAMES = ['A', 'B'];
+const CAMERA_SEGMENT_NAMES = ['AB'];
+const DEFAULT_CAMERA_HOLD_DURATIONS = { A: 3, B: 3 };
 const DEFAULT_PARTICLE_SCALE = 4.3;
 const DEFAULT_PARTICLE_ALPHA = 2.45;
 const DEFAULT_PARTICLE_DENSITY = 2.4;
@@ -738,9 +714,6 @@ const cameraAnimation = {
   duration: DEFAULT_CAMERA_ANIMATION_DURATION,
   keyA: null,
   keyB: null,
-  keyC: null,
-  keyD: null,
-  keyE: null,
   moveDurations: null,
   holdDurations: null,
 };
@@ -750,7 +723,6 @@ const cameraAnimLookPosition = new THREE.Vector3();
 const cameraAnimLookTarget = new THREE.Vector3();
 const cameraAnimQuatA = new THREE.Quaternion();
 const cameraAnimQuatB = new THREE.Quaternion();
-const cameraAnimQuatC = new THREE.Quaternion();
 const cameraAnimQuatOut = new THREE.Quaternion();
 let suppressCameraInput = false;
 let suppressSceneInput = false;
@@ -1056,60 +1028,6 @@ function defaultCameraKeyBState() {
   };
 }
 
-function defaultCameraKeyCState() {
-  return {
-    x: 1337.87,
-    y: 217.59,
-    z: 6208.74,
-    targetX: 106.3,
-    targetY: 66.7,
-    targetZ: -171.7,
-    fov: 37,
-    zoom: 1,
-    near: DEFAULT_CAMERA_NEAR,
-    far: DEFAULT_CAMERA_FAR,
-    fadeNear: DEFAULT_FADE_NEAR,
-    fadeFar: DEFAULT_FADE_FAR,
-    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
-  };
-}
-
-function defaultCameraKeyDState() {
-  return {
-    x: -760,
-    y: 132,
-    z: 530,
-    targetX: 112,
-    targetY: 54,
-    targetZ: -34,
-    fov: 64,
-    zoom: 1,
-    near: DEFAULT_CAMERA_NEAR,
-    far: DEFAULT_CAMERA_FAR,
-    fadeNear: DEFAULT_FADE_NEAR,
-    fadeFar: 1200,
-    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
-  };
-}
-
-function defaultCameraKeyEState() {
-  return {
-    x: 348,
-    y: 88,
-    z: 28,
-    targetX: 260,
-    targetY: 116,
-    targetZ: -46,
-    fov: 36,
-    zoom: 1,
-    near: 0.35,
-    far: DEFAULT_CAMERA_FAR,
-    fadeNear: 4,
-    fadeFar: 1200,
-    maxPolarDeg: DEFAULT_MAX_POLAR_DEG,
-  };
-}
-
 const CAMERA_SHOTS = {
   'Low Orbit': {
     x: 520,
@@ -1352,9 +1270,6 @@ function defaultCameraAnimationState() {
     duration: totalCameraAnimationDuration(moveDurations, holdDurations),
     keyA: defaultCameraKeyAState(),
     keyB: defaultCameraKeyBState(),
-    keyC: defaultCameraKeyCState(),
-    keyD: defaultCameraKeyDState(),
-    keyE: defaultCameraKeyEState(),
     moveDurations,
     holdDurations,
   };
@@ -1371,9 +1286,6 @@ function normalizeCameraAnimationState(state = {}) {
     duration: totalCameraAnimationDuration(moveDurations, holdDurations),
     keyA: normalizeCameraState(state.keyA || defaults.keyA),
     keyB: normalizeCameraState(state.keyB || defaults.keyB),
-    keyC: normalizeCameraState(state.keyC || defaults.keyC),
-    keyD: normalizeCameraState(state.keyD || defaults.keyD),
-    keyE: normalizeCameraState(state.keyE || defaults.keyE),
     moveDurations,
     holdDurations,
   };
@@ -1526,22 +1438,13 @@ function updateDebugData() {
       durationSeconds: roundForDebug(totalCameraAnimationDuration(), 2),
       moveDurations: cleanDebugObject({
         AB: roundForDebug(cameraAnimation.moveDurations?.AB, 2),
-        BC: roundForDebug(cameraAnimation.moveDurations?.BC, 2),
-        CD: roundForDebug(cameraAnimation.moveDurations?.CD, 2),
-        DE: roundForDebug(cameraAnimation.moveDurations?.DE, 2),
       }),
       holdDurations: cleanDebugObject({
         A: roundForDebug(cameraAnimation.holdDurations?.A, 2),
         B: roundForDebug(cameraAnimation.holdDurations?.B, 2),
-        C: roundForDebug(cameraAnimation.holdDurations?.C, 2),
-        D: roundForDebug(cameraAnimation.holdDurations?.D, 2),
-        E: roundForDebug(cameraAnimation.holdDurations?.E, 2),
       }),
       keyframeA: cameraStatePayload(cameraAnimation.keyA),
       keyframeB: cameraStatePayload(cameraAnimation.keyB),
-      keyframeC: cameraStatePayload(cameraAnimation.keyC),
-      keyframeD: cameraStatePayload(cameraAnimation.keyD),
-      keyframeE: cameraStatePayload(cameraAnimation.keyE),
     },
     scene: sceneDebugPayload(),
     particles: particleDebugPayload(),
@@ -1793,29 +1696,8 @@ function easeInOutExpo(t) {
     : (2 - Math.pow(2, -20 * t + 10)) / 2;
 }
 
-function smootherstep01(t) {
-  const x = clamp(t, 0, 1);
-  return x * x * x * (x * (x * 6 - 15) + 10);
-}
-
-function cameraSequenceProgress(t) {
-  const x = clamp(t, 0, 1);
-  return lerp(smootherstep01(x), easeInOutExpo(x), 0.18);
-}
-
 function lerp(a, b, t) {
   return a + (b - a) * t;
-}
-
-function catmullRom(p0, p1, p2, p3, t) {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return 0.5 * (
-    2 * p1 +
-    (-p0 + p2) * t +
-    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-  );
 }
 
 function lerpCameraStates(from, to, t) {
@@ -1836,28 +1718,6 @@ function lerpCameraStates(from, to, t) {
     fadeFar: lerp(a.fadeFar, b.fadeFar, t),
     maxPolarDeg: lerp(a.maxPolarDeg, b.maxPolarDeg, t),
   };
-}
-
-function catmullCameraStates(p0, p1, p2, p3, t) {
-  const a = normalizeCameraState(p0);
-  const b = normalizeCameraState(p1);
-  const c = normalizeCameraState(p2);
-  const d = normalizeCameraState(p3);
-  return normalizeCameraState({
-    x: catmullRom(a.x, b.x, c.x, d.x, t),
-    y: catmullRom(a.y, b.y, c.y, d.y, t),
-    z: catmullRom(a.z, b.z, c.z, d.z, t),
-    targetX: catmullRom(a.targetX, b.targetX, c.targetX, d.targetX, t),
-    targetY: catmullRom(a.targetY, b.targetY, c.targetY, d.targetY, t),
-    targetZ: catmullRom(a.targetZ, b.targetZ, c.targetZ, d.targetZ, t),
-    fov: catmullRom(a.fov, b.fov, c.fov, d.fov, t),
-    zoom: catmullRom(a.zoom, b.zoom, c.zoom, d.zoom, t),
-    near: catmullRom(a.near, b.near, c.near, d.near, t),
-    far: catmullRom(a.far, b.far, c.far, d.far, t),
-    fadeNear: catmullRom(a.fadeNear, b.fadeNear, c.fadeNear, d.fadeNear, t),
-    fadeFar: catmullRom(a.fadeFar, b.fadeFar, c.fadeFar, d.fadeFar, t),
-    maxPolarDeg: catmullRom(a.maxPolarDeg, b.maxPolarDeg, c.maxPolarDeg, d.maxPolarDeg, t),
-  });
 }
 
 function setStableLookTargetForState(state, fallbackState, outTarget) {
@@ -1894,16 +1754,8 @@ function cameraStateForKeyIndex(index) {
   return cameraAnimation[`key${key}`];
 }
 
-function cameraSegmentState(segmentIndex, t) {
-  const lastIndex = CAMERA_KEY_NAMES.length - 1;
-  const fromIndex = clamp(segmentIndex, 0, lastIndex - 1);
-  return catmullCameraStates(
-    cameraStateForKeyIndex(Math.max(0, fromIndex - 1)),
-    cameraStateForKeyIndex(fromIndex),
-    cameraStateForKeyIndex(fromIndex + 1),
-    cameraStateForKeyIndex(Math.min(lastIndex, fromIndex + 2)),
-    t
-  );
+function cameraSegmentState(t) {
+  return lerpCameraStates(cameraAnimation.keyA, cameraAnimation.keyB, t);
 }
 
 function cameraQuaternionForKeyIndex(index) {
@@ -1917,10 +1769,9 @@ function cameraQuaternionForKeyIndex(index) {
   );
 }
 
-function cameraSegmentQuaternion(segmentIndex, t) {
-  const fromIndex = clamp(segmentIndex, 0, CAMERA_KEY_NAMES.length - 2);
-  cameraQuaternionFromState(cameraStateForKeyIndex(fromIndex), cameraStateForKeyIndex(fromIndex + 1), cameraAnimQuatA);
-  cameraQuaternionFromState(cameraStateForKeyIndex(fromIndex + 1), cameraStateForKeyIndex(fromIndex), cameraAnimQuatB);
+function cameraSegmentQuaternion(t) {
+  cameraQuaternionFromState(cameraAnimation.keyA, cameraAnimation.keyB, cameraAnimQuatA);
+  cameraQuaternionFromState(cameraAnimation.keyB, cameraAnimation.keyA, cameraAnimQuatB);
   return cameraAnimQuatOut.copy(cameraAnimQuatA).slerp(cameraAnimQuatB, t);
 }
 
@@ -1947,8 +1798,8 @@ function cameraAnimationFrameAtElapsed(elapsedSeconds) {
         const localT = clamp((elapsedSeconds - cursor) / moveDuration, 0, 1);
         const easedT = easeInOutExpo(localT);
         return {
-          state: cameraSegmentState(index, easedT),
-          quaternion: cameraSegmentQuaternion(index, easedT),
+          state: cameraSegmentState(easedT),
+          quaternion: cameraSegmentQuaternion(easedT),
         };
       }
       cursor += moveDuration;
@@ -1989,7 +1840,7 @@ function updateCameraAnimation(now) {
   if (elapsedSeconds >= durationSeconds) {
     cameraAnimation.active = false;
     controls.enabled = true;
-    applyCameraState(cameraAnimation.keyE, true);
+    applyCameraState(cameraAnimation.keyB, true);
     updateCameraAnimationDebug();
   }
 }
@@ -3174,8 +3025,6 @@ function buildGenerationDataCenters() {
   const accentLines = [];
   const yaw = GENERATION_GLOBAL_GRID_YAW;
   const spacing = GENERATION_GLOBAL_GRID_SPACING;
-  const cy = Math.cos(yaw);
-  const sy = Math.sin(yaw);
   const campusSites = [];
   const siteKeys = new Set();
 
@@ -3203,27 +3052,6 @@ function buildGenerationDataCenters() {
 
   function addLocalLine(lines, origin, ax, ay, az, bx, by, bz) {
     pushLine(lines, localPoint(origin[0], origin[2], yaw, ax, ay, az), localPoint(origin[0], origin[2], yaw, bx, by, bz));
-  }
-
-  function addSoundBarrierRun(gx0, gz0, gx1, gz1, height = 38, offset = 0) {
-    const dx = gx1 - gx0;
-    const dz = gz1 - gz0;
-    const len = Math.hypot(dx, dz) || 1;
-    const nx = -dz / len * offset;
-    const nz = dx / len * offset;
-    const a = generationGlobalGridPoint((gx0 + nx) * spacing, (gz0 + nz) * spacing, 0.7);
-    const b = generationGlobalGridPoint((gx1 + nx) * spacing, (gz1 + nz) * spacing, 0.7);
-    for (const y of [0.7, height * 0.36, height * 0.68, height]) {
-      pushLine(barrierLines, [a[0], y, a[2]], [b[0], y, b[2]]);
-    }
-    const panels = Math.max(8, Math.ceil(len * spacing / 58));
-    for (let i = 0; i <= panels; i++) {
-      const t = i / panels;
-      const x = a[0] + (b[0] - a[0]) * t;
-      const z = a[2] + (b[2] - a[2]) * t;
-      pushLine(barrierLines, [x, 0.7, z], [x, height, z]);
-      if (i % 4 === 0) pushLine(accentLines, [x - cy * 5, height + 1.8, z - sy * 5], [x + cy * 5, height + 1.8, z + sy * 5]);
-    }
   }
 
   function addHighwayRun(gx0, gz0, gx1, gz1) {
@@ -3288,15 +3116,9 @@ function buildGenerationDataCenters() {
   addHighwayRun(-8.4, -6.4, -2.0, -1.0);
   addHighwayRun(-8.1, 4.9, -1.6, 1.3);
   addHighwayRun(-7.8, -1.9, -2.4, 5.8);
-  addSoundBarrierRun(-8.4, -6.4, -2.0, -1.0, 42, -0.22);
-  addSoundBarrierRun(-8.4, -6.4, -2.0, -1.0, 34, 0.24);
-  addSoundBarrierRun(-8.1, 4.9, -1.6, 1.3, 38, -0.22);
-  addSoundBarrierRun(-7.8, -1.9, -2.4, 5.8, 36, 0.23);
-  addSoundBarrierRun(-5.8, -7.0, -5.2, 7.0, 44, 0.0);
-  addSoundBarrierRun(-3.2, -4.8, -2.5, 4.4, 32, 0.0);
 
   const group = new THREE.Group();
-  group.name = 'generation-data-center-sound-barrier-zone';
+  group.name = 'generation-data-center-zone';
   group.add(new THREE.LineSegments(makeLineGeometry(highwayLines), makeWireMaterial(greyLight, 0.22)));
   group.add(new THREE.LineSegments(makeLineGeometry(campusLines), makeWireMaterial(greyDark, 0.52)));
   group.add(new THREE.LineSegments(makeLineGeometry(detailLines), makeWireMaterial(greyMid, 0.35)));
@@ -3612,14 +3434,8 @@ for (const input of cameraAnimationTimingInputs()) {
 
 if (debugEls.setCameraKeyA) debugEls.setCameraKeyA.addEventListener('click', () => setCameraKey('A'));
 if (debugEls.setCameraKeyB) debugEls.setCameraKeyB.addEventListener('click', () => setCameraKey('B'));
-if (debugEls.setCameraKeyC) debugEls.setCameraKeyC.addEventListener('click', () => setCameraKey('C'));
-if (debugEls.setCameraKeyD) debugEls.setCameraKeyD.addEventListener('click', () => setCameraKey('D'));
-if (debugEls.setCameraKeyE) debugEls.setCameraKeyE.addEventListener('click', () => setCameraKey('E'));
 if (debugEls.returnCameraKeyA) debugEls.returnCameraKeyA.addEventListener('click', () => returnToCameraKey('A'));
 if (debugEls.returnCameraKeyB) debugEls.returnCameraKeyB.addEventListener('click', () => returnToCameraKey('B'));
-if (debugEls.returnCameraKeyC) debugEls.returnCameraKeyC.addEventListener('click', () => returnToCameraKey('C'));
-if (debugEls.returnCameraKeyD) debugEls.returnCameraKeyD.addEventListener('click', () => returnToCameraKey('D'));
-if (debugEls.returnCameraKeyE) debugEls.returnCameraKeyE.addEventListener('click', () => returnToCameraKey('E'));
 if (debugEls.playCameraMove) debugEls.playCameraMove.addEventListener('click', playCameraAnimation);
 if (debugEls.resetCameraMove) debugEls.resetCameraMove.addEventListener('click', resetCameraAnimation);
 if (debugEls.shotLowOrbit) debugEls.shotLowOrbit.addEventListener('click', () => applyCameraShot('Low Orbit'));
