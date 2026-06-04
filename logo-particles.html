@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Logo Particles</title>
+<style>
+  :root {
+    --paper: #ffffff;
+    --ink: #1d1d18;
+    --ochre: #C67C2A;
+    --gold: #FCE132;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--paper);
+  }
+
+  body {
+    min-height: 100dvh;
+    overflow: hidden;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--paper);
+  }
+
+  canvas {
+    position: fixed;
+    display: block;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 800ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body.is-ready canvas {
+    opacity: 1;
+  }
+
+  .fallback {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: min(320px, calc(100vw - 48px));
+    transform: translate(-50%, -50%);
+    color: rgba(29, 29, 24, 0.56);
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  body.has-webgl .fallback {
+    display: none;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<main class="stage" aria-labelledby="pageTitle">
+  <h1 class="sr-only" id="pageTitle">Gold particle logo field</h1>
+  <canvas id="particles" aria-hidden="true"></canvas>
+  <p class="fallback">WebGL is required to render the gold particle logo field.</p>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById("particles");
+  const gl = canvas.getContext("webgl", {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: false
+  });
+
+  if (!gl || typeof Path2D === "undefined") return;
+
+  document.body.classList.add("has-webgl");
+
+  const logoPathData = "M11.7373 0.00292969C16.8631 0.0691026 20.8864 2.12061 22.5459 6.89258H17.8066C16.6458 4.63015 14.3634 4.05104 11.6777 4.00781C6.5227 4.09988 3.99219 7.69809 3.99219 12.1475V12.3379L3.99902 12.7578C4.1541 17.0093 6.68284 20.3836 11.6689 20.4766C15.9153 20.3977 18.3494 18.7849 19.0273 14.8721H13.2422L15.5547 10.8828H23.2178V11.6074L23.2168 11.6084V12.3379C23.2168 20.5784 18.9351 24.3919 11.7373 24.4805V24.4854C11.6854 24.4854 11.6336 24.4839 11.582 24.4834C11.5479 24.4836 11.5137 24.4854 11.4795 24.4854L11.4785 24.4814C4.2955 24.3623 0.0177657 19.2834 0.000976562 12.3789H0V12.1475C0 5.22216 4.28135 0.122287 11.4785 0.00292969L11.4795 0C11.5212 8.99105e-08 11.5629 0.000718003 11.6045 0.000976562C11.6487 0.000602428 11.6929 4.42785e-07 11.7373 0V0.00292969ZM31.1934 24.4854H27.2031V10.8818L29.5156 6.89258H31.1934V24.4854ZM45.1621 24.4854H41.1719V6.89258H45.1621V24.4854ZM54.0488 6.89258H60.0322V10.8818H54.0488V20.4951H60.0322V24.4854H52.3711L50.0586 20.4951V0H54.0488V6.89258ZM68.0137 24.4854H66.3359L64.0234 20.4951V0H68.0137V24.4854ZM74.001 24.4854H68.0156V20.4951H74.001V24.4854ZM37.1807 10.8818H31.1953V6.89258H37.1807V10.8818ZM74.001 10.8818H68.0156V6.89258H74.001V10.8818ZM45.1621 3.99023H41.1719V0H45.1621V3.99023Z";
+  const logoPath = new Path2D(logoPathData);
+  const maskCanvas = document.createElement("canvas");
+  const maskContext = maskCanvas.getContext("2d");
+
+  const vertexShaderSource = `
+    attribute vec2 a_position;
+    attribute float a_size;
+    attribute float a_mix;
+    attribute float a_alpha;
+    attribute float a_twinkle;
+
+    uniform vec2 u_resolution;
+    uniform float u_pixelRatio;
+
+    varying float v_mix;
+    varying float v_alpha;
+    varying float v_twinkle;
+
+    void main() {
+      vec2 zeroToOne = a_position / u_resolution;
+      vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+      gl_Position = vec4(clipSpace * vec2(1.0, -1.0), 0.0, 1.0);
+      gl_PointSize = max(1.0, a_size * u_pixelRatio);
+
+      v_mix = a_mix;
+      v_alpha = a_alpha;
+      v_twinkle = a_twinkle;
+    }
+  `;
+
+  const fragmentShaderSource = `
+    precision mediump float;
+
+    varying float v_mix;
+    varying float v_alpha;
+    varying float v_twinkle;
+
+    void main() {
+      vec2 uv = gl_PointCoord - 0.5;
+      float distanceFromCenter = length(uv);
+      float core = smoothstep(0.46, 0.0, distanceFromCenter);
+      float edge = smoothstep(0.52, 0.16, distanceFromCenter);
+
+      vec3 ochre = vec3(0.7765, 0.4863, 0.1647);
+      vec3 gold = vec3(0.9882, 0.8824, 0.1961);
+      vec3 color = mix(ochre, gold, v_mix);
+      color = mix(color, vec3(1.0, 0.956, 0.54), core * 0.34);
+
+      float alpha = edge * v_alpha * (0.9 + v_twinkle * 0.1);
+      gl_FragColor = vec4(color, alpha);
+    }
+  `;
+
+  function createShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const error = gl.getShaderInfoLog(shader);
+      gl.deleteShader(shader);
+      throw new Error(error);
+    }
+
+    return shader;
+  }
+
+  function createProgram(vertexSource, fragmentSource) {
+    const program = gl.createProgram();
+    const vertexShader = createShader(gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentSource);
+
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const error = gl.getProgramInfoLog(program);
+      gl.deleteProgram(program);
+      throw new Error(error);
+    }
+
+    return program;
+  }
+
+  let program;
+  try {
+    program = createProgram(vertexShaderSource, fragmentShaderSource);
+  } catch (error) {
+    console.error(error);
+    return;
+  }
+
+  const attributes = {
+    position: gl.getAttribLocation(program, "a_position"),
+    size: gl.getAttribLocation(program, "a_size"),
+    mix: gl.getAttribLocation(program, "a_mix"),
+    alpha: gl.getAttribLocation(program, "a_alpha"),
+    twinkle: gl.getAttribLocation(program, "a_twinkle")
+  };
+  const uniforms = {
+    resolution: gl.getUniformLocation(program, "u_resolution"),
+    pixelRatio: gl.getUniformLocation(program, "u_pixelRatio")
+  };
+
+  const stride = 6;
+  const buffer = gl.createBuffer();
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const mouse = {
+    x: window.innerWidth * 0.5,
+    y: window.innerHeight * 0.5,
+    targetX: window.innerWidth * 0.5,
+    targetY: window.innerHeight * 0.5,
+    active: false,
+    lastMove: 0
+  };
+
+  let width = 1;
+  let height = 1;
+  let pixelRatio = 1;
+  let logoBox = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
+  let count = 0;
+  let glyphCount = 0;
+  let particleData = new Float32Array(0);
+  let xPositions = new Float32Array(0);
+  let yPositions = new Float32Array(0);
+  let xVelocities = new Float32Array(0);
+  let yVelocities = new Float32Array(0);
+  let originX = new Float32Array(0);
+  let originY = new Float32Array(0);
+  let size = new Float32Array(0);
+  let colorMix = new Float32Array(0);
+  let alpha = new Float32Array(0);
+  let phase = new Float32Array(0);
+  let wind = new Float32Array(0);
+  let depth = new Float32Array(0);
+  let spring = new Float32Array(0);
+  let friction = new Float32Array(0);
+  let twinkle = new Float32Array(0);
+  let lastTime = performance.now();
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function randomRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function layoutLogo() {
+    const maxWidth = width * 0.92;
+    const maxHeight = height * 0.86;
+    const aspect = 74 / 25;
+    let logoWidth = maxWidth;
+    let logoHeight = logoWidth / aspect;
+
+    if (logoHeight > maxHeight) {
+      logoHeight = maxHeight;
+      logoWidth = logoHeight * aspect;
+    }
+
+    const x = (width - logoWidth) * 0.5;
+    const y = (height - logoHeight) * 0.5;
+
+    logoBox = {
+      x,
+      y,
+      width: logoWidth,
+      height: logoHeight,
+      scale: logoWidth / 74
+    };
+  }
+
+  function logoToScreen(pointX, pointY) {
+    return {
+      x: logoBox.x + pointX * logoBox.scale,
+      y: logoBox.y + pointY * logoBox.scale
+    };
+  }
+
+  function sampleLogoPoint() {
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      const sampleX = Math.random() * 74;
+      const sampleY = Math.random() * 25;
+
+      if (maskContext.isPointInPath(logoPath, sampleX, sampleY)) {
+        return logoToScreen(sampleX, sampleY);
+      }
+    }
+
+    return logoToScreen(Math.random() * 74, Math.random() * 25);
+  }
+
+  function particleCounts() {
+    const logoArea = logoBox.width * logoBox.height;
+    const glyphDensity = prefersReducedMotion ? 0.038 : 0.118;
+
+    return {
+      glyph: Math.floor(clamp(logoArea * glyphDensity, prefersReducedMotion ? 5600 : 24000, prefersReducedMotion ? 18000 : 88000)),
+      ambient: 0
+    };
+  }
+
+  function rebuildParticles() {
+    layoutLogo();
+
+    const counts = particleCounts();
+    glyphCount = counts.glyph;
+    count = counts.glyph + counts.ambient;
+
+    particleData = new Float32Array(count * stride);
+    xPositions = new Float32Array(count);
+    yPositions = new Float32Array(count);
+    xVelocities = new Float32Array(count);
+    yVelocities = new Float32Array(count);
+    originX = new Float32Array(count);
+    originY = new Float32Array(count);
+    size = new Float32Array(count);
+    colorMix = new Float32Array(count);
+    alpha = new Float32Array(count);
+    phase = new Float32Array(count);
+    wind = new Float32Array(count);
+    depth = new Float32Array(count);
+    spring = new Float32Array(count);
+    friction = new Float32Array(count);
+    twinkle = new Float32Array(count);
+
+    for (let i = 0; i < count; i += 1) {
+      const isGlyphParticle = i < glyphCount;
+      const origin = isGlyphParticle
+        ? sampleLogoPoint()
+        : {
+          x: randomRange(-width * 0.08, width * 1.08),
+          y: logoBox.y + randomRange(-logoBox.height * 0.48, logoBox.height * 1.48)
+        };
+
+      originX[i] = origin.x;
+      originY[i] = origin.y;
+      xPositions[i] = origin.x + randomRange(-12, 12);
+      yPositions[i] = origin.y + randomRange(-12, 12);
+      xVelocities[i] = randomRange(-0.18, 0.18);
+      yVelocities[i] = randomRange(-0.18, 0.18);
+      depth[i] = Math.random();
+      size[i] = isGlyphParticle ? randomRange(0.42, 1.74) * (0.68 + depth[i] * 0.6) : randomRange(0.42, 1.18);
+      colorMix[i] = clamp(Math.pow(randomRange(0.05, 1), 0.68) + depth[i] * 0.1, 0, 1);
+      alpha[i] = isGlyphParticle ? randomRange(0.26, 0.86) * (0.76 + depth[i] * 0.26) : randomRange(0.12, 0.42);
+      phase[i] = Math.random();
+      wind[i] = randomRange(0.24, 1);
+      spring[i] = randomRange(0.0045, 0.0125) * (prefersReducedMotion ? 0.58 : 1);
+      friction[i] = randomRange(0.82, 0.9);
+      twinkle[i] = Math.random();
+    }
+  }
+
+  function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = Math.floor(width * pixelRatio);
+    canvas.height = Math.floor(height * pixelRatio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
+    rebuildParticles();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, particleData, gl.DYNAMIC_DRAW);
+  }
+
+  function configureAttributes() {
+    gl.useProgram(program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+
+    gl.enableVertexAttribArray(attributes.position);
+    gl.vertexAttribPointer(attributes.position, 2, gl.FLOAT, false, stride * 4, 0);
+
+    gl.enableVertexAttribArray(attributes.size);
+    gl.vertexAttribPointer(attributes.size, 1, gl.FLOAT, false, stride * 4, 2 * 4);
+
+    gl.enableVertexAttribArray(attributes.mix);
+    gl.vertexAttribPointer(attributes.mix, 1, gl.FLOAT, false, stride * 4, 3 * 4);
+
+    gl.enableVertexAttribArray(attributes.alpha);
+    gl.vertexAttribPointer(attributes.alpha, 1, gl.FLOAT, false, stride * 4, 4 * 4);
+
+    gl.enableVertexAttribArray(attributes.twinkle);
+    gl.vertexAttribPointer(attributes.twinkle, 1, gl.FLOAT, false, stride * 4, 5 * 4);
+  }
+
+  function draw(time) {
+    const dt = prefersReducedMotion
+      ? 0.45
+      : clamp((time - lastTime) / 16.67, 0.35, 1.8);
+    lastTime = time;
+
+    const pointerRecentlyActive = mouse.active && time - mouse.lastMove < 3200;
+    const pointerRadius = pointerRecentlyActive ? Math.min(width, height) * 0.22 + 88 : 0;
+    const innerRadius = pointerRadius * 0.34;
+    const pointerRadiusSquared = pointerRadius * pointerRadius;
+
+    mouse.x += (mouse.targetX - mouse.x) * 0.14;
+    mouse.y += (mouse.targetY - mouse.y) * 0.14;
+
+    for (let i = 0; i < count; i += 1) {
+      const offset = i * stride;
+      const isGlyphParticle = i < glyphCount;
+      const localPhase = phase[i] * 6.28318;
+      const slowTime = time * 0.001;
+
+      if (isGlyphParticle) {
+        const breatheX = Math.cos(localPhase + slowTime * (0.52 + wind[i] * 0.16)) * (0.38 + size[i] * 0.54);
+        const breatheY = Math.sin(localPhase * 1.7 + slowTime * (0.38 + wind[i] * 0.14)) * (0.42 + size[i] * 0.62);
+        const targetX = originX[i] + breatheX + Math.sin(slowTime * 1.9 + localPhase) * 0.52;
+        const targetY = originY[i] + breatheY + Math.cos(slowTime * 1.4 + localPhase) * 0.44;
+
+        xVelocities[i] += (targetX - xPositions[i]) * spring[i] * dt * 60;
+        yVelocities[i] += (targetY - yPositions[i]) * spring[i] * dt * 60;
+        xVelocities[i] += (0.006 + wind[i] * 0.007) * dt;
+      } else {
+        xVelocities[i] += (0.018 + wind[i] * 0.018) * dt;
+        yVelocities[i] += Math.sin(slowTime * 0.8 + localPhase) * 0.006 * dt;
+
+        if (xPositions[i] > width + 34) {
+          xPositions[i] = -34;
+          yPositions[i] = logoBox.y + randomRange(-logoBox.height * 0.52, logoBox.height * 1.52);
+        }
+      }
+
+      if (pointerRecentlyActive && pointerRadius > 0) {
+        const dx = xPositions[i] - mouse.x;
+        const dy = yPositions[i] - mouse.y;
+        const distanceSquared = dx * dx + dy * dy;
+
+        if (distanceSquared < pointerRadiusSquared && distanceSquared > 0.001) {
+          const distance = Math.sqrt(distanceSquared);
+          const reach = 1 - distance / pointerRadius;
+          const influence = reach * reach * (0.38 + depth[i] * 0.72);
+          const normalX = dx / distance;
+          const normalY = dy / distance;
+          const tangentX = -normalY;
+          const tangentY = normalX;
+          const orbit = (4.2 + depth[i] * 5.6) * influence;
+          const centerPush = Math.max(0, 1 - distance / innerRadius) * (5.8 + depth[i] * 6.4) * influence;
+
+          xVelocities[i] += (tangentX * orbit + normalX * centerPush) * dt;
+          yVelocities[i] += (tangentY * orbit + normalY * centerPush) * dt;
+        }
+      }
+
+      const drag = Math.pow(isGlyphParticle ? friction[i] : 0.955, dt);
+      xVelocities[i] *= drag;
+      yVelocities[i] *= drag;
+      xPositions[i] += xVelocities[i] * dt;
+      yPositions[i] += yVelocities[i] * dt;
+
+      particleData[offset] = xPositions[i];
+      particleData[offset + 1] = yPositions[i];
+      particleData[offset + 2] = size[i];
+      particleData[offset + 3] = colorMix[i];
+      particleData[offset + 4] = alpha[i];
+      particleData[offset + 5] = twinkle[i];
+    }
+
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(program);
+    gl.uniform2f(uniforms.resolution, width, height);
+    gl.uniform1f(uniforms.pixelRatio, pixelRatio);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, particleData);
+    configureAttributes();
+    gl.drawArrays(gl.POINTS, 0, count);
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener("pointermove", (event) => {
+    mouse.targetX = event.clientX;
+    mouse.targetY = event.clientY;
+    mouse.active = true;
+    mouse.lastMove = performance.now();
+  }, { passive: true });
+
+  window.addEventListener("pointerleave", () => {
+    mouse.active = false;
+  });
+
+  window.addEventListener("resize", resize, { passive: true });
+
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.clearColor(1, 1, 1, 1);
+
+  resize();
+  requestAnimationFrame(draw);
+  requestAnimationFrame(() => document.body.classList.add("is-ready"));
+})();
+</script>
+</body>
+</html>

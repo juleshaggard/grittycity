@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Topographical Map</title>
+<style>
+  :root {
+    --paper: #ffffff;
+    --ink: #202126;
+    --copper: #C67C2A;
+    --gold: #FCE132;
+    --line: rgba(32, 33, 38, 0.18);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  body {
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .topo-page {
+    position: relative;
+    min-height: 100dvh;
+    isolation: isolate;
+    background: var(--paper);
+  }
+
+  #map {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100vw;
+    height: 100dvh;
+    cursor: crosshair;
+    opacity: 0;
+    transition: opacity 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body.is-ready #map {
+    opacity: 1;
+  }
+
+  .map-title,
+  .elevation-card,
+  .scale,
+  .legend {
+    position: fixed;
+    z-index: 2;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .map-title {
+    left: clamp(18px, 2.6vw, 40px);
+    top: clamp(18px, 2.4vw, 34px);
+    display: grid;
+    gap: 7px;
+    color: rgba(32, 33, 38, 0.8);
+  }
+
+  .map-title strong {
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .map-title span,
+  .elevation-card span,
+  .scale span,
+  .legend span {
+    color: rgba(32, 33, 38, 0.48);
+    font: 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .elevation-card {
+    right: clamp(18px, 2.4vw, 36px);
+    top: clamp(18px, 2.4vw, 34px);
+    display: grid;
+    min-width: 154px;
+    gap: 7px;
+    padding: 12px 13px;
+    border: 1px solid rgba(32, 33, 38, 0.12);
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 18px 46px rgba(32, 33, 38, 0.06);
+  }
+
+  .elevation-card strong {
+    color: rgba(32, 33, 38, 0.84);
+    font: 20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+
+  .scale {
+    left: clamp(18px, 2.6vw, 40px);
+    bottom: clamp(18px, 2.4vw, 32px);
+    display: grid;
+    gap: 6px;
+  }
+
+  .scale__bar {
+    width: 180px;
+    height: 6px;
+    border: 1px solid rgba(32, 33, 38, 0.38);
+    border-left-width: 18px;
+    border-right-width: 18px;
+    background: linear-gradient(90deg, rgba(32, 33, 38, 0.72) 0 25%, transparent 25% 50%, rgba(32, 33, 38, 0.72) 50% 75%, transparent 75%);
+  }
+
+  .legend {
+    right: clamp(18px, 2.4vw, 36px);
+    bottom: clamp(18px, 2.4vw, 32px);
+    display: grid;
+    min-width: 176px;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid rgba(32, 33, 38, 0.12);
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(8px);
+  }
+
+  .legend__ramp {
+    height: 8px;
+    background:
+      radial-gradient(circle, rgba(198, 124, 42, 0.72) 0 1px, transparent 1.4px) 0 0 / 8px 8px,
+      radial-gradient(circle, rgba(252, 225, 50, 0.86) 0 1px, transparent 1.4px) 4px 4px / 8px 8px,
+      linear-gradient(90deg, rgba(198, 124, 42, 0.24), rgba(252, 225, 50, 0.38));
+    border: 1px solid rgba(32, 33, 38, 0.12);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    .map-title span,
+    .scale,
+    .legend {
+      display: none;
+    }
+
+    .elevation-card {
+      left: 18px;
+      right: auto;
+      top: auto;
+      bottom: 18px;
+      min-width: 132px;
+    }
+  }
+</style>
+</head>
+<body>
+<main class="topo-page" aria-labelledby="pageTitle">
+  <h1 class="sr-only" id="pageTitle">Interactive procedural topographical map</h1>
+  <canvas id="map" aria-hidden="true"></canvas>
+
+  <div class="map-title" aria-hidden="true">
+    <strong>Particle Relief</strong>
+    <span>Plate 07 / point contour interval</span>
+  </div>
+
+  <div class="elevation-card" aria-hidden="true">
+    <span>Elevation</span>
+    <strong id="elevationValue">-- m</strong>
+    <span id="coordValue">X -- / Y --</span>
+  </div>
+
+  <div class="scale" aria-hidden="true">
+    <div class="scale__bar"></div>
+    <span>0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.4 km</span>
+  </div>
+
+  <div class="legend" aria-hidden="true">
+    <div class="legend__ramp"></div>
+    <span>Low particle / contour band / summit dust</span>
+  </div>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById("map");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const elevationValue = document.getElementById("elevationValue");
+  const coordValue = document.getElementById("coordValue");
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const TAU = Math.PI * 2;
+
+  const terrain = {
+    width: 260,
+    height: 180,
+    values: new Float32Array(0),
+    min: 0,
+    max: 1
+  };
+
+  const pointer = {
+    x: window.innerWidth * 0.56,
+    y: window.innerHeight * 0.48,
+    targetX: window.innerWidth * 0.56,
+    targetY: window.innerHeight * 0.48,
+    active: false
+  };
+
+  let width = 1;
+  let height = 1;
+  let pixelRatio = 1;
+  let raf = 0;
+  let lastTime = performance.now();
+  let particleCount = 0;
+  let originX = new Float32Array(0);
+  let originY = new Float32Array(0);
+  let xPositions = new Float32Array(0);
+  let yPositions = new Float32Array(0);
+  let xVelocities = new Float32Array(0);
+  let yVelocities = new Float32Array(0);
+  let particleSize = new Float32Array(0);
+  let particleAlpha = new Float32Array(0);
+  let particlePhase = new Float32Array(0);
+  let particleDrift = new Float32Array(0);
+  let particleElevation = new Float32Array(0);
+  let particleFill = [];
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  function smooth(t) {
+    return t * t * (3 - 2 * t);
+  }
+
+  function hash(x, y) {
+    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+    return n - Math.floor(n);
+  }
+
+  function valueNoise(x, y) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const xf = x - xi;
+    const yf = y - yi;
+    const u = smooth(xf);
+    const v = smooth(yf);
+
+    const a = hash(xi, yi);
+    const b = hash(xi + 1, yi);
+    const c = hash(xi, yi + 1);
+    const d = hash(xi + 1, yi + 1);
+
+    return lerp(lerp(a, b, u), lerp(c, d, u), v);
+  }
+
+  function fbm(x, y) {
+    let value = 0;
+    let amplitude = 0.55;
+    let frequency = 1;
+    let total = 0;
+
+    for (let i = 0; i < 6; i++) {
+      value += valueNoise(x * frequency, y * frequency) * amplitude;
+      total += amplitude;
+      amplitude *= 0.52;
+      frequency *= 2.06;
+    }
+
+    return value / total;
+  }
+
+  function buildTerrain() {
+    const count = terrain.width * terrain.height;
+    terrain.values = new Float32Array(count);
+    terrain.min = 1;
+    terrain.max = 0;
+
+    for (let y = 0; y < terrain.height; y++) {
+      for (let x = 0; x < terrain.width; x++) {
+        const nx = x / (terrain.width - 1);
+        const ny = y / (terrain.height - 1);
+        const dx = nx - 0.5;
+        const dy = ny - 0.5;
+        const falloff = 1 - clamp(Math.hypot(dx * 1.16, dy * 1.04) * 1.28, 0, 1);
+        const ridgeA = Math.abs(fbm(nx * 4.2 + 6.4, ny * 3.8 + 1.2) - 0.5);
+        const ridgeB = Math.abs(fbm(nx * 8.4 - 2.1, ny * 7.6 + 8.8) - 0.5);
+        const broad = fbm(nx * 2.3 + 2.2, ny * 2.1 - 4.7);
+        const folds = 1 - Math.min(1, ridgeA * 2.8 + ridgeB * 1.3);
+        const basin = Math.max(0, 0.46 - Math.hypot(dx + 0.18, dy - 0.1)) * 0.5;
+        let elevation = broad * 0.42 + folds * 0.46 + falloff * 0.34 - basin;
+
+        elevation = clamp((elevation - 0.2) / 1.08, 0, 1);
+        terrain.values[y * terrain.width + x] = elevation;
+        terrain.min = Math.min(terrain.min, elevation);
+        terrain.max = Math.max(terrain.max, elevation);
+      }
+    }
+  }
+
+  function sampleTerrain(nx, ny) {
+    const x = clamp(nx, 0, 1) * (terrain.width - 1);
+    const y = clamp(ny, 0, 1) * (terrain.height - 1);
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const xf = x - xi;
+    const yf = y - yi;
+    const x1 = Math.min(xi + 1, terrain.width - 1);
+    const y1 = Math.min(yi + 1, terrain.height - 1);
+    const a = terrain.values[yi * terrain.width + xi];
+    const b = terrain.values[yi * terrain.width + x1];
+    const c = terrain.values[y1 * terrain.width + xi];
+    const d = terrain.values[y1 * terrain.width + x1];
+
+    return lerp(lerp(a, b, xf), lerp(c, d, xf), yf);
+  }
+
+  function contourMetrics(elevation) {
+    const interval = 0.055;
+    const majorEvery = 4;
+    const scaled = elevation / interval;
+    const index = Math.max(1, Math.round(scaled));
+    const distance = Math.abs(scaled - index);
+    const strength = clamp(1 - distance / 0.16, 0, 1);
+
+    return {
+      index,
+      strength,
+      major: index % majorEvery === 0
+    };
+  }
+
+  function randomRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function particleColor(elevation, metrics, isContourParticle) {
+    const copper = [198, 124, 42];
+    const gold = [252, 225, 50];
+    const highElevation = elevation > 0.68;
+    const summit = elevation > 0.82;
+    const brightContour = isContourParticle && metrics.major && elevation > 0.42;
+    const ridgeHighlight = isContourParticle && metrics.index % 3 === 0 && elevation > 0.56;
+
+    return highElevation || summit || brightContour || ridgeHighlight ? gold : copper;
+  }
+
+  function particleTotals() {
+    const area = width * height;
+    const contourDensity = prefersReducedMotion ? 0.016 : 0.032;
+    const fieldDensity = prefersReducedMotion ? 0.004 : 0.0072;
+
+    return {
+      contour: Math.floor(clamp(area * contourDensity, prefersReducedMotion ? 5200 : 18000, prefersReducedMotion ? 16000 : 52000)),
+      field: Math.floor(clamp(area * fieldDensity, prefersReducedMotion ? 1200 : 3800, prefersReducedMotion ? 5200 : 12000))
+    };
+  }
+
+  function findContourPoint() {
+    let best = null;
+    let bestScore = -1;
+
+    for (let attempt = 0; attempt < 42; attempt++) {
+      const nx = Math.random();
+      const ny = Math.random();
+      const elevation = sampleTerrain(nx, ny);
+      const metrics = contourMetrics(elevation);
+      const score = metrics.strength + Math.random() * 0.12;
+
+      if (elevation > 0.06 && elevation < 0.98 && score > bestScore) {
+        bestScore = score;
+        best = { nx, ny, elevation, metrics };
+      }
+
+      if (bestScore > 0.82) break;
+    }
+
+    if (best) return best;
+
+    const nx = Math.random();
+    const ny = Math.random();
+    const elevation = sampleTerrain(nx, ny);
+    return { nx, ny, elevation, metrics: contourMetrics(elevation) };
+  }
+
+  function findFieldPoint() {
+    for (let attempt = 0; attempt < 22; attempt++) {
+      const nx = Math.random();
+      const ny = Math.random();
+      const elevation = sampleTerrain(nx, ny);
+      const metrics = contourMetrics(elevation);
+      const openSpace = 1 - metrics.strength;
+      const ridgeBias = 0.34 + elevation * 0.42;
+
+      if (Math.random() < openSpace * ridgeBias) {
+        return { nx, ny, elevation, metrics };
+      }
+    }
+
+    const nx = Math.random();
+    const ny = Math.random();
+    const elevation = sampleTerrain(nx, ny);
+    return { nx, ny, elevation, metrics: contourMetrics(elevation) };
+  }
+
+  function rebuildParticles() {
+    const totals = particleTotals();
+    particleCount = totals.contour + totals.field;
+    originX = new Float32Array(particleCount);
+    originY = new Float32Array(particleCount);
+    xPositions = new Float32Array(particleCount);
+    yPositions = new Float32Array(particleCount);
+    xVelocities = new Float32Array(particleCount);
+    yVelocities = new Float32Array(particleCount);
+    particleSize = new Float32Array(particleCount);
+    particleAlpha = new Float32Array(particleCount);
+    particlePhase = new Float32Array(particleCount);
+    particleDrift = new Float32Array(particleCount);
+    particleElevation = new Float32Array(particleCount);
+    particleFill = new Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      const isContourParticle = i < totals.contour;
+      const point = isContourParticle ? findContourPoint() : findFieldPoint();
+      const jitter = isContourParticle ? 0.42 : 1.8;
+      const x = point.nx * width + randomRange(-jitter, jitter);
+      const y = point.ny * height + randomRange(-jitter, jitter);
+      const color = particleColor(point.elevation, point.metrics, isContourParticle);
+
+      originX[i] = x;
+      originY[i] = y;
+      xPositions[i] = x + randomRange(-8, 8);
+      yPositions[i] = y + randomRange(-8, 8);
+      xVelocities[i] = randomRange(-0.12, 0.12);
+      yVelocities[i] = randomRange(-0.12, 0.12);
+      particleElevation[i] = point.elevation;
+      particlePhase[i] = Math.random() * TAU;
+      particleDrift[i] = isContourParticle ? randomRange(0.35, 1.4) : randomRange(1.4, 3.4);
+
+      if (isContourParticle) {
+        particleSize[i] = point.metrics.major ? randomRange(1.35, 2.35) : randomRange(0.82, 1.62);
+        particleAlpha[i] = point.metrics.major ? randomRange(0.64, 0.92) : randomRange(0.42, 0.76);
+      } else {
+        particleSize[i] = randomRange(0.58, 1.22);
+        particleAlpha[i] = randomRange(0.18, 0.48);
+      }
+
+      particleFill[i] = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${particleAlpha[i].toFixed(3)})`;
+    }
+  }
+
+  function updateReadout() {
+    if (!pointer.active) {
+      elevationValue.textContent = "-- m";
+      coordValue.textContent = "X -- / Y --";
+      return;
+    }
+
+    const elevation = sampleTerrain(pointer.x / width, pointer.y / height);
+    const meters = Math.round(220 + elevation * 1840);
+
+    elevationValue.textContent = `${meters} m`;
+    coordValue.textContent = `X ${Math.round(pointer.x)} / Y ${Math.round(pointer.y)}`;
+  }
+
+  function drawPointerParticles() {
+    if (!pointer.active) return;
+
+    const ringCount = 72;
+    const baseRadius = Math.min(width, height) * 0.075;
+
+    for (let i = 0; i < ringCount; i++) {
+      const angle = i / ringCount * TAU;
+      const ring = i % 3 === 0 ? baseRadius * 1.36 : baseRadius;
+      const x = pointer.x + Math.cos(angle) * ring;
+      const y = pointer.y + Math.sin(angle) * ring;
+      const size = i % 3 === 0 ? 1.8 : 1.25;
+
+      ctx.fillStyle = i % 2 === 0 ? "rgba(198, 124, 42, 0.72)" : "rgba(252, 225, 50, 0.86)";
+      ctx.fillRect(x - size * 0.5, y - size * 0.5, size, size);
+    }
+  }
+
+  function render(time = performance.now()) {
+    const dt = prefersReducedMotion ? 0.7 : clamp((time - lastTime) / 16.67, 0.35, 1.8);
+    const activeRadius = pointer.active ? Math.min(width, height) * 0.17 : 0;
+    const activeRadiusSquared = activeRadius * activeRadius;
+
+    lastTime = time;
+    pointer.x += (pointer.targetX - pointer.x) * 0.18;
+    pointer.y += (pointer.targetY - pointer.y) * 0.18;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+
+    for (let i = 0; i < particleCount; i++) {
+      const phase = particlePhase[i];
+      const drift = prefersReducedMotion ? 0 : particleDrift[i];
+      const elevation = particleElevation[i];
+      const anchorX = originX[i] + Math.cos(time * 0.00048 + phase) * drift;
+      const anchorY = originY[i] + Math.sin(time * 0.00042 + phase * 1.37) * drift - elevation * 1.4;
+
+      xVelocities[i] += (anchorX - xPositions[i]) * 0.026 * dt;
+      yVelocities[i] += (anchorY - yPositions[i]) * 0.026 * dt;
+
+      if (pointer.active && activeRadius > 0) {
+        const dx = xPositions[i] - pointer.x;
+        const dy = yPositions[i] - pointer.y;
+        const distanceSquared = dx * dx + dy * dy;
+
+        if (distanceSquared > 0.001 && distanceSquared < activeRadiusSquared) {
+          const distance = Math.sqrt(distanceSquared);
+          const influence = Math.pow(1 - distance / activeRadius, 2.2);
+          const normalX = dx / distance;
+          const normalY = dy / distance;
+          const lift = 0.7 + elevation * 0.7;
+
+          xVelocities[i] += normalX * 0.72 * influence * lift * dt;
+          yVelocities[i] += normalY * 0.72 * influence * lift * dt;
+        }
+      }
+
+      xVelocities[i] *= 0.9;
+      yVelocities[i] *= 0.9;
+      xPositions[i] += xVelocities[i] * dt;
+      yPositions[i] += yVelocities[i] * dt;
+
+      const size = particleSize[i] + elevation * 0.28;
+      ctx.fillStyle = particleFill[i];
+      ctx.fillRect(xPositions[i] - size * 0.5, yPositions[i] - size * 0.5, size, size);
+    }
+
+    drawPointerParticles();
+    updateReadout();
+    raf = requestAnimationFrame(render);
+  }
+
+  function resize() {
+    pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    width = Math.max(1, Math.floor(window.innerWidth));
+    height = Math.max(1, Math.floor(window.innerHeight));
+
+    canvas.width = Math.floor(width * pixelRatio);
+    canvas.height = Math.floor(height * pixelRatio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    rebuildParticles();
+  }
+
+  function handlePointerMove(event) {
+    pointer.targetX = event.clientX;
+    pointer.targetY = event.clientY;
+    pointer.active = true;
+  }
+
+  function handlePointerLeave() {
+    pointer.active = false;
+  }
+
+  buildTerrain();
+  resize();
+  document.body.classList.add("is-ready");
+
+  window.addEventListener("resize", resize, { passive: true });
+  window.addEventListener("pointermove", handlePointerMove, { passive: true });
+  window.addEventListener("pointerleave", handlePointerLeave, { passive: true });
+  raf = requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>
