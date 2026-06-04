@@ -337,8 +337,8 @@
   <div class="lbl" id="lblText">Tracing generation plant systems...</div>
 </div>
 <div class="corner">
-  ENERGY GENERATION PLANT - WIRE TURBINE FIELD
-  <small id="plantHudStatus">TURBINES -- · GRID FLOW 1.00 · CITY HAZE 0.72</small>
+  ENERGY GENERATION PLANT - DATA / GRID FIELD
+  <small id="plantHudStatus">DATA CENTERS -- · GRID FLOW 1.00 · WATER FLOW 0.72</small>
 </div>
 <div class="hud">
   <b>drag</b> to orbit &nbsp;-&nbsp; <b>scroll</b> to zoom &nbsp;-&nbsp; <b>middle/right-drag</b> to pan
@@ -2553,6 +2553,7 @@ const windParticleData = [];
 let windParticleGeo = null;
 const windRotorData = [];
 let windRotorBladeGeo = null;
+let generationDataCenterCount = 0;
 const SKIDSTEER_LOOP_SECONDS = 240;
 const SKIDSTEER_PATROL_CYCLES = 20;
 const SKIDSTEER_FORWARD_YAW_OFFSET = 0;
@@ -3165,6 +3166,145 @@ function buildGenerationWindFarm() {
   scene.add(group);
 }
 
+function buildGenerationDataCenters() {
+  const campusLines = [];
+  const detailLines = [];
+  const barrierLines = [];
+  const highwayLines = [];
+  const accentLines = [];
+  const yaw = GENERATION_GLOBAL_GRID_YAW;
+  const spacing = GENERATION_GLOBAL_GRID_SPACING;
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
+  const campusSites = [];
+  const siteKeys = new Set();
+
+  function gridPoint(gx, gz, y = 0.38) {
+    return generationGlobalGridPoint(gx * spacing, gz * spacing, y);
+  }
+
+  function addCampusSite(gx, gz) {
+    const key = `${gx},${gz}`;
+    if (siteKeys.has(key)) return;
+    if (gx < -8 || gx > 1 || gz < -7 || gz > 7) return;
+    siteKeys.add(key);
+    campusSites.push([gx, gz]);
+  }
+
+  for (let gz = -6; gz <= 6; gz += 3) {
+    const riverGx = generationRiverGxAt(gz);
+    addCampusSite(Math.floor(riverGx - 4.8), gz);
+    addCampusSite(Math.floor(riverGx - 3.1), gz + 1);
+  }
+  addCampusSite(-7, -4);
+  addCampusSite(-6, 3);
+  addCampusSite(-4, 6);
+  generationDataCenterCount = campusSites.length;
+
+  function addLocalLine(lines, origin, ax, ay, az, bx, by, bz) {
+    pushLine(lines, localPoint(origin[0], origin[2], yaw, ax, ay, az), localPoint(origin[0], origin[2], yaw, bx, by, bz));
+  }
+
+  function addSoundBarrierRun(gx0, gz0, gx1, gz1, height = 38, offset = 0) {
+    const dx = gx1 - gx0;
+    const dz = gz1 - gz0;
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len * offset;
+    const nz = dx / len * offset;
+    const a = generationGlobalGridPoint((gx0 + nx) * spacing, (gz0 + nz) * spacing, 0.7);
+    const b = generationGlobalGridPoint((gx1 + nx) * spacing, (gz1 + nz) * spacing, 0.7);
+    for (const y of [0.7, height * 0.36, height * 0.68, height]) {
+      pushLine(barrierLines, [a[0], y, a[2]], [b[0], y, b[2]]);
+    }
+    const panels = Math.max(8, Math.ceil(len * spacing / 58));
+    for (let i = 0; i <= panels; i++) {
+      const t = i / panels;
+      const x = a[0] + (b[0] - a[0]) * t;
+      const z = a[2] + (b[2] - a[2]) * t;
+      pushLine(barrierLines, [x, 0.7, z], [x, height, z]);
+      if (i % 4 === 0) pushLine(accentLines, [x - cy * 5, height + 1.8, z - sy * 5], [x + cy * 5, height + 1.8, z + sy * 5]);
+    }
+  }
+
+  function addHighwayRun(gx0, gz0, gx1, gz1) {
+    const a = generationGlobalGridPoint(gx0 * spacing, gz0 * spacing, 0.52);
+    const b = generationGlobalGridPoint(gx1 * spacing, gz1 * spacing, 0.52);
+    const dx = b[0] - a[0];
+    const dz = b[2] - a[2];
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len;
+    const nz = dx / len;
+    for (const offset of [-28, -12, 12, 28]) {
+      pushLine(highwayLines, [a[0] + nx * offset, 0.52, a[2] + nz * offset], [b[0] + nx * offset, 0.52, b[2] + nz * offset]);
+    }
+    const ticks = Math.ceil(len / 72);
+    for (let i = 1; i < ticks; i += 2) {
+      const t = i / ticks;
+      const x = a[0] + dx * t;
+      const z = a[2] + dz * t;
+      pushLine(accentLines, [x + nx * 3, 0.72, z + nz * 3], [x + nx * 22, 0.72, z + nz * 22]);
+    }
+  }
+
+  function addDataCenterCampus(gx, gz, index) {
+    const origin = gridPoint(gx + ((index % 2) * 0.12), gz + (((index + 1) % 2) * -0.1));
+    const hallW = 188 + (index % 3) * 24;
+    const hallD = 104 + (index % 2) * 24;
+    const hallH = 40 + (index % 4) * 5;
+    const annexW = hallW * 0.44;
+    const annexD = hallD * 0.46;
+
+    addWireBox(campusLines, origin[0], origin[2], hallW, hallH, hallD, yaw, 0, true);
+    addWireBox(detailLines, origin[0], origin[2], hallW * 0.86, 7, hallD * 0.78, yaw, hallH + 2, true);
+    const annex = localPoint(origin[0], origin[2], yaw, hallW * 0.36, 0, -hallD * 0.62);
+    addWireBox(campusLines, annex[0], annex[2], annexW, 28, annexD, yaw, 0, true);
+
+    for (let i = 0; i < 6; i++) {
+      const x = -hallW * 0.38 + i * (hallW * 0.76 / 5);
+      addLocalLine(detailLines, origin, x, hallH + 10, -hallD * 0.42, x, hallH + 10, hallD * 0.42);
+      const hvac = localPoint(origin[0], origin[2], yaw, x, 0, hallD * 0.08);
+      addWireBox(detailLines, hvac[0], hvac[2], 16, 8, 22, yaw, hallH + 8, false);
+      if (i % 2 === 0) pushLine(accentLines, localPoint(origin[0], origin[2], yaw, x - 7, hallH + 18, -hallD * 0.26), localPoint(origin[0], origin[2], yaw, x + 7, hallH + 18, -hallD * 0.26));
+    }
+
+    for (const z of [-hallD * 0.58, hallD * 0.58]) {
+      for (let i = 0; i < 5; i++) {
+        const x = -hallW * 0.44 + i * (hallW * 0.22);
+        const unit = localPoint(origin[0], origin[2], yaw, x, 0, z);
+        addWireBox(detailLines, unit[0], unit[2], 18, 18, 11, yaw, 0, false);
+      }
+    }
+
+    const yardA = localPoint(origin[0], origin[2], yaw, -hallW * 0.62, 0, -hallD * 0.78);
+    const yardB = localPoint(origin[0], origin[2], yaw, hallW * 0.62, 0, hallD * 0.78);
+    pushLine(barrierLines, yardA, localPoint(origin[0], origin[2], yaw, hallW * 0.62, 0, -hallD * 0.78));
+    pushLine(barrierLines, yardA, localPoint(origin[0], origin[2], yaw, -hallW * 0.62, 0, hallD * 0.78));
+    pushLine(barrierLines, yardB, localPoint(origin[0], origin[2], yaw, -hallW * 0.62, 0, hallD * 0.78));
+    pushLine(barrierLines, yardB, localPoint(origin[0], origin[2], yaw, hallW * 0.62, 0, -hallD * 0.78));
+  }
+
+  campusSites.forEach((site, index) => addDataCenterCampus(site[0], site[1], index));
+
+  addHighwayRun(-8.4, -6.4, -2.0, -1.0);
+  addHighwayRun(-8.1, 4.9, -1.6, 1.3);
+  addHighwayRun(-7.8, -1.9, -2.4, 5.8);
+  addSoundBarrierRun(-8.4, -6.4, -2.0, -1.0, 42, -0.22);
+  addSoundBarrierRun(-8.4, -6.4, -2.0, -1.0, 34, 0.24);
+  addSoundBarrierRun(-8.1, 4.9, -1.6, 1.3, 38, -0.22);
+  addSoundBarrierRun(-7.8, -1.9, -2.4, 5.8, 36, 0.23);
+  addSoundBarrierRun(-5.8, -7.0, -5.2, 7.0, 44, 0.0);
+  addSoundBarrierRun(-3.2, -4.8, -2.5, 4.4, 32, 0.0);
+
+  const group = new THREE.Group();
+  group.name = 'generation-data-center-sound-barrier-zone';
+  group.add(new THREE.LineSegments(makeLineGeometry(highwayLines), makeWireMaterial(greyLight, 0.22)));
+  group.add(new THREE.LineSegments(makeLineGeometry(campusLines), makeWireMaterial(greyDark, 0.52)));
+  group.add(new THREE.LineSegments(makeLineGeometry(detailLines), makeWireMaterial(greyMid, 0.35)));
+  group.add(new THREE.LineSegments(makeLineGeometry(barrierLines), makeWireMaterial(greyDark, 0.38)));
+  group.add(new THREE.LineSegments(makeLineGeometry(accentLines), makeWireMaterial(accentYellow, 0.46)));
+  scene.add(group);
+}
+
 function buildPlant() {
   lblText.textContent = 'Extruding turbine hall and substation frames...';
   const waterLines = [];
@@ -3286,11 +3426,10 @@ function buildPlant() {
   scene.add(waterMesh, cityMesh, structureMesh, detailMesh, accentMesh, powerMesh);
   buildGenerationOverarchingGrid();
   buildGenerationSolarArrays();
-  buildGenerationWindFarm();
+  buildGenerationDataCenters();
   buildGenerationSkidsteers();
 
   scene.add(createRiverParticles(4600));
-  scene.add(createWindFarmParticles(2200));
   scene.add(createFlowParticles(11200));
 }
 
@@ -3442,7 +3581,7 @@ function updateHud(elapsed) {
   const output = 842 + Math.sin(elapsed * 0.16) * 18 + Math.sin(elapsed * 0.071) * 9;
   const water = 0.72 + Math.sin(elapsed * 0.24) * 0.06;
   const flow = 1 + Math.sin(elapsed * 0.34) * 0.08;
-  hudStatus.textContent = `TURBINES ${String(generationWindTurbineCount).padStart(2, '0')} - GRID FLOW ${flow.toFixed(2)} - WATER FLOW ${water.toFixed(2)}`;
+  hudStatus.textContent = `DATA CENTERS ${String(generationDataCenterCount).padStart(2, '0')} - GRID FLOW ${flow.toFixed(2)} - WATER FLOW ${water.toFixed(2)}`;
   readoutOutput.textContent = `Output ${output.toFixed(1)} MW`;
   readoutSteam.textContent = `River flow ${water.toFixed(2)}`;
   readoutGrid.textContent = `Bus frequency ${(59.98 + Math.sin(elapsed * 0.41) * 0.02).toFixed(2)} hz`;
@@ -3564,9 +3703,6 @@ function animate() {
   updateHaze(dt, elapsed);
   updateFlow(dt, elapsed);
   updateRiverFlow(dt, elapsed);
-  updateWindFarmParticles(dt, elapsed);
-  updateWindRotors(dt, elapsed);
-  updateSkidsteers(elapsed);
   updateOverarchingGridParticles(dt, elapsed);
   updateCameraAnimation(performance.now());
   if (!cameraAnimation.active) controls.update();
