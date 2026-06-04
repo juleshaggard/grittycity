@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Ambient Gold Dust</title>
+<style>
+  :root {
+    --paper: #ffffff;
+    --ochre: #C67C2A;
+    --gold: #FCE132;
+    --ink: #2a2520;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--paper);
+  }
+
+  body {
+    min-height: 100dvh;
+    overflow: hidden;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    display: block;
+    background: var(--paper);
+    opacity: 0;
+    transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body.is-ready canvas {
+    opacity: 1;
+  }
+
+  .fallback {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: min(320px, calc(100vw - 48px));
+    transform: translate(-50%, -50%);
+    color: rgba(42, 37, 32, 0.62);
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  body.has-webgl .fallback {
+    display: none;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<main aria-labelledby="pageTitle">
+  <h1 class="sr-only" id="pageTitle">Ambient gold dust flowing around the pointer</h1>
+  <canvas id="dust" aria-hidden="true"></canvas>
+  <p class="fallback">WebGL is required to render the gold dust particle field.</p>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById("dust");
+  const gl = canvas.getContext("webgl", {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: false
+  });
+
+  if (!gl) return;
+
+  document.body.classList.add("has-webgl");
+
+  const vertexShaderSource = `
+    attribute vec2 a_position;
+    attribute float a_size;
+    attribute float a_mix;
+    attribute float a_alpha;
+    attribute float a_twinkle;
+
+    uniform vec2 u_resolution;
+    uniform float u_pixelRatio;
+    uniform float u_time;
+
+    varying float v_mix;
+    varying float v_alpha;
+    varying float v_twinkle;
+
+    void main() {
+      vec2 zeroToOne = a_position / u_resolution;
+      vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+      gl_Position = vec4(clipSpace * vec2(1.0, -1.0), 0.0, 1.0);
+
+      float shimmer = 0.78 + 0.22 * sin(u_time * 2.15 + a_twinkle * 6.2831);
+      gl_PointSize = max(1.0, a_size * shimmer * u_pixelRatio);
+
+      v_mix = a_mix;
+      v_alpha = a_alpha;
+      v_twinkle = shimmer;
+    }
+  `;
+
+  const fragmentShaderSource = `
+    precision mediump float;
+
+    varying float v_mix;
+    varying float v_alpha;
+    varying float v_twinkle;
+
+    void main() {
+      vec2 uv = gl_PointCoord - 0.5;
+      vec2 windShape = vec2(uv.x * 0.62, uv.y * 1.08);
+      float dist = length(windShape);
+      float core = smoothstep(0.46, 0.0, dist);
+      float edge = smoothstep(0.52, 0.16, dist);
+
+      vec3 ochre = vec3(0.7765, 0.4863, 0.1647);
+      vec3 gold = vec3(0.9882, 0.8824, 0.1961);
+      vec3 color = mix(ochre, gold, v_mix);
+      color = mix(color, vec3(1.0, 0.956, 0.54), core * 0.34);
+
+      float alpha = edge * v_alpha * (0.74 + v_twinkle * 0.26);
+      gl_FragColor = vec4(color, alpha);
+    }
+  `;
+
+  function createShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const error = gl.getShaderInfoLog(shader);
+      gl.deleteShader(shader);
+      throw new Error(error);
+    }
+
+    return shader;
+  }
+
+  function createProgram(vertexSource, fragmentSource) {
+    const program = gl.createProgram();
+    const vertexShader = createShader(gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentSource);
+
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const error = gl.getProgramInfoLog(program);
+      gl.deleteProgram(program);
+      throw new Error(error);
+    }
+
+    return program;
+  }
+
+  let program;
+  try {
+    program = createProgram(vertexShaderSource, fragmentShaderSource);
+  } catch (error) {
+    console.error(error);
+    return;
+  }
+
+  const stride = 6;
+  const buffer = gl.createBuffer();
+  const attributes = {
+    position: gl.getAttribLocation(program, "a_position"),
+    size: gl.getAttribLocation(program, "a_size"),
+    mix: gl.getAttribLocation(program, "a_mix"),
+    alpha: gl.getAttribLocation(program, "a_alpha"),
+    twinkle: gl.getAttribLocation(program, "a_twinkle")
+  };
+  const uniforms = {
+    resolution: gl.getUniformLocation(program, "u_resolution"),
+    pixelRatio: gl.getUniformLocation(program, "u_pixelRatio"),
+    time: gl.getUniformLocation(program, "u_time")
+  };
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const mouse = {
+    x: window.innerWidth * 0.52,
+    y: window.innerHeight * 0.5,
+    targetX: window.innerWidth * 0.52,
+    targetY: window.innerHeight * 0.5,
+    active: false,
+    lastMove: 0
+  };
+
+  let width = 1;
+  let height = 1;
+  let pixelRatio = 1;
+  let clumps = [];
+  let particles = [];
+  let particleData = new Float32Array(0);
+  let lastTime = performance.now();
+  let frameId = 0;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function randomRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function particleCount() {
+    const area = window.innerWidth * window.innerHeight;
+    const density = prefersReducedMotion ? 0.013 : 0.045;
+    return Math.floor(clamp(area * density, prefersReducedMotion ? 5200 : 22000, prefersReducedMotion ? 13500 : 72000));
+  }
+
+  function clumpCount() {
+    const area = window.innerWidth * window.innerHeight;
+    const density = prefersReducedMotion ? 0.0000042 : 0.0000062;
+    return Math.floor(clamp(area * density, prefersReducedMotion ? 3 : 5, prefersReducedMotion ? 7 : 9));
+  }
+
+  function resetClump(clump, fromLeft) {
+    const depth = Math.random();
+    clump.x = fromLeft ? randomRange(-width * 0.36, -width * 0.04) : randomRange(-width * 0.18, width * 1.12);
+    clump.y = randomRange(height * 0.08, height * 0.92);
+    clump.radiusX = randomRange(1856, 4416) * (0.72 + depth * 0.78);
+    clump.radiusY = randomRange(544, 1664) * (0.64 + depth * 0.74);
+    clump.speed = randomRange(22, 58) * (0.72 + depth * 0.76);
+    clump.gust = randomRange(5, 20) * (0.6 + depth);
+    clump.wave = randomRange(4, 14);
+    clump.waveSpeed = randomRange(0.18, 0.52);
+    clump.turbulence = randomRange(0.62, 1.38);
+    clump.phase = randomRange(0, Math.PI * 2);
+    clump.depth = depth;
+    clump.resetFrame = frameId;
+  }
+
+  function rebuildClumps() {
+    const count = clumpCount();
+    clumps = Array.from({ length: count }, () => {
+      const clump = {};
+      resetClump(clump, false);
+      return clump;
+    });
+  }
+
+  function sampleClumpOffset(particle) {
+    const angle = randomRange(0, Math.PI * 2);
+    const radius = Math.pow(Math.random(), 2.15);
+    particle.localX = Math.cos(angle) * radius;
+    particle.localY = Math.sin(angle) * radius * randomRange(0.56, 1.06);
+    particle.localDrift = randomRange(-11, 11);
+    particle.localLift = randomRange(-7, 7);
+    particle.clumpPull = randomRange(0.72, 1.34);
+  }
+
+  function placeParticleInClump(particle, clump) {
+    particle.x = clump.x + particle.localX * clump.radiusX + randomRange(-4, 4);
+    particle.y = clump.y + particle.localY * clump.radiusY + randomRange(-3, 3);
+  }
+
+  function resetParticle(particle, fromLeft, forcedClumpIndex) {
+    const depth = Math.random();
+    const looseDust = forcedClumpIndex == null && (!clumps.length || Math.random() < 0.028);
+    particle.clumpIndex = looseDust ? -1 : forcedClumpIndex ?? Math.floor(Math.random() * clumps.length);
+    sampleClumpOffset(particle);
+
+    if (particle.clumpIndex >= 0 && clumps[particle.clumpIndex]) {
+      placeParticleInClump(particle, clumps[particle.clumpIndex]);
+    } else {
+      particle.x = fromLeft ? randomRange(-width * 0.24, width * 0.08) : randomRange(-width * 0.24, width * 1.08);
+      particle.y = randomRange(-height * 0.08, height * 1.08);
+    }
+
+    particle.speed = randomRange(12, 38) * (0.62 + depth * 0.88);
+    particle.size = randomRange(0.42, 1.72) * (0.6 + depth * 0.82);
+    particle.mix = Math.pow(Math.random(), 0.72);
+    particle.alpha = randomRange(0.22, 0.76) * (0.52 + depth * 0.62) * (looseDust ? 0.34 : 1);
+    particle.phase = randomRange(0, Math.PI * 2);
+    particle.wave = randomRange(2, 13) * (0.3 + depth);
+    particle.waveSpeed = randomRange(0.55, 1.65);
+    particle.gust = randomRange(0.62, 1.86);
+    particle.shear = randomRange(-1, 1);
+    particle.lift = randomRange(-1, 1);
+    particle.depth = depth;
+    particle.twinkle = Math.random();
+  }
+
+  function rebuildParticles() {
+    rebuildClumps();
+    const count = particleCount();
+    particles = Array.from({ length: count }, () => {
+      const particle = {};
+      resetParticle(particle, false);
+      return particle;
+    });
+    particleData = new Float32Array(count * stride);
+  }
+
+  function updateClumps(delta, elapsed, speedScale) {
+    for (const clump of clumps) {
+      clump.resetFrame = -1;
+
+      const broadGust = Math.sin(elapsed * 0.46 + clump.y * 0.009 + clump.phase);
+      const ribbonGust = Math.sin(elapsed * 0.92 + clump.y * 0.022 - clump.x * 0.004 + clump.phase * 0.7);
+      const curlX = Math.sin(elapsed * 0.38 + clump.x * 0.0032 + clump.y * 0.0065 + clump.phase * 1.7);
+      const curlY = Math.cos(elapsed * 0.32 - clump.x * 0.0027 + clump.y * 0.0088 + clump.phase * 1.2);
+      const gustPressure = 1 + Math.max(0, broadGust) * 0.34 + Math.max(0, ribbonGust) * 0.26;
+
+      clump.x += (clump.speed * gustPressure + clump.gust + curlX * 10 * clump.turbulence) * delta * speedScale;
+      clump.y += (Math.sin(elapsed * clump.waveSpeed + clump.phase) * clump.wave + curlY * 14 * clump.turbulence) * delta * speedScale;
+
+      if (clump.x > width + clump.radiusX * 1.8 || clump.y < -height * 0.16 || clump.y > height * 1.16) {
+        resetClump(clump, true);
+      }
+    }
+  }
+
+  function resize() {
+    width = Math.max(1, window.innerWidth);
+    height = Math.max(1, window.innerHeight);
+    pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = Math.floor(width * pixelRatio);
+    canvas.height = Math.floor(height * pixelRatio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
+    mouse.targetX = clamp(mouse.targetX, 0, width);
+    mouse.targetY = clamp(mouse.targetY, 0, height);
+    mouse.x = clamp(mouse.x, 0, width);
+    mouse.y = clamp(mouse.y, 0, height);
+
+    rebuildParticles();
+  }
+
+  function bindAttributes() {
+    const bytesPerFloat = Float32Array.BYTES_PER_ELEMENT;
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(attributes.position);
+    gl.vertexAttribPointer(attributes.position, 2, gl.FLOAT, false, stride * bytesPerFloat, 0);
+
+    gl.enableVertexAttribArray(attributes.size);
+    gl.vertexAttribPointer(attributes.size, 1, gl.FLOAT, false, stride * bytesPerFloat, 2 * bytesPerFloat);
+
+    gl.enableVertexAttribArray(attributes.mix);
+    gl.vertexAttribPointer(attributes.mix, 1, gl.FLOAT, false, stride * bytesPerFloat, 3 * bytesPerFloat);
+
+    gl.enableVertexAttribArray(attributes.alpha);
+    gl.vertexAttribPointer(attributes.alpha, 1, gl.FLOAT, false, stride * bytesPerFloat, 4 * bytesPerFloat);
+
+    gl.enableVertexAttribArray(attributes.twinkle);
+    gl.vertexAttribPointer(attributes.twinkle, 1, gl.FLOAT, false, stride * bytesPerFloat, 5 * bytesPerFloat);
+  }
+
+  function fillBuffer() {
+    let index = 0;
+
+    for (const particle of particles) {
+      particleData[index++] = particle.x;
+      particleData[index++] = particle.y;
+      particleData[index++] = particle.size;
+      particleData[index++] = particle.mix;
+      particleData[index++] = particle.alpha;
+      particleData[index++] = particle.twinkle;
+    }
+
+    gl.bufferData(gl.ARRAY_BUFFER, particleData, gl.DYNAMIC_DRAW);
+  }
+
+  function updateParticles(delta, elapsed) {
+    const influenceRadius = Math.min(width, height) * 0.22 + 88;
+    const innerRadius = influenceRadius * 0.34;
+    const mouseFresh = mouse.active && performance.now() - mouse.lastMove < 3200;
+    const speedScale = prefersReducedMotion ? 0.26 : 1;
+
+    frameId++;
+    updateClumps(delta, elapsed, speedScale);
+
+    mouse.x += (mouse.targetX - mouse.x) * 0.14;
+    mouse.y += (mouse.targetY - mouse.y) * 0.14;
+
+    let index = 0;
+
+    for (const particle of particles) {
+      const broadGust = Math.sin(elapsed * 0.52 + particle.y * 0.010 + particle.phase);
+      const ribbonGust = Math.sin(elapsed * 1.18 + particle.y * 0.025 - particle.x * 0.0048 + particle.phase * 0.7);
+      const curlA = Math.sin(elapsed * 0.5 + particle.x * 0.0062 + particle.y * 0.013 + particle.phase * 1.9);
+      const curlB = Math.cos(elapsed * 0.42 - particle.x * 0.0085 + particle.y * 0.009 + particle.phase * 1.3);
+      const curlC = Math.sin(elapsed * 0.86 + particle.x * 0.014 - particle.y * 0.006 + particle.phase * 0.8);
+      const wave = Math.sin(elapsed * particle.waveSpeed * 0.45 + particle.phase + particle.x * 0.0032);
+      const gustPressure = 1 + Math.max(0, broadGust) * 0.42 + Math.max(0, ribbonGust) * 0.28;
+      let vx = particle.speed * gustPressure + (8 + 18 * particle.depth) * particle.gust;
+      let vy = wave * particle.wave + broadGust * (7 + 14 * particle.depth) + particle.lift * 8;
+      vx += (curlB * 4 + curlC * 3) * (0.45 + particle.depth);
+      vy += (curlA * 8 - curlC * 4) * (0.48 + particle.depth);
+      const clump = particle.clumpIndex >= 0 ? clumps[particle.clumpIndex] : null;
+
+      if (clump && clump.resetFrame === frameId) {
+        resetParticle(particle, true, particle.clumpIndex);
+      }
+
+      if (clump) {
+        const targetX = clump.x + particle.localX * clump.radiusX + Math.sin(elapsed * 1.9 + particle.phase) * particle.localDrift;
+        const targetY = clump.y + particle.localY * clump.radiusY + Math.cos(elapsed * 1.45 + particle.phase) * particle.localLift;
+        const anchor = (1.18 + particle.depth * 0.68) * particle.clumpPull;
+
+        vx += (targetX - particle.x) * anchor;
+        vy += (targetY - particle.y) * anchor;
+      }
+
+      if (mouseFresh) {
+        const dx = particle.x - mouse.x;
+        const dy = particle.y - mouse.y;
+        const distanceSq = dx * dx + dy * dy;
+
+        if (distanceSq < influenceRadius * influenceRadius) {
+          const distance = Math.max(Math.sqrt(distanceSq), 0.001);
+          const normalX = dx / distance;
+          const normalY = dy / distance;
+          const tangentX = -normalY;
+          const tangentY = normalX;
+          const reach = 1 - distance / influenceRadius;
+          const pull = reach * reach * (0.38 + particle.depth * 0.72);
+          const wake = clamp((particle.x - mouse.x) / influenceRadius, 0, 1);
+          const orbit = (150 + particle.speed * 1.8) * pull;
+          const centerPush = Math.max(0, 1 - distance / innerRadius) * (118 + particle.speed) * pull;
+
+          vx += tangentX * orbit + normalX * centerPush;
+          vy += tangentY * orbit + normalY * centerPush;
+          vy += Math.sin(elapsed * 2.2 + particle.phase) * 18 * pull;
+          vx += wake * (46 + particle.speed * 0.34) * pull;
+        }
+      }
+
+      particle.x += vx * delta * speedScale;
+      particle.y += vy * delta * speedScale;
+
+      if (particle.x > width + 32 || particle.y < -height * 0.15 || particle.y > height * 1.15) {
+        resetParticle(particle, true);
+      }
+
+      particleData[index++] = particle.x;
+      particleData[index++] = particle.y;
+      particleData[index++] = particle.size;
+      particleData[index++] = particle.mix;
+      particleData[index++] = particle.alpha;
+      particleData[index++] = particle.twinkle;
+    }
+  }
+
+  function render(now) {
+    const delta = Math.min(0.035, (now - lastTime) / 1000 || 0.016);
+    const elapsed = now / 1000;
+    lastTime = now;
+
+    updateParticles(delta, elapsed);
+
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, particleData);
+    gl.uniform1f(uniforms.time, elapsed);
+    gl.drawArrays(gl.POINTS, 0, particles.length);
+
+    requestAnimationFrame(render);
+  }
+
+  function handlePointerMove(event) {
+    mouse.targetX = event.clientX;
+    mouse.targetY = event.clientY;
+    mouse.active = true;
+    mouse.lastMove = performance.now();
+  }
+
+  function handlePointerLeave() {
+    mouse.lastMove = 0;
+  }
+
+  function boot() {
+    resize();
+
+    gl.useProgram(program);
+    gl.clearColor(1, 1, 1, 1);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.DEPTH_TEST);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    bindAttributes();
+    fillBuffer();
+    gl.uniform2f(uniforms.resolution, width, height);
+    gl.uniform1f(uniforms.pixelRatio, pixelRatio);
+
+    window.addEventListener("resize", () => {
+      resize();
+      gl.useProgram(program);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      bindAttributes();
+      fillBuffer();
+      gl.uniform2f(uniforms.resolution, width, height);
+      gl.uniform1f(uniforms.pixelRatio, pixelRatio);
+    }, { passive: true });
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("pointerleave", handlePointerLeave, { passive: true });
+
+    document.body.classList.add("is-ready");
+    requestAnimationFrame(render);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
