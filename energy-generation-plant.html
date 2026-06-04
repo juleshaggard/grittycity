@@ -3318,8 +3318,6 @@ function buildPlant() {
   addRiverFlowPath(riverPath.map(([x, y, z]) => [x, y + 3.2, z]));
   addDam(structureLines, accentLines, -684, -164, 0.34, 184);
   addDam(structureLines, accentLines, -476, 424, -0.46, 164);
-  const downstreamBridgeYaw = Math.atan2(256 - 54, -558 - -634) + Math.PI * 0.5;
-  addGoldenGateBridge(cityLines, accentLines, -596, 155, downstreamBridgeYaw, 645, 144, 222);
 
   addWireBox(structureLines, -84, -28, 230, 64, 112, -0.06, 0);
   addWireBox(detailLines, -84, -28, 194, 18, 78, -0.06, 66);
