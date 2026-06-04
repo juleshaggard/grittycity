@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gold Dust Logo Hover</title>
+<style>
+  :root {
+    --paper: #ffffff;
+    --ochre: #C67C2A;
+    --gold: #FCE132;
+    --ink: #2a2520;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--paper);
+  }
+
+  body {
+    min-height: 100dvh;
+    overflow: hidden;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    display: block;
+    background: var(--paper);
+    opacity: 0;
+    transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body.is-ready canvas {
+    opacity: 1;
+  }
+
+  .fallback {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: min(320px, calc(100vw - 48px));
+    transform: translate(-50%, -50%);
+    color: rgba(42, 37, 32, 0.62);
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  body.has-webgl .fallback {
+    display: none;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<main aria-labelledby="pageTitle">
+  <h1 class="sr-only" id="pageTitle">Gold dust particles forming a logo on hover</h1>
+  <canvas id="dust" aria-hidden="true"></canvas>
+  <p class="fallback">WebGL is required to render the gold dust logo hover field.</p>
+</main>
+
+<script>
+(() => {
+  const canvas = document.getElementById("dust");
+  const gl = canvas.getContext("webgl", {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: false
+  });
+
+  if (!gl || typeof Path2D === "undefined") return;
+
+  document.body.classList.add("has-webgl");
+
+  const logoPathData = "M11.7373 0.00292969C16.8631 0.0691026 20.8864 2.12061 22.5459 6.89258H17.8066C16.6458 4.63015 14.3634 4.05104 11.6777 4.00781C6.5227 4.09988 3.99219 7.69809 3.99219 12.1475V12.3379L3.99902 12.7578C4.1541 17.0093 6.68284 20.3836 11.6689 20.4766C15.9153 20.3977 18.3494 18.7849 19.0273 14.8721H13.2422L15.5547 10.8828H23.2178V11.6074L23.2168 11.6084V12.3379C23.2168 20.5784 18.9351 24.3919 11.7373 24.4805V24.4854C11.6854 24.4854 11.6336 24.4839 11.582 24.4834C11.5479 24.4836 11.5137 24.4854 11.4795 24.4854L11.4785 24.4814C4.2955 24.3623 0.0177657 19.2834 0.000976562 12.3789H0V12.1475C0 5.22216 4.28135 0.122287 11.4785 0.00292969L11.4795 0C11.5212 8.99105e-08 11.5629 0.000718003 11.6045 0.000976562C11.6487 0.000602428 11.6929 4.42785e-07 11.7373 0V0.00292969ZM31.1934 24.4854H27.2031V10.8818L29.5156 6.89258H31.1934V24.4854ZM45.1621 24.4854H41.1719V6.89258H45.1621V24.4854ZM54.0488 6.89258H60.0322V10.8818H54.0488V20.4951H60.0322V24.4854H52.3711L50.0586 20.4951V0H54.0488V6.89258ZM68.0137 24.4854H66.3359L64.0234 20.4951V0H68.0137V24.4854ZM74.001 24.4854H68.0156V20.4951H74.001V24.4854ZM37.1807 10.8818H31.1953V6.89258H37.1807V10.8818ZM74.001 10.8818H68.0156V6.89258H74.001V10.8818ZM45.1621 3.99023H41.1719V0H45.1621V3.99023Z";
+  const logoPath = new Path2D(logoPathData);
+  const maskCanvas = document.createElement("canvas");
+  const maskContext = maskCanvas.getContext("2d");
+
+  const vertexShaderSource = `
+    attribute vec2 a_position;
+    attribute float a_size;
+    attribute float a_mix;
+    attribute float a_alpha;
+    attribute float a_twinkle;
+
+    uniform vec2 u_resolution;
+    uniform float u_pixelRatio;
+
+    varying float v_mix;
+    varying float v_alpha;
+    varying float v_twinkle;
+
+    void main() {
+      vec2 zeroToOne = a_position / u_resolution;
+      vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+      gl_Position = vec4(clipSpace * vec2(1.0, -1.0), 0.0, 1.0);
+
+      gl_PointSize = max(1.0, a_size * u_pixelRatio);
+
+      v_mix = a_mix;
+      v_alpha = a_alpha;
+      v_twinkle = a_twinkle;
+    }
+  `;
+
+  const fragmentShaderSource = `
+    precision mediump float;
+
+    varying float v_mix;
+    varying float v_alpha;
+    varying float v_twinkle;
+
+    void main() {
+      vec2 uv = gl_PointCoord - 0.5;
+      float dist = length(uv);
+      float core = smoothstep(0.46, 0.0, dist);
+      float edge = smoothstep(0.52, 0.16, dist);
+
+      vec3 ochre = vec3(0.7765, 0.4863, 0.1647);
+      vec3 gold = vec3(0.9882, 0.8824, 0.1961);
+      vec3 color = mix(ochre, gold, v_mix);
+      color = mix(color, vec3(1.0, 0.956, 0.54), core * 0.34);
+
+      float alpha = edge * v_alpha * (0.9 + v_twinkle * 0.1);
+      gl_FragColor = vec4(color, alpha);
+    }
+  `;
+
+  function createShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const error = gl.getShaderInfoLog(shader);
+      gl.deleteShader(shader);
+      throw new Error(error);
+    }
+
+    return shader;
+  }
+
+  function createProgram(vertexSource, fragmentSource) {
+    const program = gl.createProgram();
+    const vertexShader = createShader(gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentSource);
+
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const error = gl.getProgramInfoLog(program);
+      gl.deleteProgram(program);
+      throw new Error(error);
+    }
+
+    return program;
+  }
+
+  let program;
+  try {
+    program = createProgram(vertexShaderSource, fragmentShaderSource);
+  } catch (error) {
+    console.error(error);
+    return;
+  }
+
+  const stride = 6;
+  const buffer = gl.createBuffer();
+  const attributes = {
+    position: gl.getAttribLocation(program, "a_position"),
+    size: gl.getAttribLocation(program, "a_size"),
+    mix: gl.getAttribLocation(program, "a_mix"),
+    alpha: gl.getAttribLocation(program, "a_alpha"),
+    twinkle: gl.getAttribLocation(program, "a_twinkle")
+  };
+  const uniforms = {
+    resolution: gl.getUniformLocation(program, "u_resolution"),
+    pixelRatio: gl.getUniformLocation(program, "u_pixelRatio")
+  };
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const mouse = {
+    x: window.innerWidth * 0.52,
+    y: window.innerHeight * 0.5,
+    targetX: window.innerWidth * 0.52,
+    targetY: window.innerHeight * 0.5,
+    active: false,
+    hovering: false,
+    returning: false,
+    lastMove: 0
+  };
+
+  let width = 1;
+  let height = 1;
+  let pixelRatio = 1;
+  let logoBox = { x: 0, y: 0, width: 1, height: 1, scale: 1 };
+  let particles = [];
+  let particleData = new Float32Array(0);
+  let lastTime = performance.now();
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function smoothstep(edge0, edge1, value) {
+    const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+
+  function randomRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function easeInOut(value) {
+    return value * value * (3 - 2 * value);
+  }
+
+  function particleCount() {
+    const area = window.innerWidth * window.innerHeight;
+    const density = prefersReducedMotion ? 0.0095 : 0.031;
+    return Math.floor(clamp(area * density, prefersReducedMotion ? 3600 : 14000, prefersReducedMotion ? 9000 : 46000));
+  }
+
+  function layoutLogo() {
+    const aspect = 74 / 25;
+    const maxWidth = width * 0.86;
+    const maxHeight = height * 0.48;
+    let logoWidth = maxWidth;
+    let logoHeight = logoWidth / aspect;
+
+    if (logoHeight > maxHeight) {
+      logoHeight = maxHeight;
+      logoWidth = logoHeight * aspect;
+    }
+
+    logoBox = {
+      x: (width - logoWidth) * 0.5,
+      y: (height - logoHeight) * 0.5,
+      width: logoWidth,
+      height: logoHeight,
+      scale: logoWidth / 74
+    };
+  }
+
+  function topographicHeight(radius) {
+    const ringCount = 18;
+    const ringIndex = Math.min(ringCount - 1, Math.max(0, Math.floor(radius * ringCount)));
+    const heightLevel = 1 - ringIndex / (ringCount - 1);
+
+    return { ringIndex, heightLevel };
+  }
+
+  function projectTopographicPoint(x, y, heightLevel) {
+    const lift = heightLevel * Math.min(width, height) * 0.18;
+    const centerX = width * 0.5;
+    const centerY = height * 0.5;
+    const fromCenterX = x - centerX;
+    const fromCenterY = y - centerY;
+    const perspective = 1 + heightLevel * 0.08;
+
+    return {
+      x: centerX + fromCenterX * perspective + lift * 0.16,
+      y: centerY + fromCenterY * perspective - lift * 0.62
+    };
+  }
+
+  function cymaticDensity(nx, ny) {
+    const radius = Math.hypot(nx, ny);
+    if (radius > 1.08) return 0;
+
+    const angle = Math.atan2(ny, nx);
+    const radial = Math.sin(23.5 * radius + 0.78 * Math.sin(8 * angle));
+    const grid = Math.sin(8.3 * nx) * Math.sin(8.3 * ny);
+    const diagonal = Math.sin(6.6 * (nx + ny)) * Math.sin(6.6 * (nx - ny));
+    const rosette = Math.cos(10 * angle) * Math.sin(15.5 * radius);
+    const field = radial + grid * 0.54 + diagonal * 0.32 + rosette * 0.24;
+
+    const nodeBand = 1 - smoothstep(0.018, 0.15, Math.abs(field));
+    const ringAccent = Math.pow(0.5 + 0.5 * Math.cos(37 * radius + 1.5 * Math.sin(6 * angle)), 7);
+    const plateEdge = 1 - smoothstep(0.88, 1.08, radius);
+
+    return plateEdge * clamp(nodeBand * 0.92 + ringAccent * 0.18, 0, 1);
+  }
+
+  function fallbackCymaticPoint() {
+    const centerX = width * 0.5;
+    const centerY = height * 0.5;
+    const plateX = width * 0.46;
+    const plateY = height * 0.46;
+    const ringCount = 18;
+    const angle = randomRange(0, Math.PI * 2);
+    const ring = Math.floor(Math.random() * ringCount) + 0.5;
+    const warp = 0.024 * Math.sin(angle * 8) + 0.018 * Math.cos(angle * 5);
+    const radius = clamp(ring / ringCount + warp + randomRange(-0.004, 0.004), 0.02, 1.02);
+    const heightInfo = topographicHeight(radius);
+    const projected = projectTopographicPoint(
+      centerX + Math.cos(angle) * radius * plateX,
+      centerY + Math.sin(angle) * radius * plateY,
+      heightInfo.heightLevel
+    );
+
+    return {
+      x: projected.x,
+      y: projected.y,
+      density: 0.62 + ring / ringCount * 0.28,
+      ringIndex: heightInfo.ringIndex,
+      heightLevel: heightInfo.heightLevel
+    };
+  }
+
+  function sampleCymaticPoint() {
+    const centerX = width * 0.5;
+    const centerY = height * 0.5;
+    const plateX = width * 0.46;
+    const plateY = height * 0.46;
+
+    for (let attempt = 0; attempt < 96; attempt++) {
+      const x = randomRange(centerX - plateX * 1.1, centerX + plateX * 1.1);
+      const y = randomRange(centerY - plateY * 1.1, centerY + plateY * 1.1);
+      const nx = (x - centerX) / plateX;
+      const ny = (y - centerY) / plateY;
+      const radius = Math.hypot(nx, ny);
+      const density = cymaticDensity(nx, ny);
+
+      if (Math.random() < density) {
+        const heightInfo = topographicHeight(radius);
+        const projected = projectTopographicPoint(x, y, heightInfo.heightLevel);
+
+        return {
+          x: projected.x,
+          y: projected.y,
+          density,
+          ringIndex: heightInfo.ringIndex,
+          heightLevel: heightInfo.heightLevel
+        };
+      }
+    }
+
+    return fallbackCymaticPoint();
+  }
+
+  function logoToScreen(pointX, pointY) {
+    return {
+      x: logoBox.x + pointX * logoBox.scale,
+      y: logoBox.y + pointY * logoBox.scale
+    };
+  }
+
+  function logoPreferenceFromScreen(screenX, screenY) {
+    return {
+      x: clamp((screenX - logoBox.x) / logoBox.width, 0, 1) * 74,
+      y: clamp((screenY - logoBox.y) / logoBox.height, 0, 1) * 25
+    };
+  }
+
+  function sampleLogoPoint(preferredX, preferredY) {
+    const hasPreference = Number.isFinite(preferredX) && Number.isFinite(preferredY);
+
+    for (let attempt = 0; attempt < 130; attempt++) {
+      const usePreference = hasPreference && Math.random() < 0.86;
+      const xSpread = 5.8 + Math.random() * 6.8;
+      const ySpread = 5.2 + Math.random() * 9.4;
+      const sampleX = usePreference
+        ? clamp(preferredX + randomRange(-xSpread, xSpread), 0, 74)
+        : Math.random() * 74;
+      const sampleY = usePreference && Math.random() < 0.42
+        ? clamp(preferredY + randomRange(-ySpread, ySpread), 0, 25)
+        : Math.random() * 25;
+
+      if (maskContext.isPointInPath(logoPath, sampleX, sampleY)) {
+        return logoToScreen(sampleX, sampleY);
+      }
+    }
+
+    return logoToScreen(Math.random() * 74, Math.random() * 25);
+  }
+
+  function createParticle() {
+    const point = sampleCymaticPoint();
+    const logoPreference = logoPreferenceFromScreen(point.x, point.y);
+    const logo = sampleLogoPoint(logoPreference.x, logoPreference.y);
+    const depth = Math.random();
+    const jitter = randomRange(0.4, 2.1);
+    const heightWeight = 0.52 + point.heightLevel * 0.72;
+
+    return {
+      baseX: point.x,
+      baseY: point.y,
+      logoX: logo.x,
+      logoY: logo.y,
+      x: point.x + randomRange(-jitter, jitter),
+      y: point.y + randomRange(-jitter, jitter),
+      vx: 0,
+      vy: 0,
+      size: randomRange(0.42, 1.74) * (0.64 + depth * 0.54 + point.heightLevel * 0.52),
+      mix: clamp(Math.pow(randomRange(0.05, 1), 0.68) + point.heightLevel * 0.18, 0, 1),
+      alpha: randomRange(0.22, 0.78) * (0.55 + point.density * 0.38 + point.heightLevel * 0.36),
+      spring: randomRange(0.0045, 0.0125) * heightWeight * (prefersReducedMotion ? 0.58 : 1),
+      logoSpring: randomRange(0.06, 0.12) * (prefersReducedMotion ? 0.72 : 1),
+      friction: randomRange(0.82, 0.9),
+      wind: randomRange(0.18, 1),
+      phase: Math.random() * Math.PI * 2,
+      heightLevel: point.heightLevel,
+      ringIndex: point.ringIndex,
+      morph: 0,
+      depth,
+      twinkle: Math.random()
+    };
+  }
+
+  function rebuildParticles() {
+    layoutLogo();
+    const count = particleCount();
+    particles = Array.from({ length: count }, createParticle);
+    particleData = new Float32Array(count * stride);
+  }
+
+  function resize() {
+    width = Math.max(1, window.innerWidth);
+    height = Math.max(1, window.innerHeight);
+    pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = Math.floor(width * pixelRatio);
+    canvas.height = Math.floor(height * pixelRatio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
+    mouse.targetX = clamp(mouse.targetX, 0, width);
+    mouse.targetY = clamp(mouse.targetY, 0, height);
+    mouse.x = clamp(mouse.x, 0, width);
+    mouse.y = clamp(mouse.y, 0, height);
+
+    rebuildParticles();
+  }
+
+  function bindAttributes() {
+    const bytesPerFloat = Float32Array.BYTES_PER_ELEMENT;
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(attributes.position);
+    gl.vertexAttribPointer(attributes.position, 2, gl.FLOAT, false, stride * bytesPerFloat, 0);
+
+    gl.enableVertexAttribArray(attributes.size);
+    gl.vertexAttribPointer(attributes.size, 1, gl.FLOAT, false, stride * bytesPerFloat, 2 * bytesPerFloat);
+
+    gl.enableVertexAttribArray(attributes.mix);
+    gl.vertexAttribPointer(attributes.mix, 1, gl.FLOAT, false, stride * bytesPerFloat, 3 * bytesPerFloat);
+
+    gl.enableVertexAttribArray(attributes.alpha);
+    gl.vertexAttribPointer(attributes.alpha, 1, gl.FLOAT, false, stride * bytesPerFloat, 4 * bytesPerFloat);
+
+    gl.enableVertexAttribArray(attributes.twinkle);
+    gl.vertexAttribPointer(attributes.twinkle, 1, gl.FLOAT, false, stride * bytesPerFloat, 5 * bytesPerFloat);
+  }
+
+  function fillBuffer() {
+    let index = 0;
+    let unsettledParticles = 0;
+
+    for (const particle of particles) {
+      particleData[index++] = particle.x;
+      particleData[index++] = particle.y;
+      particleData[index++] = particle.size;
+      particleData[index++] = particle.mix;
+      particleData[index++] = particle.alpha;
+      particleData[index++] = particle.twinkle;
+    }
+
+    gl.bufferData(gl.ARRAY_BUFFER, particleData, gl.DYNAMIC_DRAW);
+  }
+
+  function updateParticles(delta) {
+    const now = performance.now();
+    const influenceRadius = Math.min(width, height) * 0.32 + 145;
+    const innerRadius = influenceRadius * 0.34;
+    const revealRadius = Math.max(330, Math.min(width, height) * 0.52);
+    const fieldRadius = revealRadius * 0.76;
+    const mouseFresh = mouse.active && now - mouse.lastMove < 3200;
+    const step = Math.min(delta * 60, 2);
+    const forceScale = prefersReducedMotion ? 0.48 : 1;
+
+    mouse.x += (mouse.targetX - mouse.x) * 0.14;
+    mouse.y += (mouse.targetY - mouse.y) * 0.14;
+
+    let index = 0;
+
+    const logoCursorX = clamp(mouse.x, logoBox.x, logoBox.x + logoBox.width);
+    const logoCursorY = clamp(mouse.y, logoBox.y, logoBox.y + logoBox.height);
+
+    for (const particle of particles) {
+      const logoDistance = Math.hypot(particle.logoX - logoCursorX, particle.logoY - logoCursorY);
+      const baseDistance = Math.hypot(particle.baseX - mouse.x, particle.baseY - mouse.y);
+      const logoReveal = 1 - smoothstep(revealRadius * 0.12, revealRadius, logoDistance);
+      const fieldReveal = 1 - smoothstep(fieldRadius * 0.18, fieldRadius, baseDistance);
+      const localTarget = mouse.hovering
+        ? clamp(logoReveal * 0.9 + fieldReveal * 0.26, 0, 1)
+        : 0;
+      const morphRate = localTarget > particle.morph ? 0.46 : (mouse.returning ? 0.24 : 0.08);
+
+      particle.morph += (localTarget - particle.morph) * morphRate * step;
+      particle.morph = clamp(particle.morph, 0, 1);
+
+      const easedMorph = easeInOut(particle.morph);
+      const windX = (0.008 + particle.wind * 0.012) * (1 - easedMorph);
+      const windY = Math.sin(now * 0.001 + particle.phase) * 0.008 * (1 - easedMorph);
+      const logoFloatX = Math.cos(now * 0.001 + particle.phase) * (0.18 + particle.depth * 0.42) * easedMorph;
+      const logoFloatY = Math.sin(now * 0.00082 + particle.phase * 1.37) * (0.18 + particle.depth * 0.42) * easedMorph;
+      const targetX = particle.baseX * (1 - easedMorph) + (particle.logoX + logoFloatX) * easedMorph;
+      const targetY = particle.baseY * (1 - easedMorph) + (particle.logoY + logoFloatY) * easedMorph;
+      const spring = particle.spring * (1 - easedMorph) + particle.logoSpring * easedMorph;
+
+      particle.vx += (targetX - particle.x) * spring * step;
+      particle.vy += (targetY - particle.y) * spring * step;
+      particle.vx += windX * step;
+      particle.vy += windY * step;
+
+      if (mouse.returning) {
+        const returnSpring = (0.038 + particle.heightLevel * 0.012) * (prefersReducedMotion ? 0.72 : 1);
+        const returnDistance = Math.hypot(particle.x - particle.baseX, particle.y - particle.baseY);
+
+        particle.vx += (particle.baseX - particle.x) * returnSpring * step;
+        particle.vy += (particle.baseY - particle.y) * returnSpring * step;
+        particle.vx *= Math.pow(0.58, step);
+        particle.vy *= Math.pow(0.58, step);
+
+        if (particle.morph < 0.012 && returnDistance < 1.8) {
+          particle.x = particle.baseX;
+          particle.y = particle.baseY;
+          particle.vx = 0;
+          particle.vy = 0;
+        } else {
+          unsettledParticles++;
+        }
+      }
+
+      if (mouseFresh) {
+        const dx = particle.x - mouse.x;
+        const dy = particle.y - mouse.y;
+        const distanceSq = dx * dx + dy * dy;
+
+        if (distanceSq < influenceRadius * influenceRadius) {
+          const distance = Math.max(Math.sqrt(distanceSq), 0.001);
+          const normalX = dx / distance;
+          const normalY = dy / distance;
+          const tangentX = -normalY;
+          const tangentY = normalX;
+          const reach = 1 - distance / influenceRadius;
+          const pull = reach * reach * (0.38 + particle.depth * 0.72);
+          const interactionScale = 1 - easedMorph * 0.98;
+          const orbit = (4.2 + particle.depth * 5.6) * pull * forceScale * interactionScale;
+          const centerPush = Math.max(0, 1 - distance / innerRadius) * (5.8 + particle.depth * 6.4) * pull * forceScale * interactionScale;
+
+          particle.vx += tangentX * orbit + normalX * centerPush;
+          particle.vy += tangentY * orbit + normalY * centerPush;
+        }
+      }
+
+      const friction = Math.pow(particle.friction, step);
+      particle.vx *= friction;
+      particle.vy *= friction;
+      particle.x += particle.vx * step;
+      particle.y += particle.vy * step;
+
+      particleData[index++] = particle.x;
+      particleData[index++] = particle.y;
+      const hoverFade = mouse.hovering ? 0.62 + easedMorph * 1.68 : 1 + easedMorph * 1.12;
+      const logoMix = particle.mix * (1 - easedMorph * 0.72) + easedMorph * (0.04 + particle.twinkle * 0.22);
+
+      particleData[index++] = particle.size * (1 + easedMorph * 0.18);
+      particleData[index++] = clamp(logoMix, 0, 1);
+      particleData[index++] = clamp(particle.alpha * hoverFade, 0, 1);
+      particleData[index++] = particle.twinkle;
+    }
+
+    if (mouse.returning && unsettledParticles === 0) {
+      mouse.returning = false;
+    }
+  }
+
+  function render(now) {
+    const delta = Math.min(0.035, (now - lastTime) / 1000 || 0.016);
+    lastTime = now;
+
+    updateParticles(delta);
+
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, particleData);
+    gl.drawArrays(gl.POINTS, 0, particles.length);
+
+    requestAnimationFrame(render);
+  }
+
+  function handlePointerMove(event) {
+    mouse.targetX = event.clientX;
+    mouse.targetY = event.clientY;
+    mouse.active = true;
+    mouse.hovering = true;
+    mouse.returning = false;
+    mouse.lastMove = performance.now();
+  }
+
+  function handlePointerEnter(event) {
+    mouse.targetX = event.clientX;
+    mouse.targetY = event.clientY;
+    mouse.active = true;
+    mouse.hovering = true;
+    mouse.returning = false;
+    mouse.lastMove = performance.now();
+  }
+
+  function handlePointerLeave() {
+    mouse.hovering = false;
+    mouse.returning = true;
+    mouse.lastMove = 0;
+  }
+
+  function boot() {
+    resize();
+
+    gl.useProgram(program);
+    gl.clearColor(1, 1, 1, 1);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.DEPTH_TEST);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    bindAttributes();
+    fillBuffer();
+    gl.uniform2f(uniforms.resolution, width, height);
+    gl.uniform1f(uniforms.pixelRatio, pixelRatio);
+
+    window.addEventListener("resize", () => {
+      resize();
+      gl.useProgram(program);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      bindAttributes();
+      fillBuffer();
+      gl.uniform2f(uniforms.resolution, width, height);
+      gl.uniform1f(uniforms.pixelRatio, pixelRatio);
+    }, { passive: true });
+
+    window.addEventListener("pointerenter", handlePointerEnter, { passive: true });
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("pointerleave", handlePointerLeave, { passive: true });
+
+    document.body.classList.add("is-ready");
+    requestAnimationFrame(render);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
